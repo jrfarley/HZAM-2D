@@ -23,6 +23,8 @@
 # Pkg.add("Colors")
 # Pkg.add("ColorSchemes")
 # Pkg.add("CategoricalArrays")
+# Pkg.add("Makie") 
+# Pkg.add("CairoMakie")
 
 using Distributions # needed for "Poisson" function
 using Statistics  # needed for "mean" function
@@ -37,6 +39,7 @@ using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 using Plots.PlotMeasures  # needed for plot margin adjustment
+using CairoMakie
 
 # to start Julia with multiple threads, type in terminal e.g.:
 # julia --threads 4
@@ -81,7 +84,7 @@ function get_survival_fitnesses_hetdisadvantage(genotypes, w_hyb)
 end
 
 
-function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R, 
+function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
     competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
@@ -101,6 +104,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R,
 
     # add up and check the total loci
     total_functional_loci = max(maximum(female_mating_trait_loci), maximum(male_mating_trait_loci), maximum(competition_trait_loci), maximum(hybrid_survival_loci))
+    functional_loci_range = 1:total_functional_loci
     num_neutral_loci = length(Vector(neutral_loci))
     if total_functional_loci + num_neutral_loci ≠ total_loci
         println("#### WARNING: Please examine your loci numbers and indices, as they don't all match up ####")
@@ -148,6 +152,9 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R,
         N_M = size(genotypes_M, 3)
 
         println("generation: ", generation, "; individuals: ", N_F + N_M)
+
+        functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
+        scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
 
         # calculate mating trait values (T) from genotypes
         female_mating_traits = calc_traits_additive(genotypes_F[:, female_mating_trait_loci, :])
@@ -509,8 +516,16 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(1, 10, 1.0, 1.05)
+sim_results = run_one_HZAM_sim(0.99, 1000, 1.0, 1.05; 
+    K_total = 1000, max_generations = 10)
+functional_loci_range = 1:3
+genotypes_F = sim_results[1]
+genotypes_M = sim_results[2]
+functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
 
+# make a Makie plot
+
+scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
 
 
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R, 
