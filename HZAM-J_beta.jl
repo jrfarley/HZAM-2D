@@ -25,6 +25,7 @@
 # Pkg.add("CategoricalArrays")
 # Pkg.add("Makie") 
 # Pkg.add("CairoMakie")
+# Pkg.add("GLMakie") 
 
 using Distributions # needed for "Poisson" function
 using Statistics  # needed for "mean" function
@@ -33,13 +34,13 @@ using CSV # for saving in csv format
 using DataFrames # for converting data to save as csv
 
 # for plotting:
-using Plots
-gr()  # use GR backend for graphs
+#using Plots
+#gr()  # use GR backend for graphs
 using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
-using Plots.PlotMeasures  # needed for plot margin adjustment
-using CairoMakie
+#using Plots.PlotMeasures  # needed for plot margin adjustment
+using GLMakie
 
 # to start Julia with multiple threads, type in terminal e.g.:
 # julia --threads 4
@@ -145,6 +146,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     extinction = false  # if extinction happens later this will be set true
 
+    functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
+    Figure()
+    display(scatter(1:length(functionalLoci_HI_all_inds), functionalLoci_HI_all_inds))
+
     for generation in 1:max_generations
 
         # Prepare for mating and reproduction
@@ -152,10 +157,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         N_M = size(genotypes_M, 3)
 
         println("generation: ", generation, "; individuals: ", N_F + N_M)
-
-        functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
-        scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
-
+ 
         # calculate mating trait values (T) from genotypes
         female_mating_traits = calc_traits_additive(genotypes_F[:, female_mating_trait_loci, :])
         male_mating_traits = calc_traits_additive(genotypes_M[:, male_mating_trait_loci, :])
@@ -289,6 +291,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         # assign surviving offspring to new adult population
         genotypes_F = genotypes_daughters[:, :, daughters_survive]
         genotypes_M = genotypes_sons[:, :, sons_survive]
+
+        # update the plot
+        functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
+        display(scatter(1:length(functionalLoci_HI_all_inds), functionalLoci_HI_all_inds))
 
     end # of loop through generations
     return genotypes_F, genotypes_M, extinction 
@@ -516,8 +522,8 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.99, 1000, 1.0, 1.05; 
-    K_total = 1000, max_generations = 10)
+sim_results = run_one_HZAM_sim(0.99, 1, 1.0, 1.05; 
+    K_total = 1000, max_generations = 50)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
@@ -527,15 +533,6 @@ functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_ra
 
 scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
 
-
-function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R, 
-    K_total::Int = 1000, max_generations::Int = 1000, 
-    total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
-    competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
-    survival_fitness_method::String = "epistasis", per_reject_cost = 0,
-    starting_pop_ratio = 1.0)
-
-    return genotypes_F, genotypes_M, extinction 
 
 # Figure 3A
 RunName = "JL_fig3aHet"
