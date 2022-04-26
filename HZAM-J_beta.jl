@@ -52,8 +52,8 @@ using GLMakie
 function generate_genotype_array(N_pop0,N_pop1,loci)
     total_N = N_pop0 + N_pop1  
     genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
-    genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop1
-    genotypes[:,:,(N_pop0+1):total_N] .= 1  # assigns genotypes of pop
+    genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
+    genotypes[:,:,(N_pop0+1):total_N] .= 1  # assigns genotypes of pop1
     return genotypes
 end
 
@@ -90,7 +90,34 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
     competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
     survival_fitness_method::String = "epistasis", per_reject_cost = 0,
-    starting_pop_ratio = 1.0)
+    starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
+    starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
+    sigma_disp = 0.01, sigma_comp = 0.01)
+
+    # specify ecological resource competitive abilities for two resources A and B 
+    # ecolDiff = 1.0 # this is "E" in the paper 
+    competAbility_useResourceA_pop0 = (1 + ecolDiff)/2    # equals 1 when ecolDiff = 1   
+    competAbility_useResourceB_pop0 = 1 - competAbility_useResourceA_pop0
+    competAbility_useResourceA_pop1 = (1 - ecolDiff)/2   # equals 0 when ecolDiff = 1
+    competAbility_useResourceB_pop1 = 1 - competAbility_useResourceA_pop1
+
+    # set up carying capacities on each resource, and starting pop sizes of each species
+    K_A = K_total / 2  # EVEN NUMBER; carrying capacity (on resource alpha) of entire range (for two sexes combined), regardless of species 
+    K_B = K_total / 2   # EVEN NUMBER; carrying capacity (on resource beta) of entire range (for two sexes combined), regardless of species
+
+    if sympatry  # if sympatry is true, then set both pop sizes according to full range 
+        starting_range_pop0 = [0.0, 1.0] 
+        starting_range_pop1 = [0.0, 1.0]
+        pop0_starting_N = K_A   # starting N of species 0
+        pop0_starting_N_half = Int(pop0_starting_N/2)  # The "Int" is to ensure no decimal
+        pop1_starting_N = Int(round(starting_pop_ratio * K_B))   # starting N of species 1, which can be lower if starting_pop_ratio is below 1)
+        pop1_starting_N_half = Int(pop1_starting_N/2)
+    else  # sympatry is false, then set pop sizes assuming no range overlap--this is why the "2" is in the formulae below  
+        pop0_starting_N = 2 * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]) 
+        pop0_starting_N_half = Int(pop0_starting_N/2)
+        pop1_starting_N = 2 * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1])
+        pop1_starting_N_half = Int(pop1_starting_N/2)
+    end 
 
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -110,16 +137,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     if total_functional_loci + num_neutral_loci ≠ total_loci
         println("#### WARNING: Please examine your loci numbers and indices, as they don't all match up ####")
     end
-
-    # set up carying capacities on each resource, and starting pop sizes of each species
-    K_A = K_total / 2  # EVEN NUMBER; carrying capacity (on resource alpha) of entire range (for two sexes combined), regardless of species 
-    K_B = K_total / 2   # EVEN NUMBER; carrying capacity (on resource beta) of entire range (for two sexes combined), regardless of species
     
-    pop0_starting_N = K_A   # starting N of species 0
-    pop0_starting_N_half = Int(pop0_starting_N/2)
-    pop1_starting_N = Int(round(starting_pop_ratio * K_B))   # starting N of species 1, which can be lower if starting_pop_ratio is below 1)
-    pop1_starting_N_half = Int(pop1_starting_N/2)
-
     # convert S_AM to pref_ratio (for use in math below)
     if S_AM == 1
         S_AM_for_math = 1 + 10^(-15)
@@ -130,13 +148,6 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     end
     pref_SD = sqrt(-1 / (2 * log(1 / S_AM_for_math)))  # width of female acceptance curve for male trait
 
-    # specify ecological resource competitive abilities for two resources A and B 
-    # ecolDiff = 1.0 # this is "E" in the paper 
-    competAbility_useResourceA_species0 = (1 + ecolDiff)/2    # equals 1 when ecolDiff = 1   
-    competAbility_useResourceB_species0 = 1 - competAbility_useResourceA_species0
-    competAbility_useResourceA_species1 = (1 - ecolDiff)/2   # equals 0 when ecolDiff = 1
-    competAbility_useResourceB_species1 = 1 - competAbility_useResourceA_species1
-
     # Generate genotype array for population of females:
     # this is a 3D array, where rows (D1) are alleles (row 1 from mother, row 2 from father),
     # columns (D2) are loci, and pages (D3) are individuals
@@ -144,6 +155,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     genotypes_M = generate_genotype_array(pop0_starting_N_half, pop1_starting_N_half, total_loci)
     # functional loci are first, followed by neutral loci
 
+    # Generate breeding locations of individuals (vector in same order of individuals as D3 of the genotype array)
+    locations_F_pop0 = ((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1]), 
+    locations_F_pop1 = ((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
+    locations_F = [locations_F_pop0 locations_F_pop1] ## THIS NOT WORKING YET--PICK UP HERE
+ 
     extinction = false  # if extinction happens later this will be set true
 
     functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
@@ -361,7 +377,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                 final_distribution = []
             
                 # run one simulation by calling the function defined above:
-                run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R,
+                run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
                     K_total, max_generations,
                     total_loci, female_mating_trait_loci, male_mating_trait_loci,
                     competition_trait_loci, hybrid_survival_loci, neutral_loci,
