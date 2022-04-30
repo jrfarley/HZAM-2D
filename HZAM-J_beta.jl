@@ -91,7 +91,19 @@ function disperse_individual(start_location, sigma_disp, geographic_limits)::Flo
             return new_location 
         end
     end 
-end 
+end
+
+# These next two functions define the way potential male mates are chosen
+# When in sympatric model, choose random male (note the second and third arguments not used but allows function to be called in same way as in spatial model):
+function choose_random_male(elig_M, locations_M, focal_location)
+    focal_male = splice!(elig_M, rand(eachindex(elig_M)))
+    return focal_male, elig_M
+end
+# When in spatial model, choose closest male:
+function choose_closest_male(elig_M, locations_M, focal_location)
+    focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- focal_location)))
+    return focal_male, elig_M
+end
 
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
@@ -173,6 +185,13 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     extinction = false  # if extinction happens later this will be set true
 
+    # Pick function for choosing potential male mate (these two functions defined above) 
+    if sympatry # if sympatry, then choose random male
+        pick_potential_mate = choose_random_male
+    else # if space matters, then choose closest male
+        pick_potential_mate = choose_closest_male
+    end 
+
     functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
     Figure()
     display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
@@ -202,10 +221,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         competition_traits_M = calc_traits_additive(genotypes_M[:, competition_trait_loci, :])
 
         # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-        ind_useResourceA_F = competAbility_useResourceA_species1 .+ ((1 .- competition_traits_F) .* (competAbility_useResourceA_species0 - competAbility_useResourceA_species1))
-        ind_useResourceB_F = competAbility_useResourceB_species0 .+ (competition_traits_F .* (competAbility_useResourceB_species1 - competAbility_useResourceB_species0))
-        ind_useResourceA_M = competAbility_useResourceA_species1 .+ ((1 .- competition_traits_M) .* (competAbility_useResourceA_species0 - competAbility_useResourceA_species1))
-        ind_useResourceB_M = competAbility_useResourceB_species0 .+ (competition_traits_M .* (competAbility_useResourceB_species1 - competAbility_useResourceB_species0))
+        ind_useResourceA_F = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_F) .* (competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1))
+        ind_useResourceB_F = competAbility_useResourceB_pop0 .+ (competition_traits_F .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
+        ind_useResourceA_M = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_M) .* (competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1))
+        ind_useResourceB_M = competAbility_useResourceB_pop0 .+ (competition_traits_M .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
         # sum up the resource use over all individuals
         total_useResourceA = sum(ind_useResourceA_F) + sum(ind_useResourceA_M)
         total_useResourceB = sum(ind_useResourceB_F) + sum(ind_useResourceB_M)
@@ -247,8 +266,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             elig_M = Vector(1:N_M)
             # determine male mate of female
             while mate == false
-                # present female with random male, and remove him from list using "splice!" 
-                focal_male = splice!(elig_M, rand(eachindex(elig_M)))
+                # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
+                focal_male, elig_M = pick_potential_mate(elig_M, locations_M, locations_F[mother])
                 # compare male trait with female's trait (preference), and determine
                 # whether she accepts; note that match_strength is determined by a
                 # Gaussian, with a maximum of 1 and minimum of zero.
@@ -565,8 +584,9 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.8, 1, 0, 1.05; 
-    K_total = 1000, max_generations = 1)
+sim_results = run_one_HZAM_sim(0.9, 1, 0, 1.05; 
+    K_total = 1000, max_generations = 100,
+    sigma_disp = 0.05)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
