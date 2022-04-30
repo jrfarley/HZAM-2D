@@ -112,7 +112,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     survival_fitness_method::String = "epistasis", per_reject_cost = 0,
     starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
     starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
-    sigma_disp = 0.01, sigma_comp = 0.01)
+    sigma_disp = 0.01, sigma_comp = 0.01,
+    do_plot = true, plot_int = 10)
 
     # specify ecological resource competitive abilities for two resources A and B 
     # ecolDiff = 1.0 # this is "E" in the paper 
@@ -190,16 +191,18 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         pick_potential_mate = choose_random_male
     else # if space matters, then choose closest male
         pick_potential_mate = choose_closest_male
-    end 
-
-    functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
-    Figure()
-    display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+    end
+    
+    if do_plot
+        functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
+        Figure()
+        display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+    end
 
     # TO DO LIST:
     
-    # NEED TO MAKE MATE PAIRING DEPENDENT ON LOCATION
-    
+    # INCORPORATE DENSITY-BASED REPRODUCTIVE FITNESS
+
     # STILL NEED TO SOLVE FOR SPATIAL MODEL: HOW TO TAKE INTO ACCOUNT BOTH ECOLOGY AND LOCATION IN DETERMINING COMPETITION
     # (For now, simply assuming zero ecological differentiation so equal use of resources A and B;
     # beware of running with ecolDiff > 0 as that will not properly take into account comp between locally ecologically diff individuals)
@@ -355,8 +358,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         locations_M = locations_sons[sons_survive] 
 
         # update the plot
-        functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
-        display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+        if (do_plot && (generation % plot_int == 0))
+            functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
+            display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+        end
 
     end # of loop through generations
     return genotypes_F, locations_F, genotypes_M, locations_M, extinction 
@@ -584,9 +589,10 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.9, 1, 0, 1.05; 
-    K_total = 1000, max_generations = 100,
-    sigma_disp = 0.05)
+sim_results = run_one_HZAM_sim(0.9, 10, 0, 1.05; 
+    K_total = 1000, max_generations = 1000,
+    sigma_disp = 0.01, sympatry = false)
+#    do_plot = true, plot_int = 10)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
