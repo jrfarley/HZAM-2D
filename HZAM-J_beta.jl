@@ -84,6 +84,14 @@ function get_survival_fitnesses_hetdisadvantage(genotypes, w_hyb)
     return hetdisadvantage_fitnesses
 end
 
+function disperse_individual(start_location, sigma_disp, geographic_limits)::Float32
+    while true
+        new_location = start_location + (sigma_disp * randn())
+        if (new_location >= geographic_limits[1]) & (new_location <= geographic_limits[2]) # checks if location is in range
+            return new_location 
+        end
+    end 
+end 
 
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
@@ -156,15 +164,26 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     # functional loci are first, followed by neutral loci
 
     # Generate breeding locations of individuals (vector in same order of individuals as D3 of the genotype array)
-    locations_F_pop0 = ((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1]), 
-    locations_F_pop1 = ((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
-    locations_F = [locations_F_pop0 locations_F_pop1] ## THIS NOT WORKING YET--PICK UP HERE
- 
+    locations_F_pop0 = Array{Float32, 1}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1]) 
+    locations_F_pop1 = Array{Float32, 1}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
+    locations_F = [locations_F_pop0; locations_F_pop1]
+    locations_M_pop0 = Array{Float32, 1}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1]) 
+    locations_M_pop1 = Array{Float32, 1}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
+    locations_M = [locations_M_pop0; locations_M_pop1] 
+
     extinction = false  # if extinction happens later this will be set true
 
     functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
     Figure()
-    display(scatter(1:length(functionalLoci_HI_all_inds), functionalLoci_HI_all_inds))
+    display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+
+    # TO DO LIST:
+    
+    # NEED TO MAKE MATE PAIRING DEPENDENT ON LOCATION
+    
+    # STILL NEED TO SOLVE FOR SPATIAL MODEL: HOW TO TAKE INTO ACCOUNT BOTH ECOLOGY AND LOCATION IN DETERMINING COMPETITION
+    # (For now, simply assuming zero ecological differentiation so equal use of resources A and B;
+    # beware of running with ecolDiff > 0 as that will not properly take into account comp between locally ecologically diff individuals)
 
     for generation in 1:max_generations
 
@@ -208,6 +227,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         # make empty arrays for storing genotypes of daughters and sons
         genotypes_daughters = Array{Int8,3}(undef, 2, total_loci, 0)
         genotypes_sons = Array{Int8,3}(undef, 2, total_loci, 0)
+        
+        # make empty arrays for storing locations of daughters and sons
+        locations_daughters = Array{Float32, 1}(undef, 0)
+        locations_sons = Array{Float32, 1}(undef, 0) 
 
         # create structures for recording indices of mother and father (for error checking, and potentially for tracking genealogies)
         # first column for mother index (3rd dim of genotypes_F) and second column for father index (3rd dim of genotypes_M) 
@@ -264,19 +287,21 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     # generate genotypes; for each locus (column), first row for allele from mother, second row for allele from father
                     for locus in 1:total_loci
                         kid_info[1, locus] = genotypes_F[rand([1 2]), locus, mother]  # for this locus, pick a random allele from the mother
-                        kid_info[2, locus] = genotypes_M[rand([1 2]), locus, father]
+                        kid_info[2, locus] = genotypes_M[rand([1 2]), locus, father]  # and from the father
                     end
-                    # determine sex of kid and add to table
+                    # determine sex and location of kid
                     if rand() > 0.5 # kid is daughter
                         genotypes_daughters = cat(genotypes_daughters, kid_info, dims=3)
                         daughter_parent_IDs = cat(daughter_parent_IDs, [mother father], dims=1)
                         daughters_per_mother[mother] += 1
                         daughters_per_father[father] += 1
+                        locations_daughters = [locations_daughters; disperse_individual(locations_F[mother], sigma_disp, geographic_limits)]
                     else # kid is son
                         genotypes_sons = cat(genotypes_sons, kid_info, dims=3)
                         son_parent_IDs = cat(son_parent_IDs, [mother father], dims=1)
                         sons_per_mother[mother] += 1
                         sons_per_father[father] += 1
+                        locations_sons = [locations_sons; disperse_individual(locations_F[mother], sigma_disp, geographic_limits)]
                     end
                 end
             end
@@ -306,14 +331,16 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
         # assign surviving offspring to new adult population
         genotypes_F = genotypes_daughters[:, :, daughters_survive]
+        locations_F = locations_daughters[daughters_survive] 
         genotypes_M = genotypes_sons[:, :, sons_survive]
+        locations_M = locations_sons[sons_survive] 
 
         # update the plot
         functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
-        display(scatter(1:length(functionalLoci_HI_all_inds), functionalLoci_HI_all_inds))
+        display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
 
     end # of loop through generations
-    return genotypes_F, genotypes_M, extinction 
+    return genotypes_F, locations_F, genotypes_M, locations_M, extinction 
 end
                    
 
@@ -538,8 +565,8 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.99, 1, 1.0, 1.05; 
-    K_total = 1000, max_generations = 50)
+sim_results = run_one_HZAM_sim(0.8, 1, 0, 1.05; 
+    K_total = 1000, max_generations = 1)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
@@ -548,6 +575,17 @@ functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_ra
 # make a Makie plot
 
 scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
+
+
+function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
+    K_total::Int = 1000, max_generations::Int = 1000, 
+    total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
+    competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
+    survival_fitness_method::String = "epistasis", per_reject_cost = 0,
+    starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
+    starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
+    sigma_disp = 0.01, sigma_comp = 0.01)
+
 
 
 # Figure 3A
