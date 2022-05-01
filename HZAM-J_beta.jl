@@ -182,7 +182,20 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     locations_F = [locations_F_pop0; locations_F_pop1]
     locations_M_pop0 = Array{Float32, 1}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1]) 
     locations_M_pop1 = Array{Float32, 1}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
-    locations_M = [locations_M_pop0; locations_M_pop1] 
+    locations_M = [locations_M_pop0; locations_M_pop1]
+    
+    # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
+    spaced_locations = collect(Float32, geographic_limits[1]:0.001:geographic_limits[2])
+    ind_locations_if_even_at_K = range(geographic_limits[1], geographic_limits[2], length=K_total)
+    function get_density_if_even_at_K(focal_location) # this function calculates local density according to a normal curve
+        sum(exp.(-((ind_locations_if_even_at_K .- focal_location).^2)./(2*(sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
+    end
+    ideal_densities_at_spaced_locations = map(get_density_if_even_at_K, spaced_locations) # this applies the above function to each geographic location
+    # assume both resources have same constand density across range
+    ideal_densities_at_spaced_locations_resourceA = ideal_densities_at_spaced_locations ./ 2
+    ideal_densities_at_spaced_locations_resourceB = ideal_densities_at_spaced_locations ./ 2 
+
+    #plot(spaced_locations, ideal_densities_at_spaced_locations_resourceA)
 
     extinction = false  # if extinction happens later this will be set true
 
@@ -228,12 +241,38 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         ind_useResourceB_F = competAbility_useResourceB_pop0 .+ (competition_traits_F .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
         ind_useResourceA_M = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_M) .* (competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1))
         ind_useResourceB_M = competAbility_useResourceB_pop0 .+ (competition_traits_M .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
-        # sum up the resource use over all individuals
-        total_useResourceA = sum(ind_useResourceA_F) + sum(ind_useResourceA_M)
-        total_useResourceB = sum(ind_useResourceB_F) + sum(ind_useResourceB_M)
-        # calculate growth rates due to each resource (according to discrete time logistic growth equation)
-        growth_rate_ResourceA = (intrinsic_R * K_A) / (K_A + ((total_useResourceA) * (intrinsic_R - 1)))
-        growth_rate_ResourceB = (intrinsic_R * K_B) / (K_B + ((total_useResourceB) * (intrinsic_R - 1)))
+         
+        if sympatry
+            # sum up the global resource use over all individuals
+            total_useResourceA = sum(ind_useResourceA_F) + sum(ind_useResourceA_M)
+            total_useResourceB = sum(ind_useResourceB_F) + sum(ind_useResourceB_M)
+            # calculate global growth rates due to each resource (according to discrete time logistic growth equation)
+            growth_rate_resourceA = (intrinsic_R * K_A) / (K_A + ((total_useResourceA) * (intrinsic_R - 1)))
+            growth_rate_resourceB = (intrinsic_R * K_B) / (K_B + ((total_useResourceB) * (intrinsic_R - 1)))
+        else  # in spatial model, calculate growth rates based on local resource use
+            # determine local resource use for each location across range
+            ind_locations_real = [locations_F; locations_M]
+            ind_useResourceA_all = [ind_useResourceA_F; ind_useResourceA_M]
+            ind_useResourceB_all = [ind_useResourceB_F; ind_useResourceB_M]  
+            function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
+                sum(ind_useResourceA_all .* exp.(-((ind_locations_real .- focal_location).^2)./(2*(sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
+            end
+            real_densities_at_spaced_locations_resourceA = map(get_useResourceA_density_real, spaced_locations) # this applies the above function to each geographic location
+            function get_useResourceB_density_real(focal_location) # do the same for resource B
+                sum(ind_useResourceB_all .* exp.(-((ind_locations_real .- focal_location).^2)./(2*(sigma_comp^2))))
+            end
+            real_densities_at_spaced_locations_resourceB = map(get_useResourceB_density_real, spaced_locations) # this applies the above function to each geographic location 
+            # calculate local growth rates due to each resource (according to discrete time logistic growth equation)
+            local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_spaced_locations_resourceA ./ (ideal_densities_at_spaced_locations_resourceA .+ ((real_densities_at_spaced_locations_resourceA) .* (intrinsic_R - 1)))
+            local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_spaced_locations_resourceB ./ (ideal_densities_at_spaced_locations_resourceB .+ ((real_densities_at_spaced_locations_resourceB) .* (intrinsic_R - 1)))
+        end
+        
+        #plot(spaced_locations, local_growth_rates_resourceA) 
+        
+        #plot(spaced_locations, local_growth_rates)  
+        
+        ### CONTINUE HERE 
+
 
         # Set up structure to record number of matings per male (and female, although almost always 1 for females), 
         # to determine sexual selection due to HI class:
@@ -293,7 +332,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             search_fitness = (1 - per_reject_cost)^rejects    # (in most of HZAM-Sym paper, per_reject_cost = 0)
 
             # determine fitness due to female use of available resources
-            growth_rate_of_focal_female = (ind_useResourceA_F[mother] * growth_rate_ResourceA) + (ind_useResourceB_F[mother] * growth_rate_ResourceB)
+            if sympatry
+                growth_rate_of_focal_female = (ind_useResourceA_F[mother] * growth_rate_resourceA) + (ind_useResourceB_F[mother] * growth_rate_resourceB)
+            else
+                location_index = argmin(abs.(spaced_locations .- locations_F[mother]))
+                local_growth_A = local_growth_rates_resourceA[location_index]
+                local_growth_B = local_growth_rates_resourceB[location_index] 
+                growth_rate_of_focal_female = (ind_useResourceA_F[mother] * local_growth_A) + (ind_useResourceB_F[mother] * local_growth_B)
+            end
+
             #combine for total fitness:   
             reproductive_fitness = 2 * growth_rate_of_focal_female * search_fitness  # the 2 is because only females, not males, produce offspring
             # now draw the number of offspring from a poisson distribution with a mean of reproductive_fitness
@@ -589,9 +636,10 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.9, 10, 0, 1.05; 
-    K_total = 1000, max_generations = 1000,
-    sigma_disp = 0.01, sympatry = false)
+sim_results = run_one_HZAM_sim(0.9, 1, 0, 1.05; 
+    K_total = 10000, max_generations = 500,
+    sigma_disp = 0.01, sympatry = false,
+    sigma_comp = 0.01)
 #    do_plot = true, plot_int = 10)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
