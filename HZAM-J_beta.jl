@@ -134,11 +134,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         pop1_starting_N = Int(round(starting_pop_ratio * K_B))   # starting N of species 1, which can be lower if starting_pop_ratio is below 1)
         pop1_starting_N_half = Int(pop1_starting_N/2)
     else  # sympatry is false, then set pop sizes assuming no range overlap--this is why the "2" is in the formulae below  
-        pop0_starting_N = 2 * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]) 
-        pop0_starting_N_half = Int(pop0_starting_N/2)
-        pop1_starting_N = 2 * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1])
+        pop0_starting_N = (2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]) 
+        pop0_starting_N_half = Int(pop0_starting_N/2)  # starting number for each sex
+        pop1_starting_N = (2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1])
         pop1_starting_N_half = Int(pop1_starting_N/2)
-    end 
+    end
+    
+    # WHEN ECOLDIFF = 1, THEN SHOULD NOT HAVE THE 2 (1 INSTEAD)
+    # WHEN ECOLDIFF = 0, THEN SHOULD HAVE THE 2
+    # SO 2-ecolDiff ?
 
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -191,7 +195,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         sum(exp.(-((ind_locations_if_even_at_K .- focal_location).^2)./(2*(sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
     ideal_densities_at_spaced_locations = map(get_density_if_even_at_K, spaced_locations) # this applies the above function to each geographic location
-    # assume both resources have same constand density across range
+    # assume both resources have same constant density across range
     ideal_densities_at_spaced_locations_resourceA = ideal_densities_at_spaced_locations ./ 2
     ideal_densities_at_spaced_locations_resourceB = ideal_densities_at_spaced_locations ./ 2 
 
@@ -267,11 +271,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_spaced_locations_resourceB ./ (ideal_densities_at_spaced_locations_resourceB .+ ((real_densities_at_spaced_locations_resourceB) .* (intrinsic_R - 1)))
         end
         
-        #plot(spaced_locations, local_growth_rates_resourceA) 
+        #plot(spaced_locations, local_growth_rates_resourceA)
+        #plot(spaced_locations, local_growth_rates_resourceB)  
         
         #plot(spaced_locations, local_growth_rates)  
         
-        ### CONTINUE HERE 
+        ### NEED TO CAREFULLY PROOF THE ABOVE, PARTICULARLY IF ECOLDIF > 0
 
 
         # Set up structure to record number of matings per male (and female, although almost always 1 for females), 
@@ -636,10 +641,10 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.9, 1, 0, 1.05; 
-    K_total = 10000, max_generations = 500,
-    sigma_disp = 0.01, sympatry = false,
-    sigma_comp = 0.01)
+sim_results = run_one_HZAM_sim(0.9, 100000, 0.25, 1.1; 
+    K_total = 5000, max_generations = 200,
+    sigma_disp = 0.052, sympatry = false,
+    sigma_comp = 0.01, plot_int = 1)
 #    do_plot = true, plot_int = 10)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
@@ -650,7 +655,33 @@ functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_ra
 
 scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
 
+# To test code inside the function:
+w_hyb = 1
+S_AM = 100000
+ecolDiff = 1
+intrinsic_R = 1.05
+K_total = 5000 
+max_generations = 200
+total_loci = 6
+female_mating_trait_loci = 1:3
+male_mating_trait_loci = 1:3
+competition_trait_loci = 1:3
+hybrid_survival_loci = 1:3
+neutral_loci = 4:6
+survival_fitness_method = "epistasis"
+per_reject_cost = 0
+starting_pop_ratio = 1.0
+sympatry = false
+geographic_limits = [0, 1]
+starting_range_pop0 = [0.0, 0.48]
+starting_range_pop1 = [0.52, 1.0]
+sigma_disp = 0.01
+sigma_comp = 0.01
+do_plot = true
+plot_int = 1
 
+
+# copy of the start of the function from above:
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
@@ -658,9 +689,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     survival_fitness_method::String = "epistasis", per_reject_cost = 0,
     starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
     starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
-    sigma_disp = 0.01, sigma_comp = 0.01)
-
-
+    sigma_disp = 0.01, sigma_comp = 0.01,
+    do_plot = true, plot_int = 10)
 
 # Figure 3A
 RunName = "JL_fig3aHet"
