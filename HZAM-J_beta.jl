@@ -25,13 +25,15 @@
 # Pkg.add("CategoricalArrays")
 # Pkg.add("Makie") 
 # Pkg.add("CairoMakie")
-# Pkg.add("GLMakie") 
+# Pkg.add("GLMakie")
+# Pkg.add("LsqFit") 
 
 using Distributions # needed for "Poisson" function
 using Statistics  # needed for "mean" function
 using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as csv
+using LsqFit
 
 # for plotting:
 #using Plots
@@ -104,6 +106,15 @@ function choose_closest_male(elig_M, locations_M, focal_location)
     focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- focal_location)))
     return focal_male, elig_M
 end
+
+function sigmoid(x, p)  # where p[1] is cline centre, and p[2] is maxSlope 
+    1 ./ (1 .+ exp.(-p[2] .* (x .- p[1])))
+end
+
+# x_test = -10:10
+# y_test = sigmoid(x_test, [0., 1.])
+
+# fit = curve_fit(sigmoid, x_test, y_test, p)
 
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
@@ -214,6 +225,9 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
         Figure()
         display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+        initial_par = [0., 1.]  # next line will start search for centre and slope with these values
+        fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
+        lines!(spaced_locations, sigmoid(spaced_locations, fit.param))
     end
 
     # TO DO LIST:
@@ -413,6 +427,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         if (do_plot && (generation % plot_int == 0))
             functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
             display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+            fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
+            lines!(spaced_locations, sigmoid(spaced_locations, fit.param))  
         end
 
     end # of loop through generations
@@ -641,9 +657,9 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.9, 100000, 0.25, 1.1; 
+sim_results = run_one_HZAM_sim(0.9, 100, 1, 1.1; 
     K_total = 5000, max_generations = 200,
-    sigma_disp = 0.052, sympatry = false,
+    sigma_disp = 0.02, sympatry = false,
     sigma_comp = 0.01, plot_int = 1)
 #    do_plot = true, plot_int = 10)
 functional_loci_range = 1:3
