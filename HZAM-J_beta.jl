@@ -223,21 +223,16 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     
     if do_plot
         functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
-        Figure()
-        display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+        fontsize_theme = Theme(fontsize = 40); set_theme!(fontsize_theme)  # this sets the standard font size
+        fig = Figure(resolution=(1200, 800), figure_padding = 40)
+        ax = Axis(fig[1, 1], xlabel = "location", ylabel = "hybrid index", title = string("generation = ", 0), xticklabelsize = 30, yticklabelsize = 30, titlegap = 20)
+        points = scatter!(ax, [locations_F; locations_M], functionalLoci_HI_all_inds, color = :black)
         initial_par = [0., 1.]  # next line will start search for centre and slope with these values
         fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
-        lines!(spaced_locations, sigmoid(spaced_locations, fit.param))
+        sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color = :blue)
     end
 
-    # TO DO LIST:
-    
-    # INCORPORATE DENSITY-BASED REPRODUCTIVE FITNESS
-
-    # STILL NEED TO SOLVE FOR SPATIAL MODEL: HOW TO TAKE INTO ACCOUNT BOTH ECOLOGY AND LOCATION IN DETERMINING COMPETITION
-    # (For now, simply assuming zero ecological differentiation so equal use of resources A and B;
-    # beware of running with ecolDiff > 0 as that will not properly take into account comp between locally ecologically diff individuals)
-
+    # loop throught the generations
     for generation in 1:max_generations
 
         # Prepare for mating and reproduction
@@ -426,9 +421,16 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
             functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])] 
-            display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+            # display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
+            # fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
+            # lines!(spaced_locations, sigmoid(spaced_locations, fit.param))  # add the sigmoid fit to the plot
+            delete!(ax, points)
+            delete!(ax, sigmoid_line)
+            points = scatter!([locations_F; locations_M], functionalLoci_HI_all_inds, color = :black)
             fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
-            lines!(spaced_locations, sigmoid(spaced_locations, fit.param))  
+            sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color = :blue)  # add the sigmoid fit to the plot
+            ax.title = string("generation = ", generation) 
+            display(fig) 
         end
 
     end # of loop through generations
@@ -660,7 +662,7 @@ RunName = "TEST"
 sim_results = run_one_HZAM_sim(0.9, 100, 1, 1.1; 
     K_total = 5000, max_generations = 200,
     sigma_disp = 0.02, sympatry = false,
-    sigma_comp = 0.01, plot_int = 1)
+    sigma_comp = 0.01, plot_int = 10)
 #    do_plot = true, plot_int = 10)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
