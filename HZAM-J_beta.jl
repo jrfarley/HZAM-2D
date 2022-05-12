@@ -230,6 +230,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         initial_par = [0., 1.]  # next line will start search for centre and slope with these values
         fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
         sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color = :blue)
+        display(fig)
     end
 
     # loop throught the generations
@@ -659,11 +660,17 @@ ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_proje
 
 
 RunName = "TEST"
-sim_results = run_one_HZAM_sim(0.9, 100, 1, 1.1; 
-    K_total = 5000, max_generations = 200,
-    sigma_disp = 0.02, sympatry = false,
-    sigma_comp = 0.01, plot_int = 10)
-#    do_plot = true, plot_int = 10)
+@time sim_results = run_one_HZAM_sim(1, 1000, 0, 1.1; 
+    K_total = 5000, max_generations = 100,
+    sigma_disp = 0.01, sympatry = false,
+    sigma_comp = 0.01, do_plot = false, plot_int = 5)
+
+    #total_loci = 20,
+    #female_mating_trait_loci = 1:17,
+    #male_mating_trait_loci = 1:17,
+    #competition_trait_loci = 1:17,
+    #hybrid_survival_loci = 1:17,
+    #neutral_loci = 18:20)
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
