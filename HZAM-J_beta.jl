@@ -111,10 +111,10 @@ function sigmoid(x, p)  # where p[1] is cline centre, and p[2] is maxSlope
     1 ./ (1 .+ exp.(-p[2] .* (x .- p[1])))
 end
 
-# x_test = -10:10
-# y_test = sigmoid(x_test, [0., 1.])
-
-# fit = curve_fit(sigmoid, x_test, y_test, p)
+# for adding jitter (small random shifts in position, to better visualize overlapping points)
+function jitter(n::Vector{Float32}, factor=0.02) 
+    n .+ (0.5 .- rand(length(n))) .* factor
+end
 
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
@@ -223,13 +223,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     
     if do_plot
         functionalLoci_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
-        fontsize_theme = Theme(fontsize = 40); set_theme!(fontsize_theme)  # this sets the standard font size
-        fig = Figure(resolution=(1200, 800), figure_padding = 40)
-        ax = Axis(fig[1, 1], xlabel = "location", ylabel = "hybrid index", title = string("generation = ", 0), xticklabelsize = 30, yticklabelsize = 30, titlegap = 20)
-        points = scatter!(ax, [locations_F; locations_M], functionalLoci_HI_all_inds, color = :black)
+        fontsize_theme = Theme(fontsize = 60); set_theme!(fontsize_theme)  # this sets the standard font size
+        fig = Figure(resolution=(1800, 1200), figure_padding = 60)
+        ax = Axis(fig[1, 1], xlabel = "location", ylabel = "hybrid index", title = string("HZAM simulation, generation = ", 0), xticklabelsize = 45, yticklabelsize = 45, titlegap = 30)
+        xlims!(-0.03, 1.03)
+        ylims!(-0.03, 1.03)
+        points = scatter!(ax, [locations_F; locations_M], jitter(functionalLoci_HI_all_inds), color = (:blue, 0.5))
         initial_par = [0., 1.]  # next line will start search for centre and slope with these values
         fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
-        sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color = :blue)
+        sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color = (:blue, 0.25), linewidth = 20)
         display(fig)
     end
 
@@ -427,17 +429,107 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             # lines!(spaced_locations, sigmoid(spaced_locations, fit.param))  # add the sigmoid fit to the plot
             delete!(ax, points)
             delete!(ax, sigmoid_line)
-            points = scatter!([locations_F; locations_M], functionalLoci_HI_all_inds, color = :black)
+            points = scatter!([locations_F; locations_M], jitter(functionalLoci_HI_all_inds), color = (:blue, 0.5))
             fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
-            sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color = :blue)  # add the sigmoid fit to the plot
-            ax.title = string("generation = ", generation) 
-            display(fig) 
+            sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color = (:blue, 0.25), linewidth = 20)  # add the sigmoid fit to the plot
+            ax.title = string("HZAM simulation, generation = ", generation) 
         end
 
     end # of loop through generations
     return genotypes_F, locations_F, genotypes_M, locations_M, extinction 
 end
-                   
+  
+
+#### Run the actual simulation by calling the above function:
+
+sim_results = run_one_HZAM_sim(0.9, 10, 0, 1.1; # these values are 
+                                # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
+    K_total = 5000, max_generations = 5000,
+    sigma_disp = 0.02, sympatry = false,
+    sigma_comp = 0.1, do_plot = true, plot_int = 5)
+
+
+
+
+
+
+
+
+    #total_loci = 11,
+    #female_mating_trait_loci = 1:5,
+    #male_mating_trait_loci = 6:10,
+    #competition_trait_loci = 6:10,
+    #hybrid_survival_loci = 6:10,
+    #neutral_loci = 11:11)
+
+
+
+
+
+
+
+
+#------------------
+
+    #total_loci = 20,
+    #female_mating_trait_loci = 1:17,
+    #male_mating_trait_loci = 1:17,
+    #competition_trait_loci = 1:17,
+    #hybrid_survival_loci = 1:17,
+    #neutral_loci = 18:20)
+functional_loci_range = 1:3
+genotypes_F = sim_results[1]
+genotypes_M = sim_results[2]
+functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
+
+# make a Makie plot
+
+scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
+
+# To test code inside the function:
+w_hyb = 1
+S_AM = 100000
+ecolDiff = 1
+intrinsic_R = 1.05
+K_total = 5000 
+max_generations = 200
+total_loci = 6
+female_mating_trait_loci = 1:3
+male_mating_trait_loci = 1:3
+competition_trait_loci = 1:3
+hybrid_survival_loci = 1:3
+neutral_loci = 4:6
+survival_fitness_method = "epistasis"
+per_reject_cost = 0
+starting_pop_ratio = 1.0
+sympatry = false
+geographic_limits = [0, 1]
+starting_range_pop0 = [0.0, 0.48]
+starting_range_pop1 = [0.52, 1.0]
+sigma_disp = 0.01
+sigma_comp = 0.01
+do_plot = true
+plot_int = 1
+
+
+# copy of the start of the function from above:
+function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
+    K_total::Int = 1000, max_generations::Int = 1000, 
+    total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
+    competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
+    survival_fitness_method::String = "epistasis", per_reject_cost = 0,
+    starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
+    starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
+    sigma_disp = 0.01, sigma_comp = 0.01,
+    do_plot = true, plot_int = 10)
+
+
+
+
+
+
+#-------------------------
+# functions used in Irwin & Schluter 2022 (the HZAM-sym model and graphing of results)
 
 function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # the semicolon makes the following optional keyword arguments 
     K_total::Int = 1000, max_generations::Int = 1000, 
@@ -641,414 +733,4 @@ function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))
 end
 
-#### Run the actual simulation by calling the above functions:
 
-# If wanting to run a test to make sure things are working (after above functions are loaded into memory):
-# RunOutcomes = run_HZAM("TEST", 1.0, 1.05, 1:3, 100, 50)
-
-ResultsFolder = "/Users/darrenirwin/Dropbox/Darren's current work/HZAM-Sym_project_and_paper/HZAM_Sym_Julia_GitHub_repo_is_within_this_folder/HZAM_Sym_Julia/HZAM_Sym_Julia_results_GitIgnore" # or change to another folder where results will be saved
-
-# To run simulations under the parameters in the paper, you can execute the following,
-# under the heading for each Figure panel in the paper. Because these are stochastic simulations,
-# results will differ a little bit (but not much) from those shown in the paper.
-# Also, the "make_and_save_figs" function has saved the figure panels under each set of conditions run below,
-# and the main script saved the Julia object where the results are stored--this starts with "outcomeArray_set"
-# and will be available on Dryad.
-
-# (Note that if the below have "Het" in their name, they were done using the heterozygote disadvantage (underdominance) 
-# option for survival fitness. If they do not have "Het" in their name, they were done using the epistasis option.)
-
-
-RunName = "TEST"
-@time sim_results = run_one_HZAM_sim(1, 1000, 0, 1.1; 
-    K_total = 5000, max_generations = 100,
-    sigma_disp = 0.01, sympatry = false,
-    sigma_comp = 0.01, do_plot = false, plot_int = 5)
-
-    #total_loci = 20,
-    #female_mating_trait_loci = 1:17,
-    #male_mating_trait_loci = 1:17,
-    #competition_trait_loci = 1:17,
-    #hybrid_survival_loci = 1:17,
-    #neutral_loci = 18:20)
-functional_loci_range = 1:3
-genotypes_F = sim_results[1]
-genotypes_M = sim_results[2]
-functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
-
-# make a Makie plot
-
-scatter(1:length(functional_HI_all_inds), functional_HI_all_inds)
-
-# To test code inside the function:
-w_hyb = 1
-S_AM = 100000
-ecolDiff = 1
-intrinsic_R = 1.05
-K_total = 5000 
-max_generations = 200
-total_loci = 6
-female_mating_trait_loci = 1:3
-male_mating_trait_loci = 1:3
-competition_trait_loci = 1:3
-hybrid_survival_loci = 1:3
-neutral_loci = 4:6
-survival_fitness_method = "epistasis"
-per_reject_cost = 0
-starting_pop_ratio = 1.0
-sympatry = false
-geographic_limits = [0, 1]
-starting_range_pop0 = [0.0, 0.48]
-starting_range_pop1 = [0.52, 1.0]
-sigma_disp = 0.01
-sigma_comp = 0.01
-do_plot = true
-plot_int = 1
-
-
-# copy of the start of the function from above:
-function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
-    K_total::Int = 1000, max_generations::Int = 1000, 
-    total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
-    competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
-    survival_fitness_method::String = "epistasis", per_reject_cost = 0,
-    starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
-    starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
-    sigma_disp = 0.01, sigma_comp = 0.01,
-    do_plot = true, plot_int = 10)
-
-# Figure 3A
-RunName = "JL_fig3aHet"
-RunOutcomes = run_HZAM(RunName, 0.0, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-# took about 5 hours to run, with 4 threads on a Mac desktop with 4 cores
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 3B
-RunName = "JL_fig3bHet"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure 4A
-RunName = "JL_Fig4aHet"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.025, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 4B
-RunName = "JL_Fig4bHet"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.2, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 4C
-RunName = "JL_Fig4cHet"
-RunOutcomes = run_HZAM(RunName, 1.0, 2.6, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure 6 row 1 panel 2
-RunName = "JL_Fig6(1,2)Het"
-RunOutcomes = run_HZAM(RunName, 0.25, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 1 panel 3
-RunName = "JL_Fig6(1,3)Het"
-RunOutcomes = run_HZAM(RunName, 0.5, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 1 panel 4
-RunName = "JL_Fig6(1,4)Het"
-RunOutcomes = run_HZAM(RunName, 0.75, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 2 panel 1
-RunName = "JL_Fig6(2,1)Het"
-RunOutcomes = run_HZAM(RunName, 0.0, 2.6, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 2 panel 2
-RunName = "JL_Fig6(2,2)Het"
-RunOutcomes = run_HZAM(RunName, 0.25, 2.6, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 2 panel 3
-RunName = "JL_Fig6(2,3)Het"
-RunOutcomes = run_HZAM(RunName, 0.5, 2.6, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure 6 row 2 panel 4
-RunName = "JL_Fig6(2,4)Het"
-RunOutcomes = run_HZAM(RunName, 0.75, 2.6, 1:25;
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure S2A (epistasis):
-RunName = "JL_fig3a"
-RunOutcomes = run_HZAM(RunName, 0.0, 1.05, 1:25)
-# this run (which does 2600 simulations) takes about 4 hours (with 4 threads on a somewhat powerful desktop Mac)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S2B (epistasis):
-RunName = "JL_fig3b"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure S7A
-RunName = "JL_fig3bHet125gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    max_generations = 125, survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S7B
-RunName = "JL_fig3bHet250gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    max_generations = 250, survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S7C
-RunName = "JL_fig3bHet500gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    max_generations = 500, survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S7E
-RunName = "JL_fig3bHet2000gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    max_generations = 2000, survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S7F
-RunName = "JL_fig3bHet4000gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    max_generations = 4000, survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure S8A
-RunName = "JL_LikeFig3bHet_butFL1"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    K_total = 1000, max_generations = 1000,
-    total_loci = 2, female_mating_trait_loci = 1:1, male_mating_trait_loci = 1:1,
-    competition_trait_loci = 1:1, hybrid_survival_loci = 1:1, neutral_loci = 2:2,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S8C
-RunName = "JL_LikeFig3bHet_butFL9"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    K_total = 1000, max_generations = 1000,
-    total_loci = 18, female_mating_trait_loci = 1:9, male_mating_trait_loci = 1:9,
-    competition_trait_loci = 1:9, hybrid_survival_loci = 1:9, neutral_loci = 10:18,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S8D
-RunName = "JL_LikeFig3bHet_butFL27"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    K_total = 1000, max_generations = 1000,
-    total_loci = 54, female_mating_trait_loci = 1:27, male_mating_trait_loci = 1:27,
-    competition_trait_loci = 1:27, hybrid_survival_loci = 1:27, neutral_loci = 28:54,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure S9A
-RunName = "JL_fig3bHetDiffLociTraitPref"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    K_total = 1000, max_generations = 1000,
-    total_loci = 9, female_mating_trait_loci = 1:3, male_mating_trait_loci = 4:6,
-    competition_trait_loci = 1:6, hybrid_survival_loci = 1:6, neutral_loci = 7:9,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S9B
-RunName = "JL_fig3bHetDiffLociTraitPrefEcol"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    K_total = 1000, max_generations = 1000,
-    total_loci = 12, female_mating_trait_loci = 1:3, male_mating_trait_loci = 4:6,
-    competition_trait_loci = 7:9, hybrid_survival_loci = 7:9, neutral_loci = 10:12,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Figure S10C
-RunName = "JL_LikeFig3bHet_but_starting_pop_ratio_0.5"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage",
-    starting_pop_ratio = 0.5)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S10D
-RunName = "JL_LikeFig4bHet_but_starting_pop_ratio_0.5"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.2, 1:25;
-    survival_fitness_method = "hetdisadvantage",
-    starting_pop_ratio = 0.5)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S10E
-RunName = "JL_LikeFig3bHet_but_starting_pop_ratio_0.1"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25;
-    survival_fitness_method = "hetdisadvantage",
-    starting_pop_ratio = 0.1)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Figure S10F
-RunName = "JL_LikeFig4bHet_but_starting_pop_ratio_0.1"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.2, 1:25;
-    survival_fitness_method = "hetdisadvantage",
-    starting_pop_ratio = 0.1)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# Not shown in paper (but available in saved results):
-RunName = "JL_LikeFig3bHet_butFL2"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    K_total = 1000, max_generations = 1000,
-    total_loci = 4, female_mating_trait_loci = 1:2, male_mating_trait_loci = 1:2,
-    competition_trait_loci = 1:2, hybrid_survival_loci = 1:2, neutral_loci = 3:4,
-    survival_fitness_method = "hetdisadvantage")
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_LikeFig3b_butFL1"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25, 
-    1000, 1000,
-    2, 1:1, 1:1,
-    1:1, 1:1, 2:2)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_LikeFig3b_butFL9"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25, 
-    1000, 1000,
-    18, 1:9, 1:9,
-    1:9, 1:9, 10:18)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_LikeFig3b_butFL27"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25, 
-    1000, 1000,
-    54, 1:27, 1:27,
-    1:27, 1:27, 28:54)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_LikeFig4c_butFL27"
-RunOutcomes = run_HZAM(RunName, 1.0, 2.6, 1:25, 
-    1000, 1000,
-    54, 1:27, 1:27,
-    1:27, 1:27, 28:54)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig4a"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.025, 1:25) 
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig4b"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.2, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig4c"
-RunOutcomes = run_HZAM(RunName, 1.0, 2.6, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(1,2)"
-RunOutcomes = run_HZAM(RunName, 0.25, 1.05, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(1,3)"
-RunOutcomes = run_HZAM(RunName, 0.5, 1.05, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(1,4)"
-RunOutcomes = run_HZAM(RunName, 0.75, 1.05, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(2,1)"
-RunOutcomes = run_HZAM(RunName, 0.0, 2.6, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(2,2)"
-RunOutcomes = run_HZAM(RunName, 0.25, 2.6, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(2,3)"
-RunOutcomes = run_HZAM(RunName, 0.5, 2.6, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_Fig6(2,4)"
-RunOutcomes = run_HZAM(RunName, 0.75, 2.6, 1:25)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3b125gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000, 125)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3b250gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000, 250)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3b500gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000,500)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3b2000gen"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000,2000)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3bDiffLociTraitPref"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000, 1000,
-    9, 1:3, 4:6,
-    1:6, 1:6, 7:9)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-# Not shown in paper (but available in saved results), with epistasis:
-RunName = "JL_fig3bDiffLociTraitPrefEcol"
-RunOutcomes = run_HZAM(RunName, 1.0, 1.05, 1:25,
-    1000, 1000,
-    12, 1:3, 4:6,
-    7:9, 7:9, 10:12)
-make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
-
-
-# make graph of epistasis fitness (for Figure 1Cii):
-survival_HI = collect(0.0:0.01:1.0)
-beta = 1
-w_hyb = 0.8
-epistasis_fitnesses = 1 .- (1 - w_hyb) .* (4 .* survival_HI .* (1 .- survival_HI)).^beta
-using Plots
-display(plot(survival_HI, epistasis_fitnesses, ylims = (0,1)))
-savefig("plot.pdf")
