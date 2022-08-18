@@ -51,6 +51,9 @@ using GLMakie
 
 # set up functions (should not define functions repeatedly in loop, as causes re-compilation, slows things)
 
+# This function sets up the genotypes of the starting population
+# in a 3D array, where rows (D1) are alleles (row 1 from mother, row 2 from father),
+# columns (D2) are loci, and pages (D3) are individuals
 function generate_genotype_array(N_pop0,N_pop1,loci)
     total_N = N_pop0 + N_pop1  
     genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
@@ -442,15 +445,19 @@ end
 
 #### Run the actual simulation by calling the above function:
 
-sim_results = run_one_HZAM_sim(0.9, 10, 0, 1.1; # these values are 
+sim_results = run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are 
                                 # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total = 5000, max_generations = 5000,
+    K_total = 1000, max_generations = 1000,
     sigma_disp = 0.02, sympatry = false,
     sigma_comp = 0.1, do_plot = true, plot_int = 5)
 
 
 
+#### The above is all that is needed for a single simulation.
 
+####################################################################
+# Below is additional things I have used for testing,
+# and summarizing results from multiple simulations 
 
 
 
