@@ -4,6 +4,8 @@
 # Starting this file on 30Jan2022 to develop an integrated HZAM model that 
 # combines features of HZAM_Sym_Julia_V1.jl and HZAM_release_2.0.R into 
 
+# THIS LINE IS JUST A TEST OF GITHUB ACCESS
+
 # If you use this code, please cite the paper below, and possibly my GitHub or Dryad repository 
 # where you obtained this code:
 
