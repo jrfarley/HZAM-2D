@@ -1,17 +1,20 @@
-# HZAM-J_beta.jl
-# Hybrid Zone with Assortative Mating, Julia implementation,
-# by Darren Irwin.
-# Starting this file on 30Jan2022 to develop an integrated HZAM model that 
-# combines features of HZAM_Sym_Julia_V1.jl and HZAM_release_2.0.R into 
+#= HZAM-J_beta.jl
+Hybrid Zone with Assortative Mating, Julia implementation,
+by Darren Irwin.
+Starting this file on 30Jan2022 to develop an integrated HZAM model that 
+combines features of HZAM_Sym_Julia_V1.jl and HZAM_release_2.0.R into 
 
-# If you use this code, please cite the paper below, and possibly my GitHub or Dryad repository 
-# where you obtained this code:
+If you use this code, please cite the paper below, and possibly my GitHub or Dryad repository 
+where you obtained this code:
 
-# Irwin, D., and Schluter, D. Hybridization and the coexistence of species. bioRxiv 2021.04.04.438369; doi: https://doi.org/10.1101/2021.04.04.438369 
+Irwin, D., and Schluter, D. Hybridization and the coexistence of species. bioRxiv 2021.04.04.438369; doi: https://doi.org/10.1101/2021.04.04.438369 
+=#
 
-# You need to make sure these packages below are added to your Julia environment.
-# to add, type "]" to get the "pkg>" prompt, then type e.g. "add Distributions";
-# or do this: 
+#= You need to make sure these packages below are added to your Julia environment.
+To add e.g. the package Distributions, 
+type "]" to get the "pkg>" prompt, then type e.g. "add Distributions";
+or run the commands below: 
+=#
 # import Pkg; 
 # Pkg.add("Distributions") 
 # Pkg.add("Statistics") 
@@ -36,12 +39,12 @@ using DataFrames # for converting data to save as csv
 using LsqFit
 
 # for plotting:
-#using Plots
-#gr()  # use GR backend for graphs
+# using Plots
+# gr()  # use GR backend for graphs
 using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
-#using Plots.PlotMeasures  # needed for plot margin adjustment
+# using Plots.PlotMeasures  # needed for plot margin adjustment
 using GLMakie
 
 # to start Julia with multiple threads, type in terminal e.g.:
@@ -54,7 +57,7 @@ using GLMakie
 # This function sets up the genotypes of the starting population
 # in a 3D array, where rows (D1) are alleles (row 1 from mother, row 2 from father),
 # columns (D2) are loci, and pages (D3) are individuals
-function generate_genotype_array(N_pop0,N_pop1,loci)
+function generate_genotype_array(N_pop0,N_pop1,loci)::Array{Int8, 3}
     total_N = N_pop0 + N_pop1  
     genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
     genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
@@ -62,9 +65,9 @@ function generate_genotype_array(N_pop0,N_pop1,loci)
     return genotypes
 end
 
-function calc_traits_additive(genotypes)
+function calc_traits_additive(genotypes::Array{Int, 3})::Vector{Float32}
     N = size(genotypes, 3) 
-    traits = Array{Float32, 1}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
+    traits = Vector{Float32}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
     for i in 1:N
         traits[i] = mean(genotypes[:,:,i])
     end
