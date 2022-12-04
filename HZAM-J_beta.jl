@@ -55,9 +55,11 @@ using GLMakie
 # set up functions (should not define functions repeatedly in loop, as causes re-compilation, slows things)
 
 # This function sets up the genotypes of the starting population
-# in a 3D array, where rows (D1) are alleles (row 1 from mother, row 2 from father),
-# columns (D2) are loci, and pages (D3) are individuals
-function generate_genotype_array(N_pop0,N_pop1,loci)::Array{Int8, 3}
+# in a 3D array, where:
+# rows (D1) are alleles (row 1 from mother, row 2 from father),
+# columns (D2) are loci, 
+# pages (D3) are individuals.  
+function generate_genotype_array(N_pop0::Int, N_pop1::Int, loci::Int)::Array{Int8, 3}
     total_N = N_pop0 + N_pop1  
     genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
     genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
@@ -65,6 +67,9 @@ function generate_genotype_array(N_pop0,N_pop1,loci)::Array{Int8, 3}
     return genotypes
 end
 
+# This function calculates each mean values of the genotypes passed to it (for each individual).
+# Used to determine trait values in an additive way.
+# Only those loci that are additive trait loci should be passed to this function.
 function calc_traits_additive(genotypes::Array{Int, 3})::Vector{Float32}
     N = size(genotypes, 3) 
     traits = Vector{Float32}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
@@ -72,19 +77,22 @@ function calc_traits_additive(genotypes::Array{Int, 3})::Vector{Float32}
         traits[i] = mean(genotypes[:,:,i])
     end
     return traits
-end
+end 
 
-function get_survival_fitnesses_epistasis(genotypes, w_hyb, beta=1)
+# This function calculates survival fitness of each individual according to epistasis,
+# with the beta parameter set to one as a default.
+function get_survival_fitnesses_epistasis(genotypes::Array{Int, 3}, w_hyb::Real, beta=1::Real)::Vector{Float32}
     survival_HI = calc_traits_additive(genotypes)
     epistasis_fitnesses = 1 .- (1 - w_hyb) .* (4 .* survival_HI .* (1 .- survival_HI)).^beta
     return epistasis_fitnesses 
 end
 
-function get_survival_fitnesses_hetdisadvantage(genotypes, w_hyb)
+# This function calculates survival fitness of each individual according to heterozygosity.
+function get_survival_fitnesses_hetdisadvantage(genotypes::Array{Int, 3}, w_hyb::Real)::Vector{Float32}
     N = size(genotypes, 3)
     num_loci = size(genotypes, 2)
     s_per_locus = 1 - w_hyb ^ (1/num_loci)  # loss in fitness due to each heterozygous locus 
-    num_hetloci = Array{Int16, 1}(undef, N)
+    num_hetloci = Vector{Int}(undef, N)
     for ind in 1:N  # count number of het loci per individual
         num_hetloci[ind] = sum(genotypes[1,:,ind] .!= genotypes[2,:,ind])
     end
@@ -92,7 +100,11 @@ function get_survival_fitnesses_hetdisadvantage(genotypes, w_hyb)
     return hetdisadvantage_fitnesses
 end
 
-function disperse_individual(start_location, sigma_disp, geographic_limits)::Float32
+# This function determines breeding location of one individual,
+# based on a normal distribution with width sigma_disp,
+# centred on birth location. Constrained to be within range. 
+# geographic_limits should be a vector with two numbers.
+function disperse_individual(start_location::Real, sigma_disp::Real, geographic_limits::Vector{Real})::Float32
     while true
         new_location = start_location + (sigma_disp * randn())
         if (new_location >= geographic_limits[1]) & (new_location <= geographic_limits[2]) # checks if location is in range
@@ -101,27 +113,30 @@ function disperse_individual(start_location, sigma_disp, geographic_limits)::Flo
     end 
 end
 
-# These next two functions define the way potential male mates are chosen
+# These next two functions define the way potential male mates are chosen.
+# elig_M is a vector of indices of possible male mates.
 # When in sympatric model, choose random male (note the second and third arguments not used but allows function to be called in same way as in spatial model):
-function choose_random_male(elig_M, locations_M, focal_location)
-    focal_male = splice!(elig_M, rand(eachindex(elig_M)))
+function choose_random_male(elig_M::Vector{Int}, locations_M::Vector{Real}, focal_location::Real)
+    focal_male = splice!(elig_M, rand(eachindex(elig_M))) # this gets the index of a random male, and removes that male from the list in elig_M
     return focal_male, elig_M
 end
 # When in spatial model, choose closest male:
-function choose_closest_male(elig_M, locations_M, focal_location)
-    focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- focal_location)))
+function choose_closest_male(elig_M::Vector{Int}, locations_M::Vector{Real}, focal_location::Real)
+    focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- focal_location))) # this gets the index of a closest male, and removes that male from the list in elig_M
     return focal_male, elig_M
 end
 
+# This function produces the y value for a sigmoid, given the centre and maximum slope.
 function sigmoid(x, p)  # where p[1] is cline centre, and p[2] is maxSlope 
     1 ./ (1 .+ exp.(-p[2] .* (x .- p[1])))
 end
 
-# for adding jitter (small random shifts in position, to better visualize overlapping points)
-function jitter(n::Vector{Float32}, factor=0.02) 
+# This function adds jitter (small random shifts in position, to better visualize overlapping points)
+function jitter(n, factor=0.02) 
     n .+ (0.5 .- rand(length(n))) .* factor
 end
 
+# This is the function to run a single HZAM simulation
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int = 1000, max_generations::Int = 1000, 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
