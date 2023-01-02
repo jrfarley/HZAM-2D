@@ -492,8 +492,6 @@ sim_results = run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are
 
 
 
-
-
 #------------------
 
     #total_loci = 20,
