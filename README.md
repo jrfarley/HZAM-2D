@@ -8,3 +8,4 @@ into a spatial model of hybrid zones with assortative mating and ecological diff
 This repo will include these earlier versions, and build one combined HZAM-J that is
 ready for further development.
 
+1Jan2023 Note to self: Best not to keep this repo in Dropbox. Rather, clone to each computer, in a folder in Documents called "Github_repos_MacBookPro" or "Github_repos_StudioMac". When starting work, always do a pull to make sure local version is same as Github version. Then push when done working on that computer. 
