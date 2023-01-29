@@ -47,6 +47,8 @@ using Plots.PlotMeasures  # needed for plot margin adjustment
 # To check, type in Julia: Threads.nthreads()
 # 4
 
+# this is a GitHub test line change
+
 # set up functions (should not define functions repeatedly in loop, as causes re-compilation, slows things)
 
 function generate_genotype_array(N_pop0,N_pop1,loci)
