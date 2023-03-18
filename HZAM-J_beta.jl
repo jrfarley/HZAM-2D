@@ -21,15 +21,15 @@ or run the commands below:
 # Pkg.add("JLD2")
 # Pkg.add("CSV")
 # Pkg.add("DataFrames")
-# Pkg.add("Plots")
+# Pkg.add("LsqFit") 
+### Pkg.add("Plots")
 # Pkg.add("CategoricalArrays")
 # Pkg.add("Colors")
 # Pkg.add("ColorSchemes")
-# Pkg.add("CategoricalArrays")
-# Pkg.add("Makie") 
-# Pkg.add("CairoMakie")
+### Pkg.add("Makie") 
+### Pkg.add("CairoMakie")
 # Pkg.add("GLMakie")
-# Pkg.add("LsqFit") 
+
 
 using Distributions # needed for "Poisson" function
 using Statistics  # needed for "mean" function
@@ -59,7 +59,7 @@ using GLMakie
 # rows (D1) are alleles (row 1 from mother, row 2 from father),
 # columns (D2) are loci, 
 # pages (D3) are individuals.  
-function generate_genotype_array(N_pop0::Int, N_pop1::Int, loci::Int)::Array{Int8, 3}
+function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)::Array{Int8, 3}
     total_N = N_pop0 + N_pop1  
     genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
     genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
@@ -70,7 +70,7 @@ end
 # This function calculates each mean values of the genotypes passed to it (for each individual).
 # Used to determine trait values in an additive way.
 # Only those loci that are additive trait loci should be passed to this function.
-function calc_traits_additive(genotypes::Array{Int, 3})::Vector{Float32}
+function calc_traits_additive(genotypes::Array{Int8, 3})::Vector{Float32}
     N = size(genotypes, 3) 
     traits = Vector{Float32}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
     for i in 1:N
@@ -81,18 +81,18 @@ end
 
 # This function calculates survival fitness of each individual according to epistasis,
 # with the beta parameter set to one as a default.
-function get_survival_fitnesses_epistasis(genotypes::Array{Int, 3}, w_hyb::Real, beta=1::Real)::Vector{Float32}
+function get_survival_fitnesses_epistasis(genotypes::Array{Int8, 3}, w_hyb::Real, beta=1::Real)::Vector{Float32}
     survival_HI = calc_traits_additive(genotypes)
     epistasis_fitnesses = 1 .- (1 - w_hyb) .* (4 .* survival_HI .* (1 .- survival_HI)).^beta
     return epistasis_fitnesses 
 end
 
 # This function calculates survival fitness of each individual according to heterozygosity.
-function get_survival_fitnesses_hetdisadvantage(genotypes::Array{Int, 3}, w_hyb::Real)::Vector{Float32}
+function get_survival_fitnesses_hetdisadvantage(genotypes::Array{Int8, 3}, w_hyb::Real)::Vector{Float32}
     N = size(genotypes, 3)
     num_loci = size(genotypes, 2)
     s_per_locus = 1 - w_hyb ^ (1/num_loci)  # loss in fitness due to each heterozygous locus 
-    num_hetloci = Vector{Int}(undef, N)
+    num_hetloci = Vector{Integer}(undef, N)
     for ind in 1:N  # count number of het loci per individual
         num_hetloci[ind] = sum(genotypes[1,:,ind] .!= genotypes[2,:,ind])
     end
@@ -104,7 +104,7 @@ end
 # based on a normal distribution with width sigma_disp,
 # centred on birth location. Constrained to be within range. 
 # geographic_limits should be a vector with two numbers.
-function disperse_individual(start_location::Real, sigma_disp::Real, geographic_limits::Vector{Real})::Float32
+function disperse_individual(start_location::Real, sigma_disp::Real, geographic_limits::Vector{Float64})::Float32
     while true
         new_location = start_location + (sigma_disp * randn())
         if (new_location >= geographic_limits[1]) & (new_location <= geographic_limits[2]) # checks if location is in range
@@ -116,12 +116,12 @@ end
 # These next two functions define the way potential male mates are chosen.
 # elig_M is a vector of indices of possible male mates.
 # When in sympatric model, choose random male (note the second and third arguments not used but allows function to be called in same way as in spatial model):
-function choose_random_male(elig_M::Vector{Int}, locations_M::Vector{Real}, focal_location::Real)
+function choose_random_male(elig_M::Vector{UInt32}, locations_M::Vector{Float32}, focal_location::Real)
     focal_male = splice!(elig_M, rand(eachindex(elig_M))) # this gets the index of a random male, and removes that male from the list in elig_M
     return focal_male, elig_M
 end
 # When in spatial model, choose closest male:
-function choose_closest_male(elig_M::Vector{Int}, locations_M::Vector{Real}, focal_location::Real)
+function choose_closest_male(elig_M::Vector{UInt32}, locations_M::Vector{Float32}, focal_location::Real)
     focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- focal_location))) # this gets the index of a closest male, and removes that male from the list in elig_M
     return focal_male, elig_M
 end
@@ -142,7 +142,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
     competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
     survival_fitness_method::String = "epistasis", per_reject_cost = 0,
-    starting_pop_ratio = 1.0, sympatry = false, geographic_limits = [0, 1], 
+    starting_pop_ratio = 1.0, sympatry = false, geographic_limits::Vector{Float64} = [0.0, 1.0], 
     starting_range_pop0 = [0.0, 0.48], starting_range_pop1 = [0.52, 1.0],
     sigma_disp = 0.01, sigma_comp = 0.01,
     do_plot = true, plot_int = 10)
@@ -343,7 +343,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
             father = [] # will contain the index of the male mate
             # make vector of indices of eligible males
-            elig_M = Vector(1:N_M)
+            elig_M = Vector{UInt32}(1:N_M)  # this integer type allows up to more than 4 billion values 
             # determine male mate of female
             while mate == false
                 # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
@@ -470,8 +470,12 @@ sim_results = run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are
     sigma_comp = 0.1, do_plot = true, plot_int = 5)
 
 
+# Running the above should open a plot window (after maybe 10-20 seconds) and show the simulation running.
 
-#### The above is all that is needed for a single simulation.
+#### The above is all that is needed for a single simulation. 
+# I have tested the above on 18March2023 and it is working.
+
+# As of 18March2023, I have not tested below here. 
 
 ####################################################################
 # Below is additional things I have used for testing,
