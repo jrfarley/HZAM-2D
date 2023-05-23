@@ -11,6 +11,8 @@ export calc_female_growth_rate, choose_closest_male, choose_random_male, get_pop
 export plot_population, update_plot
 export calc_distance
 
+export get_genotypes, get_growth_rates, get_locations, get_ideal_densities_taylor # for use in tests only
+
 global sympatry # if sympatry is true then the ranges are one-dimensional
 global intrinsic_R # population growth rate
 global K_total, K_A, K_B # the carrying capacities of each resource
@@ -31,15 +33,15 @@ function initialize_population(new_K_total::Int,
     ecolDiff,
     new_sympatry::Bool,
     total_loci::Int,
-    new_geographic_limits::Vector{},
-    starting_range_pop0,
-    starting_range_pop1,
     new_competition_trait_loci,
     new_female_mating_trait_loci,
     new_male_mating_trait_loci,
     new_hybrid_survival_loci,
     new_intrinsic_R,
-    new_sigma_comp)
+    new_sigma_comp;
+    new_geographic_limits::Vector{}=[0.0, 1.0],
+    starting_range_pop0=[0.0, 0.48],
+    starting_range_pop1=[0.52, 1.0])
 
     # initialize the global variables
     global competition_trait_loci = new_competition_trait_loci
@@ -73,9 +75,11 @@ function initialize_population(new_K_total::Int,
         pop1_starting_N = Int(round(starting_pop_ratio * K_B))   # starting N of species 1, which can be lower if starting_pop_ratio is below 1)
         pop1_starting_N_half = Int(pop1_starting_N / 2)
     else  # sympatry is false, then set pop sizes assuming no range overlap--this is why the "2" is in the formulae below  
-        pop0_starting_N = (2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1])
+        pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]))
         pop0_starting_N_half = Int(pop0_starting_N / 2)  # starting number for each sex
-        pop1_starting_N = (2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1])
+        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1]))
+        println(pop0_starting_N_half)
+        println(pop1_starting_N)
         pop1_starting_N_half = Int(pop1_starting_N / 2)
     end
 
@@ -281,7 +285,7 @@ end
 
 # calculates the distance between the mother and the father
 function calc_distance(mother, father)
-    return abs(locations_F[mother]-locations_M[father])
+    return abs(locations_F[mother] - locations_M[father])
 end
 
 # compare male trait with female's trait (preference), and determine
@@ -303,7 +307,7 @@ end
 
 # returns the total number of females and the total number of males 
 function get_population()
-    return length(locations_F), length(locations_M)
+    return size(genotypes_F, 3), size(genotypes_M, 3)
 end
 
 # generates the genotype for an offspring based on its parents' genotypes
@@ -343,4 +347,17 @@ end
 function update_plot(generation)
     update_population_plot(calc_hybrid_indices(), [locations_F; locations_M], generation)
 end
+
+function get_genotypes()
+    return genotypes_F, genotypes_M
+end
+
+function get_growth_rates()
+    return growth_rate_resourceA, growth_rate_resourceB
+end
+
+function get_locations()
+    return locations_F, locations_M
+end
+
 end

@@ -286,6 +286,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             # calculate global growth rates due to each resource (according to discrete time logistic growth equation)
             growth_rate_resourceA = (intrinsic_R * K_A) / (K_A + ((total_useResourceA) * (intrinsic_R - 1)))
             growth_rate_resourceB = (intrinsic_R * K_B) / (K_B + ((total_useResourceB) * (intrinsic_R - 1)))
+            
         else  # in spatial model, calculate growth rates based on local resource use
             # determine local resource use for each location across range
             ind_locations_real = [locations_F; locations_M]
