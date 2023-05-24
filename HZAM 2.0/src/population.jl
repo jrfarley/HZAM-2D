@@ -11,8 +11,6 @@ export calc_female_growth_rate, choose_closest_male, choose_random_male, get_pop
 export plot_population, update_plot
 export calc_distance
 
-export get_genotypes, get_growth_rates, get_locations, get_ideal_densities_taylor # for use in tests only
-
 global sympatry # if sympatry is true then the ranges are one-dimensional
 global intrinsic_R # population growth rate
 global K_total, K_A, K_B # the carrying capacities of each resource
@@ -78,8 +76,6 @@ function initialize_population(new_K_total::Int,
         pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]))
         pop0_starting_N_half = Int(pop0_starting_N / 2)  # starting number for each sex
         pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1]))
-        println(pop0_starting_N_half)
-        println(pop1_starting_N)
         pop1_starting_N_half = Int(pop1_starting_N / 2)
     end
 
@@ -176,24 +172,16 @@ function calculate_growth_rates_sympatry()
 end
 
 # calculates the ideal density (assuming normal distribution) at the location of each female
-function get_ideal_densities_taylor(K_total, sigma_comp, locations_F)
-    #approximation of integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-
-    maximum_density = (K_total / 24) * (2 * exp(-(1 / (8 * sigma_comp^2))) +
-                                        8 * exp(-((0.375^2) / (2 * sigma_comp^2))) +
-                                        4 * exp(-(1 / (32 * sigma_comp^2))) +
-                                        8 * exp(-(1 / (128 * sigma_comp^2))) + 2)
-
-    first_coefficient_taylor_series = ((K_total * exp(-1 / (8 * sigma_comp^2))) / (2 * sigma_comp^2))
-
-    second_coefficient_taylor_series = K_total * (((3 * exp(-1 / (8 * sigma_comp^2))) / (24 * sigma_comp^4)) -
-                                                  (exp(-1 / (8 * sigma_comp^2)) / (96 * sigma_comp^6)))
-
-    function get_ideal_density(focal_location)
-        return 0.5 * (maximum_density - first_coefficient_taylor_series * (focal_location - 0.5)^2 + second_coefficient_taylor_series * (focal_location - 0.5)^4)
+function get_ideal_densities(K_total, sigma_comp, locations_F)
+    function erf(x) # approximation of the error function
+        return tanh((sqrt(pi) * log(2)) * x)
     end
 
-    return map(get_ideal_density, locations_F)
+    function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
+        return K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location) / (sqrt(2) * sigma_comp)) + erf(location / (sqrt(2) * sigma_comp)))
+    end
+
+    return map(calc_ideal_density, locations_F)
 end
 
 # calculates growth rates in the spatial model
@@ -202,7 +190,10 @@ function calculate_growth_rates_spatial()
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
 
-    ideal_densities_at_locations_F = get_ideal_densities_taylor(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
+    ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
+
+    ideal_densities_at_locations_F_resourceA = ideal_densities_at_locations_F ./ 2
+    ideal_densities_at_locations_F_resourceB = ideal_densities_at_locations_F_resourceA
 
     # assume both resources have same constant density across range
 
@@ -210,12 +201,13 @@ function calculate_growth_rates_spatial()
     ind_useResourceA_all = [ind_useResourceA_F; ind_useResourceA_M]
     ind_useResourceB_all = [ind_useResourceB_F; ind_useResourceB_M]
     ind_locations_real = [locations_F; locations_M]
+
+
     function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
         sum(ind_useResourceA_all .* exp.(-((ind_locations_real .- focal_location) .^ 2) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
 
     real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F) # this applies the above function to each geographic location
-
 
     function get_useResourceB_density_real(focal_location) # do the same for resource B
         sum(ind_useResourceB_all .* exp.(-((ind_locations_real .- focal_location) .^ 2) ./ (2 * (sigma_comp^2))))
@@ -224,11 +216,8 @@ function calculate_growth_rates_spatial()
 
     # calculate local growth rates due to each resource (according to discrete time logistic growth equation)
 
-    local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F ./ (ideal_densities_at_locations_F .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
-    local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F ./ (ideal_densities_at_locations_F .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
-    #println(calc_local_growth_rate(ind_locations_real[29]))
-
-    #println(local_growth_rates_resourceA[29])
+    local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
+    local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
 
     return local_growth_rates_resourceA, local_growth_rates_resourceB
 end
@@ -358,6 +347,11 @@ end
 
 function get_locations()
     return locations_F, locations_M
+end
+
+function set_locations(new_locations_F, new_locations_M)
+    global locations_F = new_locations_F
+    global locations_M = new_locations_M
 end
 
 end
