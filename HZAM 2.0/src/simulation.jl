@@ -61,10 +61,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         male_mating_trait_loci,
         hybrid_survival_loci,
         intrinsic_R,
-        sigma_comp;
-        new_geographic_limits=[0.0, 1.0],
-        starting_range_pop0=[0, 0.48],
-        starting_range_pop1=[5.2, 1.0])
+        sigma_comp)
 
     extinction = false  # if extinction happens later this will be set true
 

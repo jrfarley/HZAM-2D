@@ -227,11 +227,11 @@ end
 # rows (D1) are alleles (row 1 from mother, row 2 from father),
 # columns (D2) are loci, 
 # pages (D3) are individuals.  
-function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)::Array{Int8,3}
-    total_N = N_pop0 + N_pop1
-    genotypes = Array{Int8,3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
-    genotypes[:, :, 1:N_pop0] .= 0  # assigns genotypes of pop01
-    genotypes[:, :, (N_pop0+1):total_N] .= 1  # assigns genotypes of pop1
+function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)::Array{Int8, 3}
+    total_N = N_pop0 + N_pop1  
+    genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
+    genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
+    genotypes[:,:,(N_pop0+1):total_N] .= 1  # assigns genotypes of pop1
     return genotypes
 end
 
