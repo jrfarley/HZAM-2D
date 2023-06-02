@@ -134,9 +134,9 @@ function initialize_population(new_K_total::Int,
         global ind_useResourceB_M = ind_useResourceB_F
 
         global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates_spatial()
+        global starting_locations_F, starting_locations_M = (copy(locations_F), copy(locations_M))
     end
 
-    global starting_locations_F, starting_locations_M = (copy(locations_F), copy(locations_M))
     global starting_genotypes_F, starting_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
 end
 

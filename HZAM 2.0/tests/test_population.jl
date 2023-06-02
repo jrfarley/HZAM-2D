@@ -5,7 +5,7 @@ using .Population
 
 #import .Population : get_genotypes, get_growth_rates, get_locations, get_ideal_densities, calculate_growth_rates_spatial, set_locations, generate_genotype_array, calc_traits_additive
 
-#=
+
 @testset "initialize_population_sympatry" begin
     K_total = 4
     starting_pop_ratio = 1.0
@@ -263,8 +263,6 @@ end
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    genotypes = [[0 0 0; 0 0 0], [0 0 0; 0 0 0], [1 1 1; 1 1 1]]
-
     initialize_population(K_total,
         starting_pop_ratio,
         ecolDiff,
@@ -280,11 +278,11 @@ end
         starting_range_pop0=[0, 0.48],
         starting_range_pop1=[5.2, 1.0])
 
-    println(Population.calc_hybrid_indices())
+    println(Population.calc_hybrid_indices([Population.genotypes_F; Population.genotypes_M]))
 
-    @test Population.calc_hybrid_indices() == [0.0, 1.0, 0.0, 1.0]
+    @test Population.calc_hybrid_indices([Population.genotypes_F; Population.genotypes_M]) == [0.0, 1.0, 0.0, 1.0]
 
-end=#
+end
 
 @testset "generate_offspring_genotype" begin
     K_total = 4
@@ -364,7 +362,7 @@ end
     closest_male, elig_M = choose_closest_male(collect(1:4), 1)
 
     @test closest_male == 1
-    @test elig_M == [2,3,4]
+    @test elig_M == [2, 3, 4]
 
     closest_male, elig_M = choose_closest_male(elig_M, 1)
     @test closest_male == 2
