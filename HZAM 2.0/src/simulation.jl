@@ -71,12 +71,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     else # if space matters, then choose closest male
         pick_potential_mate = choose_closest_male
     end
-
-    
     if do_plot
         plot_population()
     end
-    
+
 
     # loop throught the generations
     for generation in 1:max_generations
@@ -94,8 +92,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         ### NEED TO CAREFULLY PROOF THE ABOVE, PARTICULARLY IF ECOLDIF > 0
 
         # make empty arrays for storing genotypes of daughters and sons
-        genotypes_daughters = Array{Int8,3}(undef, 2, total_loci, 0)
-        genotypes_sons = Array{Int8,3}(undef, 2, total_loci, 0)
+        genotypes_daughters = [zeros(Int8, 2, 3) for i in 1:0] # a little sketchy FIX LATER
+        genotypes_sons = [zeros(Int8, 2, 3) for i in 1:0] # likewise
 
         # make empty arrays for storing locations of daughters and sons
         locations_daughters = Array{Float32,1}(undef, 0)
@@ -106,14 +104,18 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         daughter_parent_IDs = Array{Int}(undef, 0, 2)
         son_parent_IDs = Array{Int}(undef, 0, 2)
 
+        # flags for when it is necessary to expand the active region of the simulation
+        expand_left = false
+        expand_right = false
+
         # loop through mothers, mating and reproducing
-        for mother in 1:N_F
+        for mother in active_F
             # initialize tracking variables
             mate = false # becomes true when female is paired with male
             rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
             father = [] # will contain the index of the male mate
             # make vector of indices of eligible males
-            elig_M = Vector{UInt32}(1:N_M)  # this integer type allows up to more than 4 billion values 
+            elig_M = copy(active_M)
             # determine male mate of female
             while mate == false
                 # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
@@ -156,11 +158,19 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         survival_fitness = get_survival_fitness(kid_info[:, hybrid_survival_loci], w_hyb)#######
                         if survival_fitness > rand()
                             # determine sex and location of kid
+                            new_location = disperse_individual(mother, sigma_disp, geographic_limits)
+                            genotype_sum = sum(kid_info)
+                            if genotype_sum > 0 && new_location < (left_boundary + 1) / 10
+                                expand_left = true
+                            elseif genotype_sum < total_loci * 2 && new_location > (right_boundary - 1) / 10
+                                expand_right = true
+                            end
+
                             if rand() > 0.5 # kid is daughter
-                                genotypes_daughters = cat(genotypes_daughters, kid_info, dims=3)
+                                push!(genotypes_daughters, kid_info)
                                 locations_daughters = [locations_daughters; disperse_individual(mother, sigma_disp, geographic_limits)]
                             else # kid is son
-                                genotypes_sons = cat(genotypes_sons, kid_info, dims=3)
+                                push!(genotypes_sons, kid_info)
                                 locations_sons = [locations_sons; disperse_individual(mother, sigma_disp, geographic_limits)]
                             end
                         end
@@ -176,14 +186,20 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end
 
         # assign surviving offspring to new adult population
-        update_population(genotypes_daughters, genotypes_sons, locations_daughters, locations_sons)
+        update_population(genotypes_daughters, genotypes_sons, locations_daughters, locations_sons, expand_left, expand_right, generation)
+
+        # check if there are no remaining females in the hybrid zone
+        if(length(active_F)==0)
+            println("ENDED WITH TWO SEPARATE POPULATIONS")
+            break
+        end
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
             update_plot(generation)
         end
-        
     end # of loop through generations
+
     #return genotypes_F, locations_F, genotypes_M, locations_M, extinction
 end
 

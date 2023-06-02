@@ -9,7 +9,8 @@ using Statistics
 export initialize_population, update_population
 export calc_female_growth_rate, choose_closest_male, choose_random_male, get_population, calc_match_strength, generate_offspring_genotype, disperse_individual
 export plot_population, update_plot
-export calc_distance
+export active_F, active_M, left_boundary, right_boundary
+export calc_distance, get_num_hybridization_events
 
 global sympatry # if sympatry is true then the ranges are one-dimensional
 global intrinsic_R # population growth rate
@@ -23,6 +24,21 @@ global ind_useResourceA_M, ind_useResourceB_M # individual contributions to reso
 global competAbility_useResourceA_pop0, competAbility_useResourceA_pop1, competAbility_useResourceB_pop0, competAbility_useResourceB_pop1 # the ability of each population to use each resource
 global geographic_limits # the geographic range of the simulation
 global functional_loci_range, hybrid_survival_loci
+global num_hybridization_events = 0
+global active_region_limits = [0.4, 0.6]
+global active_F, active_M = [], []
+global inactive_F, inactive_M = [], []
+global buffer_M = []
+global individuals_per_zone_F = [[] for i in 1:10]
+global individuals_per_zone_M = [[] for i in 1:10]
+global left_boundary = 5
+global right_boundary = 6
+global starting_locations_F, starting_locations_M, starting_genotypes_F, starting_genotypes_M
+
+
+function get_num_hybridization_events()
+    return num_hybridization_events
+end
 
 # generates the starting genotypes/locations
 # and calculates the growth rates based on individual resource use
@@ -89,8 +105,29 @@ function initialize_population(new_K_total::Int,
     # initialize growth rates
     if sympatry
         global growth_rate_resourceA, growth_rate_resourceB = calculate_initial_growth_rates_sympatry(K_A, K_B)
+        global active_F = 1:length(genotypes_F)
+        global active_M = 1:length(genotypes_M)
     else
         global locations_F, locations_M = generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
+        global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
+        global active_F = vcat(individuals_per_zone_F[5], individuals_per_zone_F[6])
+        global inactive_F = vcat(individuals_per_zone_F[1],
+            individuals_per_zone_F[2],
+            individuals_per_zone_F[3],
+            individuals_per_zone_F[4],
+            individuals_per_zone_F[7],
+            individuals_per_zone_F[8],
+            individuals_per_zone_F[9],
+            individuals_per_zone_F[10])
+        global buffer_M = vcat(individuals_per_zone_M[4], individuals_per_zone_M[7])
+        global active_M = vcat(individuals_per_zone_M[5], individuals_per_zone_M[6], buffer_M)
+        global inactive_M = vcat(individuals_per_zone_M[1],
+            individuals_per_zone_M[2],
+            individuals_per_zone_M[3],
+            individuals_per_zone_M[8],
+            individuals_per_zone_M[9],
+            individuals_per_zone_M[10])
+
         global ind_useResourceA_F = [fill(competAbility_useResourceA_pop0, pop0_starting_N_half); fill(competAbility_useResourceA_pop1, pop1_starting_N_half)]
         global ind_useResourceA_M = ind_useResourceA_F
         global ind_useResourceB_F = [fill(competAbility_useResourceB_pop0, pop0_starting_N_half); fill(competAbility_useResourceB_pop1, pop1_starting_N_half)]
@@ -98,6 +135,9 @@ function initialize_population(new_K_total::Int,
 
         global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates_spatial()
     end
+
+    global starting_locations_F, starting_locations_M = (copy(locations_F), copy(locations_M))
+    global starting_genotypes_F, starting_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
 end
 
 function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
@@ -109,24 +149,181 @@ function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, 
     return [locations_F_pop0; locations_F_pop1], [locations_M_pop0; locations_M_pop1]
 end
 
+# arranges the indices of each individual by location
+function assign_zones(locations_F, locations_M)
+    new_individuals_per_zone_F = [[] for i in 1:10]
+    new_individuals_per_zone_M = [[] for i in 1:10]
+
+    for indv in eachindex(locations_F)
+        zone = trunc(Int, 10 * locations_F[indv]) + 1
+        push!(new_individuals_per_zone_F[zone], indv)
+    end
+
+
+    for indv in eachindex(locations_M)
+        zone = trunc(Int, 10 * locations_M[indv]) + 1
+        push!(new_individuals_per_zone_M[zone], indv)
+    end
+
+    return new_individuals_per_zone_F, new_individuals_per_zone_M
+end
+
 # updates the genotypes, locations, and growth rates with the values for the next generation
-function update_population(genotypes_daughters::Array{Int8,3},
-    genotypes_sons::Array{Int8,3},
+function update_population(genotypes_daughters,
+    genotypes_sons,
     locations_daughters::Array{Float32},
-    locations_sons::Array{Float32})
+    locations_sons::Array{Float32},
+    expand_left,
+    expand_right,
+    generation)
 
-    global genotypes_F = genotypes_daughters
-    global genotypes_M = genotypes_sons
+    new_active_F = []
 
-    global locations_F = locations_daughters
-    global locations_M = locations_sons
+    new_active_M = buffer_M
+    new_inactive_F = []
+    new_inactive_M = []
 
+    if expand_left && left_boundary > 1
+        global left_boundary -= 1
+        new_active_F = individuals_per_zone_F[left_boundary]
+        if left_boundary > 1
+            new_buffer_M = individuals_per_zone_M[left_boundary-1]
+            new_active_M = vcat(new_active_M, new_buffer_M)
+        end
+    end
 
-    # calculate ecological competition trait values from genotypes
-    competition_traits_F = calc_traits_additive(genotypes_F[:, competition_trait_loci, :])
-    competition_traits_M = calc_traits_additive(genotypes_M[:, competition_trait_loci, :])
+    for i in 1:left_boundary-1
+        new_inactive_F = vcat(new_inactive_F, individuals_per_zone_F[i])
+    end
+
+    for i in 1:left_boundary-2
+        new_inactive_M = vcat(new_inactive_M, individuals_per_zone_M[i])
+    end
+
+    if expand_right && right_boundary < 10
+        global right_boundary += 1
+        new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
+        if right_boundary < 10
+            new_buffer_M = individuals_per_zone_M[right_boundary+1]
+            new_active_M = vcat(new_active_M, new_buffer_M)
+        end
+    end
+
+    for i in right_boundary+1:10
+        new_inactive_F = vcat(new_inactive_F, individuals_per_zone_F[i])
+    end
+
+    for i in right_boundary+2:10
+        new_inactive_M = vcat(new_inactive_M, individuals_per_zone_M[i])
+    end
+
+    global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[new_active_F], starting_genotypes_F[new_inactive_F])
+    global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[new_active_M], starting_genotypes_M[new_inactive_M])
+
+    global locations_F = vcat(locations_daughters, starting_locations_F[new_active_F], starting_locations_F[new_inactive_F])
+    global locations_M = vcat(locations_sons, starting_locations_M[new_active_M], starting_locations_M[new_inactive_M])
+
+    num_active_F = length(locations_daughters) + length(new_active_F)
+    num_active_M = length(locations_sons) + length(new_active_M)
+
+    global active_F = collect(1:num_active_F)
+    global active_M = collect(1:num_active_M)
+
+    global inactive_F = collect(num_active_F+1:length(locations_F))
+    global inactive_M = collect(num_active_M+1:length(locations_M))
+
+    buffer_zone = [max(1, left_boundary - 1), min(10, right_boundary + 1)]
+
+    if generation % 10 == 0
+        global starting_locations_F, starting_locations_M = copy(locations_F), copy(locations_M)
+        global starting_genotypes_F, starting_genotypes_M = copy(genotypes_F), copy(genotypes_M)
+
+        global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
+
+        dead_zones = find_inactive_zones(individuals_per_zone_F, individuals_per_zone_M)
+
+        if dead_zones != []
+            global inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones])
+            global inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones])
+        end
+
+        global active_F = setdiff(active_F, inactive_F)
+        global active_M = setdiff(active_M, inactive_M)
+        global left_boundary = minimum(setdiff(collect(1:10), dead_zones))
+        global right_boundary = maximum(setdiff(collect(1:10), dead_zones))
+        buffer_zone = [left_boundary, right_boundary]
+    end
+
+    global buffer_M = [individuals_per_zone_M[buffer_zone[1]]
+        individuals_per_zone_M[buffer_zone[2]]]
+
+    competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
+    competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
 
     global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates(competition_traits_F, competition_traits_M)
+
+end
+
+# finds which parts of the range contain only individuals of one genotype
+function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+    dead_zones = []
+    output = []
+    zone_classification = []
+
+    for zone in 1:10
+        if length(indv_per_zone_M[zone]) > 0 && length(indv_per_zone_F[zone]) > 0
+            all_equal = true
+            genotype1 = genotypes_M[indv_per_zone_M[zone][1]]
+            push!(zone_classification, genotypes_M[indv_per_zone_M[zone][1]][1, 1])
+
+            for indv in indv_per_zone_F[zone]
+                if genotypes_F[indv] != genotype1
+                    all_equal = false
+                    break
+                end
+            end
+            if all_equal
+                for indv in indv_per_zone_M[zone]
+                    if genotypes_M[indv] != genotype1
+                        all_equal = false
+                        break
+                    end
+                end
+            end
+            if all_equal
+                push!(dead_zones, zone)
+            end
+        else
+            push!(dead_zones, zone)
+            if zone < 5
+                push!(zone_classification, 0)
+            else
+                push!(zone_classification, 1)
+            end
+        end
+    end
+
+    for zone in dead_zones
+        if zone == 1
+            if 2 in dead_zones && zone_classification[2] == zone_classification[1]
+                push!(output, 1)
+            end
+        elseif zone == 10
+            if 9 in dead_zones && zone_classification[10] == zone_classification[9]
+                push!(output, 10)
+            end
+        else
+            if zone - 1 in dead_zones && zone + 1 in dead_zones
+                if zone_classification[zone-1] == zone_classification[zone]
+                    if zone_classification[zone+1] == zone_classification[zone]
+                        push!(output, zone)
+                    end
+                end
+            end
+        end
+    end
+
+    return output
 end
 
 # calculates the growth rates at the beginning of the simulation when the populations are in sympatry
@@ -202,7 +399,6 @@ function calculate_growth_rates_spatial()
     ind_useResourceB_all = [ind_useResourceB_F; ind_useResourceB_M]
     ind_locations_real = [locations_F; locations_M]
 
-
     function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
         sum(ind_useResourceA_all .* exp.(-((ind_locations_real .- focal_location) .^ 2) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
@@ -227,48 +423,50 @@ end
 # rows (D1) are alleles (row 1 from mother, row 2 from father),
 # columns (D2) are loci, 
 # pages (D3) are individuals.  
-function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)::Array{Int8, 3}
-    total_N = N_pop0 + N_pop1  
-    genotypes = Array{Int8, 3}(undef, 2, loci, total_N) # The "Int8" is the type (8-bit integer), and "undef" means an unitialized array, so values are meaningless
-    genotypes[:,:,1:N_pop0] .= 0  # assigns genotypes of pop01
-    genotypes[:,:,(N_pop0+1):total_N] .= 1  # assigns genotypes of pop1
+function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)
+    total_N = N_pop0 + N_pop1
+    genotypes = vcat([fill(0, 2, loci) for i in 1:N_pop0], [fill(1, 2, loci) for j in (N_pop0+1):total_N])
+
     return genotypes
 end
 
 # This function calculates each mean values of the genotypes passed to it (for each individual).
 # Used to determine trait values in an additive way.
 # Only those loci that are additive trait loci should be passed to this function.
-function calc_traits_additive(genotypes::Array{Int8,3})::Vector{Float32}
-    N = size(genotypes, 3)
+function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3}=#
+    N = length(genotypes)
     #traits = Vector{Float32}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
 
-    function mean(array)
-        return sum(array) / length(array)
+    function mean(genotype, loci)
+        return sum(genotype[:, loci]) / (2 * length(loci))
     end
 
-    traits = map(x -> mean(genotypes[:, :, x]), 1:N)
+    traits = map(x -> mean(genotypes[x], loci), 1:N)
     return traits
 end
 
 function calc_mating_trait_female(n)
-    return mean(genotypes_F[:, female_mating_trait_loci, n])
+    return mean(genotypes_F[n][:, female_mating_trait_loci])
 end
 
 function calc_mating_trait_male(n)
-    return mean(genotypes_M[:, female_mating_trait_loci, n])
+    return mean(genotypes_M[n][:, female_mating_trait_loci])
 end
 
 # These next two functions define the way potential male mates are chosen.
 # elig_M is a vector of indices of possible male mates.
 # When in sympatric model, choose random male (note the second and third arguments not used but allows function to be called in same way as in spatial model):
-function choose_random_male(elig_M::Vector{UInt32}, female_index::Real)
+function choose_random_male(elig_M, female_index::Real)
     focal_male = splice!(elig_M, rand(eachindex(elig_M))) # this gets the index of a random male, and removes that male from the list in elig_M
     return focal_male, elig_M
 end
 
 # When in spatial model, choose closest male:
-function choose_closest_male(elig_M::Vector{UInt32}, female_index::Real)
+function choose_closest_male(elig_M, female_index::Real)
     focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- locations_F[female_index]))) # this gets the index of a closest male, and removes that male from the list in elig_M
+    if (calc_distance(female_index, focal_male) >= 0.1)
+        return focal_male, []
+    end
     return focal_male, elig_M
 end
 
@@ -296,7 +494,7 @@ end
 
 # returns the total number of females and the total number of males 
 function get_population()
-    return size(genotypes_F, 3), size(genotypes_M, 3)
+    return length(genotypes_F), length(genotypes_M)
 end
 
 # generates the genotype for an offspring based on its parents' genotypes
@@ -304,8 +502,11 @@ function generate_offspring_genotype(female_index, male_index, total_loci)
     # generate genotypes; for each locus (column), first row for allele from mother, second row for allele from father
     kid_info = Array{Int8,2}(undef, 2, total_loci)
     for locus in 1:total_loci
-        kid_info[1, locus] = genotypes_F[rand([1 2]), locus, female_index]  # for this locus, pick a random allele from the mother
-        kid_info[2, locus] = genotypes_M[rand([1 2]), locus, male_index]  # and from the father
+        kid_info[1, locus] = genotypes_F[female_index][rand([1 2]), locus]  # for this locus, pick a random allele from the mother
+        kid_info[2, locus] = genotypes_M[male_index][rand([1 2]), locus]  # and from the father
+    end
+    if (kid_info != genotypes_F[female_index][:, :])
+        global num_hybridization_events += 1
     end
     return kid_info
 end
@@ -324,17 +525,23 @@ function disperse_individual(female_index::Int, sigma_disp::Real, geographic_lim
 end
 
 # returns the hybrid index of every individual in the population
-function calc_hybrid_indices()
-    return [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
+function calc_hybrid_indices(genotypes)
+    return calc_traits_additive(genotypes, functional_loci_range)
 end
 
 
 function plot_population()
-    create_new_plot(calc_hybrid_indices(), [locations_F; locations_M])
+    create_new_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
+        [locations_F[active_F]; locations_M[active_M]],
+        calc_hybrid_indices([genotypes_F[inactive_F]; genotypes_M[inactive_M]]),
+        [locations_F[inactive_F]; locations_M[inactive_M]])
 end
 
 function update_plot(generation)
-    update_population_plot(calc_hybrid_indices(), [locations_F; locations_M], generation)
+    update_population_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
+        [locations_F[active_F]; locations_M[active_M]],
+        calc_hybrid_indices([genotypes_F[inactive_F]; genotypes_M[inactive_M]]),
+        [locations_F[inactive_F]; locations_M[inactive_M]], generation)
 end
 
 function get_genotypes()
