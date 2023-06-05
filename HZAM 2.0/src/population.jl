@@ -66,14 +66,14 @@ function initialize_population(new_K_total::Int,
     global intrinsic_R = new_intrinsic_R
     global sigma_comp = new_sigma_comp
     global geographic_limits = new_geographic_limits
-    global spaced_locations = collect(Float32, geographic_limits[1]:0.001:geographic_limits[2])
+    #global spaced_locations = collect(Float32, geographic_limits[1]:0.001:geographic_limits[2])
 
     # specify ecological resource competitive abilities for two resources A and B 
     # ecolDiff = 1.0 # this is "E" in the paper 
     global competAbility_useResourceA_pop0 = (1 + ecolDiff) / 2    # equals 1 when ecolDiff = 1   
     global competAbility_useResourceB_pop0 = 1 - competAbility_useResourceA_pop0
-    global competAbility_useResourceA_pop1 = (1 - ecolDiff) / 2   # equals 0 when ecolDiff = 1
-    global competAbility_useResourceB_pop1 = 1 - competAbility_useResourceA_pop1
+    global competAbility_useResourceA_pop1 = competAbility_useResourceB_pop0   # equals 0 when ecolDiff = 1
+    global competAbility_useResourceB_pop1 = competAbility_useResourceA_pop0
 
     # set up carying capacities on each resource, and starting pop sizes of each species
     global K_total = new_K_total
@@ -178,8 +178,8 @@ function update_population(genotypes_daughters,
     generation)
 
     new_active_F = []
-
     new_active_M = buffer_M
+
     new_inactive_F = []
     new_inactive_M = []
 
@@ -192,14 +192,6 @@ function update_population(genotypes_daughters,
         end
     end
 
-    for i in 1:left_boundary-1
-        new_inactive_F = vcat(new_inactive_F, individuals_per_zone_F[i])
-    end
-
-    for i in 1:left_boundary-2
-        new_inactive_M = vcat(new_inactive_M, individuals_per_zone_M[i])
-    end
-
     if expand_right && right_boundary < 10
         global right_boundary += 1
         new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
@@ -209,13 +201,8 @@ function update_population(genotypes_daughters,
         end
     end
 
-    for i in right_boundary+1:10
-        new_inactive_F = vcat(new_inactive_F, individuals_per_zone_F[i])
-    end
-
-    for i in right_boundary+2:10
-        new_inactive_M = vcat(new_inactive_M, individuals_per_zone_M[i])
-    end
+    new_inactive_F = setdiff(inactive_F, new_active_F)
+    new_inactive_M = setdiff(inactive_M, new_active_M)
 
     global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[new_active_F], starting_genotypes_F[new_inactive_F])
     global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[new_active_M], starting_genotypes_M[new_inactive_M])
@@ -229,8 +216,8 @@ function update_population(genotypes_daughters,
     global active_F = collect(1:num_active_F)
     global active_M = collect(1:num_active_M)
 
-    global inactive_F = collect(num_active_F+1:length(locations_F))
-    global inactive_M = collect(num_active_M+1:length(locations_M))
+    global inactive_F = new_inactive_F
+    global inactive_M = new_inactive_M
 
     buffer_zone = [max(1, left_boundary - 1), min(10, right_boundary + 1)]
 
@@ -249,8 +236,8 @@ function update_population(genotypes_daughters,
 
         global active_F = setdiff(active_F, inactive_F)
         global active_M = setdiff(active_M, inactive_M)
-        global left_boundary = minimum(setdiff(collect(1:10), dead_zones))
-        global right_boundary = maximum(setdiff(collect(1:10), dead_zones))
+        global left_boundary = minimum(vcat(10, setdiff(collect(1:10), dead_zones)))
+        global right_boundary = maximum(vcat(1, setdiff(collect(1:10), dead_zones)))
         buffer_zone = [left_boundary, right_boundary]
     end
 
@@ -262,6 +249,11 @@ function update_population(genotypes_daughters,
 
     global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates(competition_traits_F, competition_traits_M)
 
+    print("left: ")
+    println(left_boundary)
+
+    print("right: ")
+    println(right_boundary)
 end
 
 # finds which parts of the range contain only individuals of one genotype
@@ -274,7 +266,7 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
         if length(indv_per_zone_M[zone]) > 0 && length(indv_per_zone_F[zone]) > 0
             all_equal = true
             genotype1 = genotypes_M[indv_per_zone_M[zone][1]]
-            push!(zone_classification, genotypes_M[indv_per_zone_M[zone][1]][1, 1])
+            push!(zone_classification, genotype1[1, 1])
 
             for indv in indv_per_zone_F[zone]
                 if genotypes_F[indv] != genotype1
@@ -295,30 +287,17 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
             end
         else
             push!(dead_zones, zone)
-            if zone < 5
-                push!(zone_classification, 0)
-            else
-                push!(zone_classification, 1)
-            end
+            push!(zone_classification, 0.5)
         end
     end
 
     for zone in dead_zones
-        if zone == 1
-            if 2 in dead_zones && zone_classification[2] == zone_classification[1]
-                push!(output, 1)
-            end
-        elseif zone == 10
-            if 9 in dead_zones && zone_classification[10] == zone_classification[9]
-                push!(output, 10)
-            end
-        else
-            if zone - 1 in dead_zones && zone + 1 in dead_zones
-                if zone_classification[zone-1] == zone_classification[zone]
-                    if zone_classification[zone+1] == zone_classification[zone]
-                        push!(output, zone)
-                    end
-                end
+        left_zone = max(1, zone - 1)
+        right_zone = min(10, zone + 1)
+        if left_zone in dead_zones && right_zone in dead_zones
+            if abs(zone_classification[left_zone] - zone_classification[zone]) < 1 &&
+               abs(zone_classification[right_zone] - zone_classification[zone]) < 1
+                push!(output, zone)
             end
         end
     end
@@ -337,15 +316,24 @@ function calculate_initial_growth_rates_sympatry(K_A, K_B)
     return growth_rate_resourceA, growth_rate_resourceB
 end
 
+# calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
+function calculate_ind_useResource(competition_traits_F, competition_traits_M)
+    ecolDiff = competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1
+
+    ind_useResourceA_F = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_F) .* ecolDiff)
+    ind_useResourceB_F = competAbility_useResourceB_pop0 .+ (competition_traits_F .* ecolDiff)
+    ind_useResourceA_M = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_M) .* ecolDiff)
+    ind_useResourceB_M = competAbility_useResourceB_pop0 .+ (competition_traits_M .* ecolDiff)
+
+    return ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M
+end
+
 # calculates growth rates
 function calculate_growth_rates(competition_traits_F, competition_traits_M)
 
     # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
 
-    global ind_useResourceA_F = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_F) .* (competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1))
-    global ind_useResourceB_F = competAbility_useResourceB_pop0 .+ (competition_traits_F .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
-    global ind_useResourceA_M = competAbility_useResourceA_pop1 .+ ((1 .- competition_traits_M) .* (competAbility_useResourceA_pop0 - competAbility_useResourceA_pop1))
-    global ind_useResourceB_M = competAbility_useResourceB_pop0 .+ (competition_traits_M .* (competAbility_useResourceB_pop1 - competAbility_useResourceB_pop0))
+    global ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = calculate_ind_useResource(competition_traits_F, competition_traits_M)
 
     if sympatry
         return calculate_growth_rates_sympatry()
@@ -486,9 +474,13 @@ end
 # determine fitness due to female use of available resources
 function calc_female_growth_rate(focal_female_index)
     if sympatry
-        return (ind_useResourceA_F[focal_female_index] * growth_rate_resourceA) + (ind_useResourceB_F[focal_female_index] * growth_rate_resourceB)
+        growth_rateA = ind_useResourceA_F[focal_female_index] * growth_rate_resourceA
+        growth_rateB = ind_useResourceB_F[focal_female_index] * growth_rate_resourceB
+        return growth_rateA + growth_rateB
     else
-        return (ind_useResourceA_F[focal_female_index] * growth_rate_resourceA[focal_female_index]) + (ind_useResourceB_F[focal_female_index] * growth_rate_resourceB[focal_female_index])
+        growth_rateA = ind_useResourceA_F[focal_female_index] * growth_rate_resourceA[focal_female_index]
+        growth_rateB = ind_useResourceB_F[focal_female_index] * growth_rate_resourceB[focal_female_index]
+        return growth_rateA + growth_rateB
     end
 end
 
@@ -533,15 +525,15 @@ end
 function plot_population()
     create_new_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
         [locations_F[active_F]; locations_M[active_M]],
-        calc_hybrid_indices([genotypes_F[inactive_F]; genotypes_M[inactive_M]]),
-        [locations_F[inactive_F]; locations_M[inactive_M]])
+        calc_hybrid_indices([starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]),
+        [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]])
 end
 
 function update_plot(generation)
     update_population_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
         [locations_F[active_F]; locations_M[active_M]],
-        calc_hybrid_indices([genotypes_F[inactive_F]; genotypes_M[inactive_M]]),
-        [locations_F[inactive_F]; locations_M[inactive_M]], generation)
+        calc_hybrid_indices([starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]),
+        [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]], generation)
 end
 
 function get_genotypes()
@@ -559,6 +551,12 @@ end
 function set_locations(new_locations_F, new_locations_M)
     global locations_F = new_locations_F
     global locations_M = new_locations_M
+end
+
+
+function set_genotypes(new_genotypes_F, new_genotypes_M)
+    global genotypes_F = new_genotypes_F
+    global genotypes_M = new_genotypes_M
 end
 
 end

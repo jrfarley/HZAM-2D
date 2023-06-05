@@ -31,7 +31,6 @@ function create_new_plot(hybrid_indices_active, locations_active, hybrid_indices
     fit = curve_fit(sigmoid, locations_active, hybrid_indices_active, initial_par)
     global sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)
     display(fig)
-    readline()
 end
 
 function update_population_plot(hybrid_indices_active, locations_active, hybrid_indices_inactive, locations_inactive, generation)

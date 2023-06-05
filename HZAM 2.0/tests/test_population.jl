@@ -149,16 +149,6 @@ end
     @test Population.get_genotypes() == (genotypes, genotypes)
 end
 
-@testset "get_ideal_densities" begin
-    geographic_limits = [0.0, 1.0]
-    spaced_locations = collect(Float32, geographic_limits[1]:0.001:geographic_limits[2])
-    ideal_densities = Population.get_ideal_densities(1000, 0.01, spaced_locations)
-
-    @test ideal_densities[1] > 12.5 && ideal_densities[1] < 12.55
-
-    @test ideal_densities[500] > 25.066 && ideal_densities[500] < 25.067
-end
-
 @testset "calc_growth_rates" begin
     K_total = 100
     starting_pop_ratio = 1.0
@@ -367,4 +357,192 @@ end
     closest_male, elig_M = choose_closest_male(elig_M, 1)
     @test closest_male == 2
     @test elig_M == []
+end
+
+@testset "calc_match_strength" begin
+    K_total = 4
+    starting_pop_ratio = 1.0
+    ecolDiff = 0
+    sympatry = false
+    total_loci = 3
+    competition_trait_loci = 1:1
+    female_mating_trait_loci = 2:2
+    male_mating_trait_loci = 2:2
+    hybrid_survival_loci = 3:3
+    intrinsic_R = 1.1
+    sigma_comp = 0.01
+    pref_SD = sqrt(-1 / (2 * log(1 / (1 + 10^(-15)))))
+
+    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
+
+    locations_F, locations_M = ([0.1, 0.3, 0.5, 0.7], [0.15, 0.4, 0.6, 0.8])
+
+    Population.set_locations(locations_F, locations_M)
+
+    match_strength1 = calc_match_strength(1, 1, pref_SD)
+
+    match_strength2 = calc_match_strength(2, 2, pref_SD)
+
+    match_strength3 = calc_match_strength(1, 2, pref_SD)
+
+    @test match_strength1 == match_strength2
+    @test match_strength1 > match_strength3
+end
+
+@testset "get_ideal_densities" begin
+    locations_F = [0.0, 0.3, 0.7, 0.8, 1.0]
+
+    K_total = 1000
+    sigma_comp = 0.01
+
+    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F)
+
+    @test ideal_densities[1] > 12.5 && ideal_densities[1] < 12.55
+
+    @test ideal_densities[2] > 25.066 && ideal_densities[2] < 25.067
+
+    @test ideal_densities[3] > 25.066 && ideal_densities[3] < 25.067
+
+    @test ideal_densities[4] > 25.066 && ideal_densities[4] < 25.067
+
+    @test ideal_densities[5] > 12.5 && ideal_densities[5] < 12.55
+end
+
+@testset "calculate_ind_useResource_no_ecolDiff" begin
+    K_total = 4
+    starting_pop_ratio = 1.0
+    ecolDiff = 0
+    sympatry = false
+    total_loci = 3
+    competition_trait_loci = 1:1
+    female_mating_trait_loci = 2:2
+    male_mating_trait_loci = 2:2
+    hybrid_survival_loci = 3:3
+    intrinsic_R = 1.1
+    sigma_comp = 0.01
+
+    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
+
+    competition_traits_F, competition_traits_M = ([0, 1], [0, 1])
+
+    initialize_population(K_total,
+        starting_pop_ratio,
+        ecolDiff,
+        sympatry,
+        total_loci,
+        competition_trait_loci,
+        female_mating_trait_loci,
+        male_mating_trait_loci,
+        hybrid_survival_loci,
+        intrinsic_R,
+        sigma_comp;
+        new_geographic_limits=[0.0, 1.0],
+        starting_range_pop0=[0, 0.50],
+        starting_range_pop1=[0.50, 1.0])
+
+    ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = Population.calculate_ind_useResource(competition_traits_F, competition_traits_M)
+
+    @test ind_useResourceA_F == [0.5, 0.5]
+    @test ind_useResourceB_F == [0.5, 0.5]
+    @test ind_useResourceA_M == [0.5, 0.5]
+    @test ind_useResourceB_M == [0.5, 0.5]
+end
+
+@testset "calculate_ind_useResource_with_ecolDiff" begin
+    K_total = 4
+    starting_pop_ratio = 1.0
+    ecolDiff = 1.0
+    sympatry = false
+    total_loci = 3
+    competition_trait_loci = 1:1
+    female_mating_trait_loci = 2:2
+    male_mating_trait_loci = 2:2
+    hybrid_survival_loci = 3:3
+    intrinsic_R = 1.1
+    sigma_comp = 0.01
+
+    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
+
+    competition_traits_F, competition_traits_M = ([0, 1], [0, 1])
+
+    initialize_population(K_total,
+        starting_pop_ratio,
+        ecolDiff,
+        sympatry,
+        total_loci,
+        competition_trait_loci,
+        female_mating_trait_loci,
+        male_mating_trait_loci,
+        hybrid_survival_loci,
+        intrinsic_R,
+        sigma_comp;
+        new_geographic_limits=[0.0, 1.0],
+        starting_range_pop0=[0, 1.0],
+        starting_range_pop1=[0.0, 1.0])
+
+    ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = Population.calculate_ind_useResource(competition_traits_F, competition_traits_M)
+
+    @test ind_useResourceA_F == [1, 0]
+    @test ind_useResourceB_F == [0, 1]
+    @test ind_useResourceA_M == [1, 0]
+    @test ind_useResourceB_M == [0, 1]
+end
+
+@testset "find_inactive_zones1" begin
+    genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
+    genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+
+    genotypes = [genotypes_pop0; genotypes_pop1]
+
+    Population.set_genotypes(genotypes, genotypes)
+
+    locations_F = collect(Float32, 0.0:0.005:0.995)
+
+    locations_M = collect(Float32, 0.001:0.005:0.996)
+
+    indv_per_zone_F, indv_per_zone_M = Population.assign_zones(locations_F, locations_M)
+
+    dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+
+    @test dead_zones == [1, 2, 3, 4, 7, 8, 9, 10]
+end
+
+@testset "find_inactive_zones2" begin
+    genotypes_pop0 = fill([0 0 0; 0 0 0], 99)
+    genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+
+    genotypes = [genotypes_pop0; genotypes_pop1]
+
+    Population.set_genotypes(genotypes, genotypes)
+
+    locations_F = collect(Float32, 0.0:0.005:0.99)
+
+    locations_M = collect(Float32, 0.001:0.005:0.991)
+
+    indv_per_zone_F, indv_per_zone_M = Population.assign_zones(locations_F, locations_M)
+
+    dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+
+    @test dead_zones == [1, 2, 3, 7, 8, 9, 10]
+end
+
+@testset "find_inactive_zones3" begin
+    genotypes_pop0 = vcat(fill([0 0 0; 0 0 0], 45), [fill(1, 2, 3)], fill([0 0 0; 0 0 0], 54))
+    genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+
+    println(length(genotypes_pop0))
+
+    genotypes = [genotypes_pop0; genotypes_pop1]
+
+    Population.set_genotypes(genotypes, genotypes)
+
+    locations_F = collect(Float32, 0.0:0.005:0.995)
+
+    locations_M = collect(Float32, 0.001:0.005:0.996)
+
+    indv_per_zone_F, indv_per_zone_M = Population.assign_zones(locations_F, locations_M)
+
+    dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+
+    @test dead_zones == [1, 7, 8, 9, 10]
 end
