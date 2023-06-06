@@ -177,83 +177,97 @@ function update_population(genotypes_daughters,
     expand_right,
     generation)
 
+    active_locations_F = []
+    active_genotypes_F = []
+    active_locations_M = []
+    active_genotypes_M = []
+
     new_active_F = []
     new_active_M = buffer_M
 
     new_inactive_F = []
     new_inactive_M = []
 
-    if expand_left && left_boundary > 1
-        global left_boundary -= 1
-        new_active_F = individuals_per_zone_F[left_boundary]
-        if left_boundary > 1
-            new_buffer_M = individuals_per_zone_M[left_boundary-1]
-            new_active_M = vcat(new_active_M, new_buffer_M)
-        end
-    end
-
-    if expand_right && right_boundary < 10
-        global right_boundary += 1
-        new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
-        if right_boundary < 10
-            new_buffer_M = individuals_per_zone_M[right_boundary+1]
-            new_active_M = vcat(new_active_M, new_buffer_M)
-        end
-    end
-
-    new_inactive_F = setdiff(inactive_F, new_active_F)
-    new_inactive_M = setdiff(inactive_M, new_active_M)
-
-    global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[new_active_F], starting_genotypes_F[new_inactive_F])
-    global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[new_active_M], starting_genotypes_M[new_inactive_M])
-
-    global locations_F = vcat(locations_daughters, starting_locations_F[new_active_F], starting_locations_F[new_inactive_F])
-    global locations_M = vcat(locations_sons, starting_locations_M[new_active_M], starting_locations_M[new_inactive_M])
-
-    num_active_F = length(locations_daughters) + length(new_active_F)
-    num_active_M = length(locations_sons) + length(new_active_M)
-
-    global active_F = collect(1:num_active_F)
-    global active_M = collect(1:num_active_M)
-
-    global inactive_F = new_inactive_F
-    global inactive_M = new_inactive_M
-
-    buffer_zone = [max(1, left_boundary - 1), min(10, right_boundary + 1)]
-
     if generation % 10 == 0
+        global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[inactive_F])
+        global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[buffer_M], starting_genotypes_M[inactive_M])
+
+        global locations_F = vcat(locations_daughters, starting_locations_F[inactive_F])
+        global locations_M = vcat(locations_sons, starting_locations_M[buffer_M], starting_locations_M[inactive_M])
+
         global starting_locations_F, starting_locations_M = copy(locations_F), copy(locations_M)
         global starting_genotypes_F, starting_genotypes_M = copy(genotypes_F), copy(genotypes_M)
 
         global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
 
         dead_zones = find_inactive_zones(individuals_per_zone_F, individuals_per_zone_M)
+        active_zones = setdiff!(collect(1:10), dead_zones)
 
         if dead_zones != []
             global inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones])
             global inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones])
         end
 
-        global active_F = setdiff(active_F, inactive_F)
-        global active_M = setdiff(active_M, inactive_M)
-        global left_boundary = minimum(vcat(10, setdiff(collect(1:10), dead_zones)))
-        global right_boundary = maximum(vcat(1, setdiff(collect(1:10), dead_zones)))
-        buffer_zone = [left_boundary, right_boundary]
+        if active_zones != []
+            global active_F = reduce(vcat, individuals_per_zone_F[active_zones])
+            global active_M = reduce(vcat, individuals_per_zone_M[active_zones])
+            global left_boundary = minimum(vcat(10, active_zones))
+            global right_boundary = maximum(vcat(1, active_zones))
+        else
+            global active_F = []
+            global active_M = []
+        end
+    else
+        new_buffer_left, new_buffer_right = [], []
+        if expand_left && left_boundary > 1
+            global left_boundary -= 1
+            new_active_F = individuals_per_zone_F[left_boundary]
+            if left_boundary > 1
+                new_buffer_left = individuals_per_zone_M[left_boundary-1]
+                new_active_M = vcat(new_active_M, new_buffer_left)
+            end
+        end
+
+        if expand_right && right_boundary < 10
+            global right_boundary += 1
+            new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
+            if right_boundary < 10
+                new_buffer_right = individuals_per_zone_M[right_boundary+1]
+                new_active_M = vcat(new_active_M, new_buffer_right)
+            end
+        end
+
+        global buffer_M = [new_buffer_left; new_buffer_right]
+
+        new_inactive_F = setdiff(inactive_F, new_active_F)
+        new_inactive_M = setdiff(inactive_M, new_active_M)
+
+        global inactive_F = new_inactive_F
+        global inactive_M = new_inactive_M
+
+        global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[new_active_F], starting_genotypes_F[new_inactive_F])
+        global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[new_active_M], starting_genotypes_M[new_inactive_M])
+        global locations_F = vcat(locations_daughters, starting_locations_F[new_active_F], starting_locations_F[new_inactive_F])
+        global locations_M = vcat(locations_sons, starting_locations_M[new_active_M], starting_locations_M[new_inactive_M])
+
+
+        num_active_F = length(locations_daughters) + length(new_active_F)
+        num_active_M = length(locations_sons) + length(new_active_M)
+
+        global active_F = collect(1:num_active_F)
+        global active_M = collect(1:num_active_M)
+
     end
 
-    global buffer_M = [individuals_per_zone_M[buffer_zone[1]]
-        individuals_per_zone_M[buffer_zone[2]]]
+    buffer_zone = [max(1, left_boundary - 1), min(10, right_boundary + 1)]
+
+    #=global buffer_M = [individuals_per_zone_M[buffer_zone[1]]
+        individuals_per_zone_M[buffer_zone[2]]]=#
 
     competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
     competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
 
     global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates(competition_traits_F, competition_traits_M)
-
-    print("left: ")
-    println(left_boundary)
-
-    print("right: ")
-    println(right_boundary)
 end
 
 # finds which parts of the range contain only individuals of one genotype
@@ -530,10 +544,15 @@ function plot_population()
 end
 
 function update_plot(generation)
-    update_population_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
-        [locations_F[active_F]; locations_M[active_M]],
-        calc_hybrid_indices([starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]),
-        [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]], generation)
+    genotypes_active = [genotypes_F[active_F]; genotypes_M[active_M]]
+    locations_active = [locations_F[active_F]; locations_M[active_M]]
+    genotypes_inactive = [starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]
+    locations_inactive = [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]]
+    update_population_plot(calc_hybrid_indices(genotypes_active),
+        locations_active,
+        calc_hybrid_indices(genotypes_inactive),
+        locations_inactive,
+        generation)
 end
 
 function get_genotypes()

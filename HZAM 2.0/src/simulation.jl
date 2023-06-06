@@ -160,7 +160,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             # determine sex and location of kid
                             new_location = disperse_individual(mother, sigma_disp, geographic_limits)
                             genotype_sum = sum(kid_info)
-                            if genotype_sum > 0 && new_location < (left_boundary + 1) / 10
+                            if genotype_sum > 0 && new_location < left_boundary / 10
                                 expand_left = true
                             elseif genotype_sum < total_loci * 2 && new_location > (right_boundary - 1) / 10
                                 expand_right = true
