@@ -37,6 +37,7 @@ using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as csv
 using LsqFit
+using BenchmarkTools
 
 # for plotting:
 # using Plots
@@ -463,12 +464,18 @@ end
   
 
 #### Run the actual simulation by calling the above function:
-
+#=
 run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are 
                                 # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
     K_total = 1000, max_generations = 1000,
     sigma_disp = 0.02, sympatry = false,
-    sigma_comp = 0.1, do_plot = true, plot_int = 5)
+    sigma_comp = 0.1, do_plot = true, plot_int = 5)=#
+
+run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are 
+    # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
+    K_total=1000, max_generations=1000,
+    sigma_disp=0.01, sympatry=false,
+    sigma_comp=0.1, do_plot=true, plot_int=1)
 
 
 # Running the above should open a plot window (after maybe 10-20 seconds) and show the simulation running.

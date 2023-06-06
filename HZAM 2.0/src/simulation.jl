@@ -115,7 +115,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
             father = [] # will contain the index of the male mate
             # make vector of indices of eligible males
-            elig_M = copy(active_M)
+            if (length(active_M)>0)
+                elig_M = copy(active_M)
+            else
+                break
+            end
             # determine male mate of female
             while mate == false
                 # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
@@ -189,8 +193,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         update_population(genotypes_daughters, genotypes_sons, locations_daughters, locations_sons, expand_left, expand_right, generation)
 
         # check if there are no remaining females in the hybrid zone
-        if(length(active_F)==0)
-            println("ENDED WITH TWO SEPARATE POPULATIONS")
+        if (length(active_F) == 0)
+            println("NO FEMALES REMAINING IN ACTIVE ZONE")
             break
         end
 

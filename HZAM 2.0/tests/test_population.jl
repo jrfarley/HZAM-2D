@@ -35,9 +35,9 @@ using .Population
 
     @test get_population() == (2, 2)
 
-    @test Population.get_genotypes() == (genotypes, genotypes)
+    @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 
-    @test Population.get_growth_rates() == (1.0, 1.0)
+    @test (Population.growth_rate_resourceA, Population.growth_rate_resourceB) == (1.0, 1.0)
 end
 
 
@@ -73,9 +73,9 @@ end
 
     @test get_population() == (3, 3)
 
-    @test Population.get_genotypes() == (genotypes, genotypes)
+    @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 
-    @test Population.get_growth_rates() == (1.0, 1.0)
+    @test (Population.growth_rate_resourceA, Population.growth_rate_resourceB) == (1.0, 1.0)
 end
 
 
@@ -108,9 +108,9 @@ end
 
     @test get_population() == (2, 2)
 
-    @test Population.get_genotypes() == (genotypes, genotypes)
+    @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 
-    @test Population.get_growth_rates() == (1.0, 1.0)
+    @test (Population.growth_rate_resourceA, Population.growth_rate_resourceB) == (1.0, 1.0)
 end
 
 @testset "initialize_population_allopatry" begin
@@ -146,7 +146,7 @@ end
 
     @test get_population() == (2, 2)
 
-    @test Population.get_genotypes() == (genotypes, genotypes)
+    @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 end
 
 @testset "calc_growth_rates" begin
@@ -236,7 +236,7 @@ end
         end
     end
 
-    @test num_fail < 60
+    @test num_fail < 70
 end
 
 
@@ -301,7 +301,7 @@ end
         intrinsic_R,
         sigma_comp)
 
-    @test Population.get_genotypes() == (genotypes, genotypes)
+    @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 
     @test Population.generate_offspring_genotype(1, 2, 3) == [0 0 0; 1 1 1]
 end

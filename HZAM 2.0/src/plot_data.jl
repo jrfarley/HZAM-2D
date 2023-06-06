@@ -28,10 +28,10 @@ function create_new_plot(hybrid_indices_active, locations_active, hybrid_indices
     ylims!(-0.03, 1.03)
     global points_active = scatter!(ax, locations_active, jitter(hybrid_indices_active), color=(:blue, 0.5))
     global points_inactive = scatter!(ax, locations_inactive, jitter(hybrid_indices_inactive), color=(:orange, 0.5))
-    fit = curve_fit(sigmoid, locations_active, hybrid_indices_active, initial_par)
+    fit = curve_fit(sigmoid, [locations_active; locations_inactive], [hybrid_indices_active; hybrid_indices_inactive], initial_par)
     global sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)
     display(fig)
-    #readline()
+    readline()
 end
 
 function update_population_plot(hybrid_indices_active, locations_active, hybrid_indices_inactive, locations_inactive, generation)
@@ -43,12 +43,10 @@ function update_population_plot(hybrid_indices_active, locations_active, hybrid_
     delete!(ax, sigmoid_line)
     global points_active = scatter!(ax, locations_active, jitter(hybrid_indices_active), color=(:blue, 0.5))
     global points_inactive = scatter!(ax, locations_inactive, jitter(hybrid_indices_inactive), color=(:orange, 0.5))
-    fit = curve_fit(sigmoid, locations_active, hybrid_indices_active, initial_par)
+    fit = curve_fit(sigmoid, [locations_active; locations_inactive], [hybrid_indices_active; hybrid_indices_inactive], initial_par)
     global sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)  # add the sigmoid fit to the plot
     ax.title = string("HZAM simulation, generation = ", generation)
-    print("generation: ")
-    println(generation)
-    #readline()
+    println("generation: ", generation, "; individuals: ", length(locations_active)+length(locations_inactive))
 end
 
 

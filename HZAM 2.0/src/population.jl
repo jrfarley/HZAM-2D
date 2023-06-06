@@ -28,12 +28,12 @@ global num_hybridization_events = 0
 global active_region_limits = [0.4, 0.6]
 global active_F, active_M = [], []
 global inactive_F, inactive_M = [], []
-global buffer_M = []
+global buffer_M = [[], []]
 global individuals_per_zone_F = [[] for i in 1:10]
 global individuals_per_zone_M = [[] for i in 1:10]
 global left_boundary = 5
 global right_boundary = 6
-global starting_locations_F, starting_locations_M, starting_genotypes_F, starting_genotypes_M
+global fixed_locations_F, fixed_locations_M, fixed_genotypes_F, fixed_genotypes_M
 
 
 function get_num_hybridization_events()
@@ -119,8 +119,8 @@ function initialize_population(new_K_total::Int,
             individuals_per_zone_F[8],
             individuals_per_zone_F[9],
             individuals_per_zone_F[10])
-        global buffer_M = vcat(individuals_per_zone_M[4], individuals_per_zone_M[7])
-        global active_M = vcat(individuals_per_zone_M[5], individuals_per_zone_M[6], buffer_M)
+        global buffer_M = [individuals_per_zone_M[4], individuals_per_zone_M[7]]
+        global active_M = vcat(individuals_per_zone_M[5], individuals_per_zone_M[6], buffer_M[1], buffer_M[2])
         global inactive_M = vcat(individuals_per_zone_M[1],
             individuals_per_zone_M[2],
             individuals_per_zone_M[3],
@@ -134,14 +134,15 @@ function initialize_population(new_K_total::Int,
         global ind_useResourceB_M = ind_useResourceB_F
 
         global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates_spatial()
-        global starting_locations_F, starting_locations_M = (copy(locations_F), copy(locations_M))
+        global fixed_locations_F, fixed_locations_M = (copy(locations_F), copy(locations_M))
     end
 
-    global starting_genotypes_F, starting_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
+    global fixed_genotypes_F, fixed_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
 end
 
+
+# Generate breeding locations of individuals (vector in same order of individuals as D3 of the genotype array)
 function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
-    # Generate breeding locations of individuals (vector in same order of individuals as D3 of the genotype array)
     locations_F_pop0 = Array{Float32,1}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1])
     locations_F_pop1 = Array{Float32,1}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
     locations_M_pop0 = Array{Float32,1}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1])
@@ -150,16 +151,18 @@ function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, 
 end
 
 # arranges the indices of each individual by location
+# zone 1 is [0,1), zone 2 is [1, 2), etc.
 function assign_zones(locations_F, locations_M)
     new_individuals_per_zone_F = [[] for i in 1:10]
     new_individuals_per_zone_M = [[] for i in 1:10]
 
+    # assigns females
     for indv in eachindex(locations_F)
         zone = trunc(Int, 10 * locations_F[indv]) + 1
         push!(new_individuals_per_zone_F[zone], indv)
     end
 
-
+    #assigns males
     for indv in eachindex(locations_M)
         zone = trunc(Int, 10 * locations_M[indv]) + 1
         push!(new_individuals_per_zone_M[zone], indv)
@@ -177,37 +180,40 @@ function update_population(genotypes_daughters,
     expand_right,
     generation)
 
-    active_locations_F = []
-    active_genotypes_F = []
-    active_locations_M = []
-    active_genotypes_M = []
-
-    new_active_F = []
-    new_active_M = buffer_M
-
-    new_inactive_F = []
-    new_inactive_M = []
+    new_active_F = [] # keeps track of inactive females that will be active in the next generation
+    new_active_M = [] # keeps track of inactive males that will be active in the next generation
 
     if generation % 10 == 0
-        global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[inactive_F])
-        global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[buffer_M], starting_genotypes_M[inactive_M])
+        # every 10 generations the active and inactive zones are reset to reflect current distribution of genotypes
 
-        global locations_F = vcat(locations_daughters, starting_locations_F[inactive_F])
-        global locations_M = vcat(locations_sons, starting_locations_M[buffer_M], starting_locations_M[inactive_M])
+        # compile list of genotypes/locations of offspring and fixed individuals
+        global genotypes_F = vcat(genotypes_daughters, fixed_genotypes_F[inactive_F])
+        global genotypes_M = vcat(genotypes_sons, fixed_genotypes_M[buffer_M[1]], fixed_genotypes_M[buffer_M[2]], fixed_genotypes_M[inactive_M])
 
-        global starting_locations_F, starting_locations_M = copy(locations_F), copy(locations_M)
-        global starting_genotypes_F, starting_genotypes_M = copy(genotypes_F), copy(genotypes_M)
+        global locations_F = vcat(locations_daughters, fixed_locations_F[inactive_F])
+        global locations_M = vcat(locations_sons, fixed_locations_M[buffer_M[1]], fixed_locations_M[buffer_M[2]], fixed_locations_M[inactive_M])
 
+        # update fixed individuals to current population
+        global fixed_locations_F, fixed_locations_M = copy(locations_F), copy(locations_M)
+        global fixed_genotypes_F, fixed_genotypes_M = copy(genotypes_F), copy(genotypes_M)
+
+        # group population into zones
         global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
 
         dead_zones = find_inactive_zones(individuals_per_zone_F, individuals_per_zone_M)
         active_zones = setdiff!(collect(1:10), dead_zones)
 
+        # compile list of new inactive individuals
         if dead_zones != []
             global inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones])
             global inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones])
+            global buffer_M = [[], []]
+        else
+            global inactive_F = []
+            global inactive_M = []
         end
 
+        # compile list of new active individuals
         if active_zones != []
             global active_F = reduce(vcat, individuals_per_zone_F[active_zones])
             global active_M = reduce(vcat, individuals_per_zone_M[active_zones])
@@ -218,39 +224,43 @@ function update_population(genotypes_daughters,
             global active_M = []
         end
     else
-        new_buffer_left, new_buffer_right = [], []
-        if expand_left && left_boundary > 1
+        # expands active zone and updates buffer if necessary
+        if expand_left && left_boundary > 1 # expands the left boundary if not already at edge of range
             global left_boundary -= 1
             new_active_F = individuals_per_zone_F[left_boundary]
+            new_active_M = individuals_per_zone_M[left_boundary]
             if left_boundary > 1
-                new_buffer_left = individuals_per_zone_M[left_boundary-1]
-                new_active_M = vcat(new_active_M, new_buffer_left)
+                global buffer_M[1] = individuals_per_zone_M[left_boundary-1]
+            else
+                global buffer_M[1] = []
             end
         end
 
-        if expand_right && right_boundary < 10
+        if expand_right && right_boundary < 10 # expands the right boundary if not already at edge of range
             global right_boundary += 1
             new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
+            new_active_M = vcat(new_active_M, individuals_per_zone_M[right_boundary])
             if right_boundary < 10
-                new_buffer_right = individuals_per_zone_M[right_boundary+1]
-                new_active_M = vcat(new_active_M, new_buffer_right)
+                global buffer_M[2] = individuals_per_zone_M[right_boundary+1]
+            else
+                global buffer_M[2] = []
             end
         end
 
-        global buffer_M = [new_buffer_left; new_buffer_right]
+        new_active_M = vcat(new_active_M, buffer_M[1], buffer_M[2]) # add males in the buffer zone to the list of active males
 
-        new_inactive_F = setdiff(inactive_F, new_active_F)
-        new_inactive_M = setdiff(inactive_M, new_active_M)
+        # updates list of inactive individuals
+        global inactive_F = setdiff(inactive_F, new_active_F)
+        global inactive_M = setdiff(inactive_M, new_active_M)
 
-        global inactive_F = new_inactive_F
-        global inactive_M = new_inactive_M
-
-        global genotypes_F = vcat(genotypes_daughters, starting_genotypes_F[new_active_F], starting_genotypes_F[new_inactive_F])
-        global genotypes_M = vcat(genotypes_sons, starting_genotypes_M[new_active_M], starting_genotypes_M[new_inactive_M])
-        global locations_F = vcat(locations_daughters, starting_locations_F[new_active_F], starting_locations_F[new_inactive_F])
-        global locations_M = vcat(locations_sons, starting_locations_M[new_active_M], starting_locations_M[new_inactive_M])
+        # creates new lists of genotypes and locations so that the active individuals are first and the inactive individuals last 
+        global genotypes_F = vcat(genotypes_daughters, fixed_genotypes_F[new_active_F], fixed_genotypes_F[inactive_F])
+        global genotypes_M = vcat(genotypes_sons, fixed_genotypes_M[new_active_M], fixed_genotypes_M[inactive_M])
+        global locations_F = vcat(locations_daughters, fixed_locations_F[new_active_F], fixed_locations_F[inactive_F])
+        global locations_M = vcat(locations_sons, fixed_locations_M[new_active_M], fixed_locations_M[inactive_M])
 
 
+        # updates list of active individuals
         num_active_F = length(locations_daughters) + length(new_active_F)
         num_active_M = length(locations_sons) + length(new_active_M)
 
@@ -259,14 +269,11 @@ function update_population(genotypes_daughters,
 
     end
 
-    buffer_zone = [max(1, left_boundary - 1), min(10, right_boundary + 1)]
-
-    #=global buffer_M = [individuals_per_zone_M[buffer_zone[1]]
-        individuals_per_zone_M[buffer_zone[2]]]=#
-
+    # calculate new competition traits
     competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
     competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
 
+    # calculate new growth rates
     global growth_rate_resourceA, growth_rate_resourceB = calculate_growth_rates(competition_traits_F, competition_traits_M)
 end
 
@@ -276,12 +283,14 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
     output = []
     zone_classification = []
 
+    # check in each zone if all individuals have the same genotypes
     for zone in 1:10
         if length(indv_per_zone_M[zone]) > 0 && length(indv_per_zone_F[zone]) > 0
             all_equal = true
-            genotype1 = genotypes_M[indv_per_zone_M[zone][1]]
+            genotype1 = genotypes_M[indv_per_zone_M[zone][1]] # genotype of the first male in the zone
             push!(zone_classification, genotype1[1, 1])
 
+            # check each female
             for indv in indv_per_zone_F[zone]
                 if genotypes_F[indv] != genotype1
                     all_equal = false
@@ -289,6 +298,7 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
                 end
             end
             if all_equal
+                # check each male
                 for indv in indv_per_zone_M[zone]
                     if genotypes_M[indv] != genotype1
                         all_equal = false
@@ -305,6 +315,8 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
         end
     end
 
+    # goes through each zone where all individuals have the same genotype and keeps the zones where 
+    # all the individuals in the neighbouring zones also have the same genotype
     for zone in dead_zones
         left_zone = max(1, zone - 1)
         right_zone = min(10, zone + 1)
@@ -535,19 +547,20 @@ function calc_hybrid_indices(genotypes)
     return calc_traits_additive(genotypes, functional_loci_range)
 end
 
-
+# creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
 function plot_population()
     create_new_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
         [locations_F[active_F]; locations_M[active_M]],
-        calc_hybrid_indices([starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]),
-        [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]])
+        calc_hybrid_indices([fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]),
+        [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]])
 end
 
+# updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
 function update_plot(generation)
     genotypes_active = [genotypes_F[active_F]; genotypes_M[active_M]]
     locations_active = [locations_F[active_F]; locations_M[active_M]]
-    genotypes_inactive = [starting_genotypes_F[inactive_F]; starting_genotypes_M[inactive_M]]
-    locations_inactive = [starting_locations_F[inactive_F]; starting_locations_M[inactive_M]]
+    genotypes_inactive = [fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]
+    locations_inactive = [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]]
     update_population_plot(calc_hybrid_indices(genotypes_active),
         locations_active,
         calc_hybrid_indices(genotypes_inactive),
@@ -555,24 +568,13 @@ function update_plot(generation)
         generation)
 end
 
-function get_genotypes()
-    return genotypes_F, genotypes_M
-end
-
-function get_growth_rates()
-    return growth_rate_resourceA, growth_rate_resourceB
-end
-
-function get_locations()
-    return locations_F, locations_M
-end
-
+# updates the male and female locations to the given values (FOR TESTING ONLY)
 function set_locations(new_locations_F, new_locations_M)
     global locations_F = new_locations_F
     global locations_M = new_locations_M
 end
 
-
+# updates the male and female genotypes to the given values (FOR TESTING ONLY)
 function set_genotypes(new_genotypes_F, new_genotypes_M)
     global genotypes_F = new_genotypes_F
     global genotypes_M = new_genotypes_M
