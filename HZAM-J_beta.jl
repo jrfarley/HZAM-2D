@@ -40,13 +40,12 @@ using LsqFit
 using BenchmarkTools
 
 # for plotting:
-# using Plots
-# gr()  # use GR backend for graphs
+using Plots
+gr()  # use GR backend for graphs
 using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
-# using Plots.PlotMeasures  # needed for plot margin adjustment
-using GLMakie
+using Plots.PlotMeasures  # needed for plot margin adjustment
 
 # to start Julia with multiple threads, type in terminal e.g.:
 # julia --threads 4
@@ -264,7 +263,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         N_F = size(genotypes_F, 3)
         N_M = size(genotypes_M, 3)
 
-        println("generation: ", generation, "; individuals: ", N_F + N_M)
+        #println("generation: ", generation, "; individuals: ", N_F + N_M)
  
         # calculate mating trait values (T) from genotypes
         female_mating_traits = calc_traits_additive(genotypes_F[:, female_mating_trait_loci, :])
@@ -469,13 +468,13 @@ run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are
                                 # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
     K_total = 1000, max_generations = 1000,
     sigma_disp = 0.02, sympatry = false,
-    sigma_comp = 0.1, do_plot = true, plot_int = 5)=#
+    sigma_comp = 0.1, do_plot = true, plot_int = 5)
 
 run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
     K_total=1000, max_generations=1000,
     sigma_disp=0.01, sympatry=false,
-    sigma_comp=0.1, do_plot=true, plot_int=1)
+    sigma_comp=0.1, do_plot=true, plot_int=1)=#
 
 
 # Running the above should open a plot window (after maybe 10-20 seconds) and show the simulation running.
@@ -512,6 +511,8 @@ run_one_HZAM_sim(0.9, 1000, 0, 1.1; # these values are
     #competition_trait_loci = 1:17,
     #hybrid_survival_loci = 1:17,
     #neutral_loci = 18:20)
+
+    #=
 functional_loci_range = 1:3
 genotypes_F = sim_results[1]
 genotypes_M = sim_results[2]
@@ -559,7 +560,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     do_plot = true, plot_int = 10)
 
 
-
+=#
 
 
 
@@ -571,7 +572,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     total_loci::Int = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
     competition_trait_loci = 1:3, hybrid_survival_loci = 1:3, neutral_loci = 4:6,
     survival_fitness_method::String = "epistasis", per_reject_cost = 0,
-    starting_pop_ratio = 1.0)
+    starting_pop_ratio = 1.0, do_plot=false)
     # ecolDiff should be from 0 to 1 (parameter "E" in the paper)
     # intrinsic_R is called "R" in the paper
     # replications should be somehting like "1:10" or just "1" for 1 replicate, or something like "2:5" to add replicates after 1 is done
@@ -618,7 +619,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                 S_AM = S_AM_set[j]
                 println("w_hyb = ", w_hyb, "; S_AM = ", S_AM)
             
-                run_name = string("HZAM_animation_run", run_set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", total_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
+                run_name = string("HZAM_animation_run", run_set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
             
                 # set up initial values for one simulation
                 extinction = false
@@ -626,12 +627,12 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                 final_distribution = []
             
                 # run one simulation by calling the function defined above:
-                run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
+                genotypes_F, locations_F, genotypes_M, locations_M, extinction  = run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
                     K_total, max_generations,
                     total_loci, female_mating_trait_loci, male_mating_trait_loci,
                     competition_trait_loci, hybrid_survival_loci, neutral_loci,
                     survival_fitness_method, per_reject_cost,
-                    starting_pop_ratio)
+                    starting_pop_ratio, do_plot)
             
                 # Record results of the one simulation
                 functional_HI_all_inds = []
@@ -647,6 +648,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                     end
                 else  # no complete extinction
                     # use trait loci to calculate HI of each individual
+                    functional_loci_range = 1:3
                     functional_HI_all_inds = [calc_traits_additive(genotypes_F[:, functional_loci_range, :]); calc_traits_additive(genotypes_M[:, functional_loci_range, :])]
                     # calculate proportion of all individuals who are species0 or species1 (defined as low and high 10% of HI distribution, respectively)
                     species0_proportion = sum(functional_HI_all_inds .< 0.1) / length(functional_HI_all_inds)
@@ -672,13 +674,13 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     end # of replicate loop
 
     if save_outcomes_JL
-        filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set",set_name,"_surv",short_survFitnessMethod,"_ecolDiff",ecolDiff,"_growthrate",intrinsic_R,"_K",K_total,"_FL",total_functional_loci,"_NL",num_neutral_loci,"_gen",max_generations,"_SC",per_reject_cost,".jld2")
+        filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set",set_name,"_surv",short_survFitnessMethod,"_ecolDiff",ecolDiff,"_growthrate",intrinsic_R,"_K",K_total,"_gen",max_generations,"_SC",per_reject_cost,".jld2")
         save_object(filename, outcome_array)
     end
  
     if save_outcomes_csv
         for i in 1:size(outcome_array, 3)
-            filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set",set_name,"_surv",short_survFitnessMethod,"_ecolDiff",ecolDiff,"_growthrate",intrinsic_R,"_K",K_total,"_FL",total_functional_loci,"_NL",num_neutral_loci,"_gen",max_generations,"_SC",per_reject_cost,"_rep",replications[i])
+            filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set",set_name,"_surv",short_survFitnessMethod,"_ecolDiff",ecolDiff,"_growthrate",intrinsic_R,"_K",K_total,"_gen",max_generations,"_SC",per_reject_cost,"_rep",replications[i])
             CSV.write(filename, Tables.table(outcome_array[:,:,i]), writeheader=false)
         end 
     end
@@ -761,11 +763,14 @@ function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     cat_RunOutcomes = convert_to_cat_array(RunOutcomes)
     display(plot_all_outcomes(cat_RunOutcomes))
     savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.png"))
-    savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
+    #=savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
     most_common_outcomes = get_most_common_outcomes(cat_RunOutcomes)
     display(plot_common_outcomes(most_common_outcomes))
     savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.png"))
-    savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))
+    savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))=#
 end
+
+make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "original_HZAM", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:5))))
+
 
 

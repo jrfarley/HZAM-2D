@@ -82,18 +82,13 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         # Prepare for mating and reproduction
         N_F, N_M = get_population()
 
-        #println("generation: ", generation, "; individuals: ", N_F + N_M)
-
-        #plot(spaced_locations, local_growth_rates_resourceA)
-        #plot(spaced_locations, local_growth_rates_resourceB)  
-
-        #plot(spaced_locations, local_growth_rates)  
-
         ### NEED TO CAREFULLY PROOF THE ABOVE, PARTICULARLY IF ECOLDIF > 0
 
         # make empty arrays for storing genotypes of daughters and sons
         genotypes_daughters = [zeros(Int8, 2, 3) for i in 1:0] # a little sketchy FIX LATER
         genotypes_sons = [zeros(Int8, 2, 3) for i in 1:0] # likewise
+
+        mitochondria_daughters, mitochondria_sons = [], []
 
         # make empty arrays for storing locations of daughters and sons
         locations_daughters = Array{Float32,1}(undef, 0)
@@ -158,12 +153,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                 # if offspring, generate their genotypes and sexes
                 if offspring >= 1
                     for kid in 1:offspring
-                        kid_info = generate_offspring_genotype(mother, father, total_loci)
-                        survival_fitness = get_survival_fitness(kid_info[:, hybrid_survival_loci], w_hyb)#######
+                        kid_genotype, kid_mitochondria = generate_offspring_genotype(mother, father, total_loci)
+                        survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
                         if survival_fitness > rand()
                             # determine sex and location of kid
                             new_location = disperse_individual(mother, sigma_disp, geographic_limits)
-                            genotype_sum = sum(kid_info)
+                            genotype_sum = sum(kid_genotype)
                             if genotype_sum > 0 && new_location < left_boundary / 10
                                 expand_left = true
                             elseif genotype_sum < total_loci * 2 && new_location > (right_boundary - 1) / 10
@@ -171,10 +166,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             end
 
                             if rand() > 0.5 # kid is daughter
-                                push!(genotypes_daughters, kid_info)
+                                push!(genotypes_daughters, kid_genotype)
+                                push!(mitochondria_daughters, kid_mitochondria)
                                 locations_daughters = [locations_daughters; disperse_individual(mother, sigma_disp, geographic_limits)]
                             else # kid is son
-                                push!(genotypes_sons, kid_info)
+                                push!(genotypes_sons, kid_genotype)
+                                push!(mitochondria_sons, kid_mitochondria)
                                 locations_sons = [locations_sons; disperse_individual(mother, sigma_disp, geographic_limits)]
                             end
                         end
@@ -190,7 +187,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end
 
         # assign surviving offspring to new adult population
-        update_population(genotypes_daughters, genotypes_sons, locations_daughters, locations_sons, expand_left, expand_right, generation)
+        update_population(genotypes_daughters, genotypes_sons, mitochondria_daughters, mitochondria_sons, locations_daughters, locations_sons, expand_left, expand_right, generation)
 
         # check if there are no remaining females in the hybrid zone
         if (length(active_F) == 0)
@@ -204,7 +201,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end
     end # of loop through generations
 
-    #return genotypes_F, locations_F, genotypes_M, locations_M, extinction
+    return get_results(extinction)
 end
 
 # This function calculates survival fitness of each individual according to heterozygosity.
