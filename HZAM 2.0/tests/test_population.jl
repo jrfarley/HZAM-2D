@@ -303,7 +303,7 @@ end
 
     @test (Population.genotypes_F, Population.genotypes_M) == (genotypes, genotypes)
 
-    @test Population.generate_offspring_genotype(1, 2, 3) == [0 0 0; 1 1 1]
+    @test Population.generate_offspring_genotype(1, 2, 3) == ([0 0 0; 1 1 1], 0.25)
 end
 
 @testset "assign_zones" begin
@@ -491,6 +491,12 @@ end
 @testset "find_inactive_zones1" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+    mitochondria_pop0 = fill(0.25, 100)
+    mitochondria_pop1 = fill(0.75, 100)
+
+    mitochondria = [mitochondria_pop0; mitochondria_pop1]
+
+    Population.set_mitochondria(mitochondria, mitochondria)
 
     genotypes = [genotypes_pop0; genotypes_pop1]
 
@@ -510,6 +516,12 @@ end
 @testset "find_inactive_zones2" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 99)
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+    mitochondria_pop0 = fill(0.25, 99)
+    mitochondria_pop1 = fill(0.75, 100)
+
+    mitochondria = [mitochondria_pop0; mitochondria_pop1]
+
+    Population.set_mitochondria(mitochondria, mitochondria)
 
     genotypes = [genotypes_pop0; genotypes_pop1]
 
@@ -529,6 +541,12 @@ end
 @testset "find_inactive_zones3" begin
     genotypes_pop0 = vcat(fill([0 0 0; 0 0 0], 45), [fill(1, 2, 3)], fill([0 0 0; 0 0 0], 54))
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+    mitochondria_pop0 = fill(0.25, 100)
+    mitochondria_pop1 = fill(0.25, 100)
+
+    mitochondria = [mitochondria_pop0; mitochondria_pop1]
+
+    Population.set_mitochondria(mitochondria, mitochondria)
 
     println(length(genotypes_pop0))
 
@@ -545,4 +563,58 @@ end
     dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
 
     @test dead_zones == [1, 7, 8, 9, 10]
+end
+
+@testset "find_inactive_zones4" begin
+    genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
+    genotypes_pop1 = genotypes_pop0
+    mitochondria_pop0 = vcat(fill(0.25, 50), 0.75, fill(0.25, 49))
+    mitochondria_pop1 = fill(0.25, 100)
+
+    mitochondria = [mitochondria_pop0; mitochondria_pop1]
+
+    Population.set_mitochondria(mitochondria, mitochondria)
+
+    println(length(genotypes_pop0))
+
+    genotypes = [genotypes_pop0; genotypes_pop1]
+
+    Population.set_genotypes(genotypes, genotypes)
+
+    locations_F = collect(Float32, 0.0:0.005:0.995)
+
+    locations_M = collect(Float32, 0.001:0.005:0.996)
+
+    indv_per_zone_F, indv_per_zone_M = Population.assign_zones(locations_F, locations_M)
+
+    dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+
+    @test dead_zones == [1, 5, 6, 7, 8, 9, 10]
+end
+
+@testset "find_inactive_zones5" begin
+    genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
+    genotypes_pop1 = vcat(fill([0 0 0; 0 0 0], 45), [fill(1, 2, 3)], fill([0 0 0; 0 0 0], 54))
+    mitochondria_pop0 = vcat(fill(0.25, 50), 0.75, fill(0.25, 49))
+    mitochondria_pop1 = fill(0.25, 100)
+
+    mitochondria = [mitochondria_pop0; mitochondria_pop1]
+
+    Population.set_mitochondria(mitochondria, mitochondria)
+
+    println(length(genotypes_pop0))
+
+    genotypes = [genotypes_pop0; genotypes_pop1]
+
+    Population.set_genotypes(genotypes, genotypes)
+
+    locations_F = collect(Float32, 0.0:0.005:0.995)
+
+    locations_M = collect(Float32, 0.001:0.005:0.996)
+
+    indv_per_zone_F, indv_per_zone_M = Population.assign_zones(locations_F, locations_M)
+
+    dead_zones = Population.find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
+
+    @test dead_zones == [1, 5, 6, 10]
 end

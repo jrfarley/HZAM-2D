@@ -58,7 +58,8 @@ function initialize_population(new_K_total::Int,
     new_sigma_comp;
     new_geographic_limits::Vector{}=[0.0, 1.0],
     starting_range_pop0=[0.0, 0.48],
-    starting_range_pop1=[0.52, 1.0])
+    starting_range_pop1=[0.52, 1.0],
+    optimize=true)
 
     # initialize the global variables
     global competition_trait_loci = new_competition_trait_loci
@@ -112,28 +113,18 @@ function initialize_population(new_K_total::Int,
     # initialize growth rates
     if sympatry
         global growth_rate_resourceA, growth_rate_resourceB = calculate_initial_growth_rates_sympatry(K_A, K_B)
-        global active_F = 1:length(genotypes_F)
-        global active_M = 1:length(genotypes_M)
     else
         global locations_F, locations_M = generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
-        global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
-        global active_F = vcat(individuals_per_zone_F[5], individuals_per_zone_F[6])
-        global inactive_F = vcat(individuals_per_zone_F[1],
-            individuals_per_zone_F[2],
-            individuals_per_zone_F[3],
-            individuals_per_zone_F[4],
-            individuals_per_zone_F[7],
-            individuals_per_zone_F[8],
-            individuals_per_zone_F[9],
-            individuals_per_zone_F[10])
-        global buffer_M = [individuals_per_zone_M[4], individuals_per_zone_M[7]]
-        global active_M = vcat(individuals_per_zone_M[5], individuals_per_zone_M[6], buffer_M[1], buffer_M[2])
-        global inactive_M = vcat(individuals_per_zone_M[1],
-            individuals_per_zone_M[2],
-            individuals_per_zone_M[3],
-            individuals_per_zone_M[8],
-            individuals_per_zone_M[9],
-            individuals_per_zone_M[10])
+
+        if optimize
+            global individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
+            global active_F = vcat(individuals_per_zone_F[5:6]...)
+            global inactive_F = vcat(individuals_per_zone_F[[(1:4); (7:10)]]...)
+            global buffer_M = [individuals_per_zone_M[4], individuals_per_zone_M[7]]
+            global active_M = vcat(individuals_per_zone_M[5:6]...)
+            global active_M = vcat(active_M, buffer_M[1], buffer_M[2])
+            global inactive_M = vcat(individuals_per_zone_M[[(1:3); (8:10)]]...)
+        end
 
         global ind_useResourceA_F = [fill(competAbility_useResourceA_pop0, pop0_starting_N_half); fill(competAbility_useResourceA_pop1, pop1_starting_N_half)]
         global ind_useResourceA_M = ind_useResourceA_F
@@ -179,8 +170,7 @@ function assign_zones(locations_F, locations_M)
     return new_individuals_per_zone_F, new_individuals_per_zone_M
 end
 
-# updates the genotypes, locations, and growth rates with the values for the next generation
-function update_population(genotypes_daughters,
+function update_population_optimized(genotypes_daughters,
     genotypes_sons,
     mitochondria_daughters,
     mitochondria_sons,
@@ -294,8 +284,44 @@ function update_population(genotypes_daughters,
 
         global active_F = collect(1:num_active_F)
         global active_M = collect(1:num_active_M)
-
     end
+end
+
+
+# updates the genotypes, locations, and growth rates with the values for the next generation
+function update_population(genotypes_daughters,
+    genotypes_sons,
+    mitochondria_daughters,
+    mitochondria_sons,
+    locations_daughters::Array{Float32},
+    locations_sons::Array{Float32},
+    expand_left,
+    expand_right,
+    generation,
+    optimize)
+
+    if optimize
+        update_population_optimized(genotypes_daughters,
+            genotypes_sons,
+            mitochondria_daughters,
+            mitochondria_sons,
+            locations_daughters::Array{Float32},
+            locations_sons::Array{Float32},
+            expand_left,
+            expand_right,
+            generation)
+    else
+        global genotypes_F = genotypes_daughters
+        global genotypes_M = genotypes_sons
+
+        global mitochondria_F = mitochondria_daughters
+        global mitochondria_M = mitochondria_sons
+
+        global locations_F = locations_daughters
+        global locations_M = locations_sons
+    end
+
+
 
     # calculate new competition traits
     competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
@@ -351,8 +377,8 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
         left_zone = max(1, zone - 1)
         right_zone = min(10, zone + 1)
         if left_zone in dead_zones && right_zone in dead_zones
-            if abs(zone_classification[left_zone] - zone_classification[zone]) < 1 &&
-               abs(zone_classification[right_zone] - zone_classification[zone]) < 1
+            if zone_classification[left_zone] == zone_classification[zone] &&
+               zone_classification[right_zone] == zone_classification[zone]
                 push!(output, zone)
             end
         end
@@ -581,30 +607,53 @@ function calc_hybrid_indices(genotypes)
 end
 
 # creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function plot_population()
-    create_new_plot(calc_hybrid_indices([genotypes_F[active_F]; genotypes_M[active_M]]),
-        [mitochondria_F[active_F]; mitochondria_M[active_M]],
-        [locations_F[active_F]; locations_M[active_M]],
-        calc_hybrid_indices([fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]),
-        [fixed_mitochondria_F[inactive_F]; fixed_mitochondria_M[inactive_M]],
-        [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]])
+function plot_population(optimize)
+    if optimize
+        genotypes_active = [genotypes_F[active_F]; genotypes_M[active_M]]
+        locations_active = [locations_F[active_F]; locations_M[active_M]]
+        genotypes_inactive = [fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]
+        locations_inactive = [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]]
+        mitochondria_active = [mitochondria_F[active_F]; mitochondria_M[active_M]]
+        mitochondria_inactive = [fixed_mitochondria_F[inactive_F]; fixed_mitochondria_M[inactive_M]]
+
+        create_new_plot(calc_hybrid_indices(genotypes_active),
+            mitochondria_active,
+            locations_active,
+            calc_hybrid_indices(genotypes_inactive),
+            mitochondria_inactive,
+            locations_inactive)
+    else
+        create_new_plot(calc_hybrid_indices([genotypes_F; genotypes_M]),
+            [mitochondria_F; mitochondria_M],
+            [locations_F; locations_M])
+    end
 end
 
 # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function update_plot(generation)
-    genotypes_active = [genotypes_F[active_F]; genotypes_M[active_M]]
-    locations_active = [locations_F[active_F]; locations_M[active_M]]
-    genotypes_inactive = [fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]
-    locations_inactive = [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]]
-    mitochondria_active = [mitochondria_F[active_F]; mitochondria_M[active_M]]
-    mitochondria_inactive = [fixed_mitochondria_F[inactive_F]; fixed_mitochondria_M[inactive_M]]
-    update_population_plot(calc_hybrid_indices(genotypes_active),
-        mitochondria_active,
-        locations_active,
-        calc_hybrid_indices(genotypes_inactive),
-        mitochondria_inactive,
-        locations_inactive,
-        generation)
+function update_plot(generation, optimize)
+    if optimize
+        genotypes_active = [genotypes_F[active_F]; genotypes_M[active_M]]
+        locations_active = [locations_F[active_F]; locations_M[active_M]]
+        genotypes_inactive = [fixed_genotypes_F[inactive_F]; fixed_genotypes_M[inactive_M]]
+        locations_inactive = [fixed_locations_F[inactive_F]; fixed_locations_M[inactive_M]]
+        mitochondria_active = [mitochondria_F[active_F]; mitochondria_M[active_M]]
+        mitochondria_inactive = [fixed_mitochondria_F[inactive_F]; fixed_mitochondria_M[inactive_M]]
+        update_population_plot(calc_hybrid_indices(genotypes_active),
+            mitochondria_active,
+            locations_active,
+            calc_hybrid_indices(genotypes_inactive),
+            mitochondria_inactive,
+            locations_inactive,
+            generation)
+    else
+        genotypes = [genotypes_F; genotypes_M]
+        locations = [locations_F; locations_M]
+        mitochondria = [mitochondria_F; mitochondria_M]
+        update_population_plot(calc_hybrid_indices(genotypes),
+            mitochondria,
+            locations,
+            generation)
+    end
 end
 
 # updates the male and female locations to the given values (FOR TESTING ONLY)
@@ -617,6 +666,12 @@ end
 function set_genotypes(new_genotypes_F, new_genotypes_M)
     global genotypes_F = new_genotypes_F
     global genotypes_M = new_genotypes_M
+end
+
+# updates the male and female mitochondria to the given values (FOR TESTING ONLY)
+function set_mitochondria(new_mitochondria_F, new_mitochondria_M)
+    global mitochondria_F = new_mitochondria_F
+    global mitochondria_M = new_mitochondria_M
 end
 
 function get_results(extinction)

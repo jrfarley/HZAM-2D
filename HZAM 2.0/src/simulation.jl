@@ -21,7 +21,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     starting_pop_ratio=1.0, sympatry=false, geographic_limits::Vector{Float64}=[0.0, 1.0],
     starting_range_pop0=[0.0, 0.48], starting_range_pop1=[0.52, 1.0],
     sigma_disp=0.01, sigma_comp=0.01,
-    do_plot=true, plot_int=10)
+    do_plot=true, plot_int=10, optimize=true)
 
     # WHEN ECOLDIFF = 1, THEN SHOULD NOT HAVE THE 2 (1 INSTEAD)
     # WHEN ECOLDIFF = 0, THEN SHOULD HAVE THE 2
@@ -61,7 +61,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         male_mating_trait_loci,
         hybrid_survival_loci,
         intrinsic_R,
-        sigma_comp)
+        sigma_comp,
+        optimize=optimize)
 
     extinction = false  # if extinction happens later this will be set true
 
@@ -72,7 +73,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         pick_potential_mate = choose_closest_male
     end
     if do_plot
-        plot_population()
+        plot_population(optimize)
     end
 
 
@@ -103,18 +104,29 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         expand_left = false
         expand_right = false
 
+        if !optimize
+            elig_F = collect(1:N_F)
+        else
+            elig_F = active_F
+        end
+
         # loop through mothers, mating and reproducing
-        for mother in active_F
+        for mother in elig_F
             # initialize tracking variables
             mate = false # becomes true when female is paired with male
             rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
             father = [] # will contain the index of the male mate
             # make vector of indices of eligible males
-            if (length(active_M)>0)
+            if optimize
                 elig_M = copy(active_M)
             else
+                elig_M = collect(1:N_M)
+            end
+
+            if length(elig_M)==0 # check if there are any eligible males
                 break
             end
+                
             # determine male mate of female
             while mate == false
                 # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
@@ -158,11 +170,13 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         if survival_fitness > rand()
                             # determine sex and location of kid
                             new_location = disperse_individual(mother, sigma_disp, geographic_limits)
-                            genotype_sum = sum(kid_genotype)
-                            if genotype_sum > 0 && new_location < left_boundary / 10
-                                expand_left = true
-                            elseif genotype_sum < total_loci * 2 && new_location > (right_boundary - 1) / 10
-                                expand_right = true
+                            if optimize
+                                genotype_sum = sum(kid_genotype)
+                                if genotype_sum > 0 && new_location < left_boundary / 10
+                                    expand_left = true
+                                elseif genotype_sum < total_loci * 2 && new_location > (right_boundary - 1) / 10
+                                    expand_right = true
+                                end
                             end
 
                             if rand() > 0.5 # kid is daughter
@@ -187,7 +201,16 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end
 
         # assign surviving offspring to new adult population
-        update_population(genotypes_daughters, genotypes_sons, mitochondria_daughters, mitochondria_sons, locations_daughters, locations_sons, expand_left, expand_right, generation)
+        update_population(genotypes_daughters,
+            genotypes_sons,
+            mitochondria_daughters,
+            mitochondria_sons,
+            locations_daughters,
+            locations_sons,
+            expand_left,
+            expand_right,
+            generation,
+            optimize)
 
         # check if there are no remaining females in the hybrid zone
         if (length(active_F) == 0)
@@ -197,7 +220,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
-            update_plot(generation)
+            update_plot(generation, optimize)
         end
     end # of loop through generations
 
