@@ -594,9 +594,9 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     save_each_sim = false  # whether to save detailed data for each simulation
 
     # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
+    w_hyb_set = [1]#[1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
     # the set of assortative mating strengths (S_AM) that will be run
-    S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+    S_AM_set = [300]#[1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
     if survival_fitness_method == "epistasis"
         short_survFitnessMethod = "Ep"
@@ -770,7 +770,7 @@ function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))=#
 end
 
-make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "original_HZAM", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:5))))
+make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "Testing_Original", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:20))))
 
 
 

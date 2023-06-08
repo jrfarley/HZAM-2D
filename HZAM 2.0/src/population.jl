@@ -253,30 +253,36 @@ function update_population_optimized(genotypes_daughters,
 
         new_active_M = vcat(new_active_M, buffer_M[1], buffer_M[2]) # add males in the buffer zone to the list of active males
 
-        num_fixed_F = reduce(+, map(length, individuals_per_zone_F))
-        num_fixed_M = reduce(+, map(length, individuals_per_zone_M))
+        try
+            # updates list of inactive individuals
+            global inactive_F = setdiff(inactive_F, new_active_F)
+            global inactive_M = setdiff(inactive_M, new_active_M)
 
-        @test num_fixed_F == length(fixed_locations_F)
-        @test num_fixed_M == length(fixed_locations_M)
-        @test maximum(vcat(0, new_active_F)) <= length(fixed_locations_F)
-        @test maximum(vcat(0, new_active_M)) <= length(fixed_locations_M)
-        @test maximum(vcat(0, inactive_F)) <= length(fixed_locations_F)
-        @test maximum(vcat(0, inactive_M)) <= length(fixed_locations_M)
+            # creates new lists of genotypes and locations so that the active individuals are first and the inactive individuals last 
+            global genotypes_F = vcat(genotypes_daughters, fixed_genotypes_F[new_active_F], fixed_genotypes_F[inactive_F])
+            global genotypes_M = vcat(genotypes_sons, fixed_genotypes_M[new_active_M], fixed_genotypes_M[inactive_M])
 
-        # updates list of inactive individuals
-        global inactive_F = setdiff(inactive_F, new_active_F)
-        global inactive_M = setdiff(inactive_M, new_active_M)
+            global mitochondria_F = vcat(mitochondria_daughters, fixed_mitochondria_F[new_active_F], fixed_mitochondria_F[inactive_F])
+            global mitochondria_M = vcat(mitochondria_sons, fixed_mitochondria_M[new_active_M], fixed_mitochondria_M[inactive_M])
 
-        # creates new lists of genotypes and locations so that the active individuals are first and the inactive individuals last 
-        global genotypes_F = vcat(genotypes_daughters, fixed_genotypes_F[new_active_F], fixed_genotypes_F[inactive_F])
-        global genotypes_M = vcat(genotypes_sons, fixed_genotypes_M[new_active_M], fixed_genotypes_M[inactive_M])
+            global locations_F = vcat(locations_daughters, fixed_locations_F[new_active_F], fixed_locations_F[inactive_F])
+            global locations_M = vcat(locations_sons, fixed_locations_M[new_active_M], fixed_locations_M[inactive_M])
+        catch e
+            println(eachindex(locations_F))
+            println(eachindex(locations_M))
 
-        global mitochondria_F = vcat(mitochondria_daughters, fixed_mitochondria_F[new_active_F], fixed_mitochondria_F[inactive_F])
-        global mitochondria_M = vcat(mitochondria_sons, fixed_mitochondria_M[new_active_M], fixed_mitochondria_M[inactive_M])
+            @testset "find_error" begin
+                num_fixed_F = reduce(+, map(length, individuals_per_zone_F))
+                num_fixed_M = reduce(+, map(length, individuals_per_zone_M))
 
-        global locations_F = vcat(locations_daughters, fixed_locations_F[new_active_F], fixed_locations_F[inactive_F])
-        global locations_M = vcat(locations_sons, fixed_locations_M[new_active_M], fixed_locations_M[inactive_M])
-
+                @test num_fixed_F == length(fixed_locations_F)
+                @test num_fixed_M == length(fixed_locations_M)
+                @test maximum(vcat(0, new_active_F)) <= length(fixed_locations_F)
+                @test maximum(vcat(0, new_active_M)) <= length(fixed_locations_M)
+                @test maximum(vcat(0, inactive_F)) <= length(fixed_locations_F)
+                @test maximum(vcat(0, inactive_M)) <= length(fixed_locations_M)
+            end
+        end
 
         # updates list of active individuals
         num_active_F = length(locations_daughters) + length(new_active_F)
@@ -334,57 +340,31 @@ end
 # finds which parts of the range contain only individuals of one genotype
 function find_inactive_zones(indv_per_zone_F, indv_per_zone_M)
     dead_zones = []
-    output = []
-    zone_classification = []
 
-    # check in each zone if all individuals have the same genotypes
-    for zone in 1:10
-        if length(indv_per_zone_M[zone]) > 0 && length(indv_per_zone_F[zone]) > 0
-            all_equal = true
-            genotype1 = genotypes_M[indv_per_zone_M[zone][1]] # genotype of the first male in the zone
-            mitochondria1 = mitochondria_M[indv_per_zone_M[zone][1]]
+    # check if all individuals in a zone have the same genotype/mitochondria
+    function is_zone_inactive(zone)
+        genotypes = [genotypes_F[indv_per_zone_F[zone]]; genotypes_M[indv_per_zone_M[zone]]]
+        mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
 
-            push!(zone_classification, genotype1[1, 1])
-
-            # check each female
-            for indv in indv_per_zone_F[zone]
-                if genotypes_F[indv] != genotype1 || mitochondria_F[indv] != mitochondria1
-                    all_equal = false
-                    break
-                end
-            end
-            if all_equal
-                # check each male
-                for indv in indv_per_zone_M[zone]
-                    if genotypes_M[indv] != genotype1 || mitochondria_M[indv] != mitochondria1
-                        all_equal = false
-                        break
-                    end
-                end
-                if all_equal
-                    push!(dead_zones, zone)
-                end
-            end
-        else
-            push!(dead_zones, zone)
-            push!(zone_classification, 0.5)
-        end
+        return length(genotypes_F[indv_per_zone_F[zone]]) > 0 && allequal(genotypes) && allequal(mitochondria)
     end
 
-    # goes through each zone where all individuals have the same genotype and keeps the zones where 
-    # all the individuals in the neighbouring zones also have the same genotype
-    for zone in dead_zones
+    # checks if all individuals in neighbouring zones have the same genotype/mitochondria
+    function check_neighbours(zone)
         left_zone = max(1, zone - 1)
         right_zone = min(10, zone + 1)
         if left_zone in dead_zones && right_zone in dead_zones
-            if zone_classification[left_zone] == zone_classification[zone] &&
-               zone_classification[right_zone] == zone_classification[zone]
-                push!(output, zone)
-            end
+            return mitochondria_F[indv_per_zone_F[left_zone]][1] == mitochondria_F[indv_per_zone_F[zone]][1] == mitochondria_F[indv_per_zone_F[right_zone]][1] &&
+                   genotypes_F[indv_per_zone_F[left_zone]][1] == genotypes_F[indv_per_zone_F[zone]][1] == genotypes_F[indv_per_zone_F[right_zone]][1]
         end
+
+        return false
     end
 
-    return output
+
+    dead_zones = filter(is_zone_inactive, collect(1:10))
+
+    return filter(check_neighbours, dead_zones)
 end
 
 # calculates the growth rates at the beginning of the simulation when the populations are in sympatry

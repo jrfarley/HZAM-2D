@@ -212,9 +212,9 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             generation,
             optimize)
 
-        # check if there are no remaining females in the hybrid zone
-        if (length(active_F) == 0)
-            println("NO FEMALES REMAINING IN ACTIVE ZONE")
+        # check if there are any remaining females in any of the active zones
+        if optimize && length(active_F)==0
+            println("EXITING EARLY")
             break
         end
 

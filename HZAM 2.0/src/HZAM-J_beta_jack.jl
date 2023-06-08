@@ -11,7 +11,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6, total_functional_loci=1:3, num_neutral_loci=3,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
-    starting_pop_ratio=1.0)
+    starting_pop_ratio=1.0, optimize=true)
     # ecolDiff should be from 0 to 1 (parameter "E" in the paper)
     # intrinsic_R is called "R" in the paper
     # replications should be somehting like "1:10" or just "1" for 1 replicate, or something like "2:5" to add replicates after 1 is done
@@ -33,9 +33,9 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     save_each_sim = false  # whether to save detailed data for each simulation
 
     # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
+    w_hyb_set = [1.0]#[1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
     # the set of assortative mating strengths (S_AM) that will be run
-    S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+    S_AM_set = [300]#[1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
     if survival_fitness_method == "epistasis"
         short_survFitnessMethod = "Ep"
@@ -70,7 +70,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                     total_loci, female_mating_trait_loci, male_mating_trait_loci,
                     competition_trait_loci, hybrid_survival_loci, neutral_loci,
                     survival_fitness_method, per_reject_cost,
-                    starting_pop_ratio, do_plot=false)
+                    starting_pop_ratio, do_plot=false, optimize)
 
 
                 if extinction  # whole simulation went extinct
