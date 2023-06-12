@@ -295,8 +295,8 @@ end
 @testset "find_inactive_zones1" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
-    mitochondria_pop0 = fill(0.25, 100)
-    mitochondria_pop1 = fill(0.75, 100)
+    mitochondria_pop0 = fill(0, 100)
+    mitochondria_pop1 = fill(1, 100)
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -322,8 +322,8 @@ end
 @testset "find_inactive_zones2" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 99)
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
-    mitochondria_pop0 = fill(0.25, 99)
-    mitochondria_pop1 = fill(0.75, 100)
+    mitochondria_pop0 = fill(0, 99)
+    mitochondria_pop1 = fill(1, 100)
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -349,8 +349,8 @@ end
 @testset "find_inactive_zones3" begin
     genotypes_pop0 = vcat(fill([0 0 0; 0 0 0], 45), [fill(1, 2, 3)], fill([0 0 0; 0 0 0], 54))
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
-    mitochondria_pop0 = fill(0.25, 100)
-    mitochondria_pop1 = fill(0.25, 100)
+    mitochondria_pop0 = fill(0, 100)
+    mitochondria_pop1 = fill(1, 100)
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -376,9 +376,9 @@ end
 
 @testset "find_inactive_zones4" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
-    genotypes_pop1 = genotypes_pop0
-    mitochondria_pop0 = vcat(fill(0.25, 50), 0.75, fill(0.25, 49))
-    mitochondria_pop1 = fill(0.25, 100)
+    genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
+    mitochondria_pop0 = vcat(fill(0, 50), 1, fill(0, 49))
+    mitochondria_pop1 = fill(1, 100)
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -399,14 +399,14 @@ end
         mitochondria,
         mitochondria)
 
-    @test dead_zones == [1, 5, 6, 7, 8, 9, 10]
+    @test dead_zones == [1, 7, 8, 9, 10]
 end
 
 @testset "find_inactive_zones5" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
-    genotypes_pop1 = vcat(fill([0 0 0; 0 0 0], 45), [fill(1, 2, 3)], fill([0 0 0; 0 0 0], 54))
-    mitochondria_pop0 = vcat(fill(0.25, 50), 0.75, fill(0.25, 49))
-    mitochondria_pop1 = fill(0.25, 100)
+    genotypes_pop1 = vcat(fill([1 1 1; 1 1 1], 45), [fill(0, 2, 3)], fill([1 1 1; 1 1 1], 54))
+    mitochondria_pop0 = vcat(fill(0, 50), 1, fill(0, 49))
+    mitochondria_pop1 = fill(1, 100)
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -427,14 +427,14 @@ end
         mitochondria,
         mitochondria)
 
-    @test dead_zones == [1, 5, 6, 10]
+    @test dead_zones == [1, 10]
 end
 
 @testset "find_inactive_zones6" begin
     genotypes_pop0 = [[0 0 0; 0 0 0]]
     genotypes_pop1 = [[0 0 0; 0 0 0]]
-    mitochondria_pop0 = [0.25]
-    mitochondria_pop1 = [0.25]
+    mitochondria_pop0 = [0]
+    mitochondria_pop1 = [0]
 
     mitochondria = [mitochondria_pop0; mitochondria_pop1]
 
@@ -456,4 +456,13 @@ end
         mitochondria)
 
     @test dead_zones == []
+end
+
+@testset "mean" begin
+    genotypes = [[1 0 1; 0 1 0], [0 0 1; 1 0 0], [1 1 1; 1 1 1]]
+
+    @test Population.mean(genotypes[1], collect(1:2)) == 0.5
+
+    @test Population.mean(genotypes[2], [2]) == 0
+    @test Population.mean(genotypes[3], collect(1:3)) == 1
 end

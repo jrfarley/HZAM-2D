@@ -191,6 +191,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             break # break out of current loop (this simulation) 
         end
 
+        if length(pd.active_F) < 100
+            expand_left = true
+            expand_right = true
+        end
+
         # assign surviving offspring to new adult population
         pd = update_population(pd,
             genotypes_daughters,
@@ -218,7 +223,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         # check if there are any remaining females in any of the active zones
         if optimize && length(pd.active_F) == 0
             println("EXITING EARLY")
-            #readline()
+            plot_population(pd, optimize, functional_loci_range)
+            readline()
             break
         end
     end # of loop through generations

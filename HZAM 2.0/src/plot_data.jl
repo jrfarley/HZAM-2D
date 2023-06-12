@@ -65,6 +65,7 @@ function update_population_plot(hybrid_indices_active, mitochondria_active, loca
     global sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)  # add the sigmoid fit to the plot
     ax.title = string("HZAM simulation, generation = ", generation)
     println("generation: ", generation, "; individuals: ", length(locations_active)+length(locations_inactive))
+    readline()
 end
 
 function update_population_plot(hybrid_indices, mitochondria, locations, generation)

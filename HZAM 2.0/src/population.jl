@@ -234,7 +234,6 @@ struct PopulationData
             if dead_zones != []
                 inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones])
                 inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones])
-                buffer_M = [[], []]
             else
                 inactive_F = []
                 inactive_M = []
@@ -250,6 +249,8 @@ struct PopulationData
                 active_F = []
                 active_M = []
             end
+
+            buffer_M = [[], []]
         else
             # expands active zone and updates buffer if necessary
             if expand_left && left_boundary > 1 # expands the left boundary if not already at edge of range
@@ -488,31 +489,32 @@ end
 # finds which parts of the range contain only individuals of one genotype
 function find_inactive_zones(indv_per_zone_F, indv_per_zone_M, genotypes_F, genotypes_M, mitochondria_F, mitochondria_M)
     dead_zones = []
+    left_boundary = 11
+    right_boundary = 0
 
-    # check if all individuals in a zone have the same genotype/mitochondria
-    function is_zone_inactive(zone)
+    for zone in 1:10
         genotypes = [genotypes_F[indv_per_zone_F[zone]]; genotypes_M[indv_per_zone_M[zone]]]
         mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
 
-        return length(genotypes_F[indv_per_zone_F[zone]]) > 0 && allequal(genotypes) && allequal(mitochondria)
-    end
-
-    # checks if all individuals in neighbouring zones have the same genotype/mitochondria
-    function check_neighbours(zone)
-        left_zone = max(1, zone - 1)
-        right_zone = min(10, zone + 1)
-        if left_zone in dead_zones && right_zone in dead_zones
-            return mitochondria_F[indv_per_zone_F[left_zone]][1] == mitochondria_F[indv_per_zone_F[zone]][1] == mitochondria_F[indv_per_zone_F[right_zone]][1] &&
-                   genotypes_F[indv_per_zone_F[left_zone]][1] == genotypes_F[indv_per_zone_F[zone]][1] == genotypes_F[indv_per_zone_F[right_zone]][1]
+        if length(mitochondria) == 0 || maximum(map(maximum, genotypes)) > 0 || maximum(mitochondria) > 0
+            left_boundary = max(zone - 1, 0)
+            break
         end
-
-        return false
     end
 
+    for zone in 10:-1:left_boundary
+        genotypes = [genotypes_F[indv_per_zone_F[zone]]; genotypes_M[indv_per_zone_M[zone]]]
+        mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
 
-    dead_zones = filter(is_zone_inactive, collect(1:10))
+        if length(mitochondria) == 0 || minimum(map(minimum, genotypes)) < 1 || minimum(mitochondria) < 1
+            right_boundary = min(zone + 1, 10)
+            break
+        end
+    end
 
-    return filter(check_neighbours, dead_zones)
+    active_zones = collect(left_boundary:right_boundary)
+
+    return setdiff(collect(1:10), active_zones)
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1

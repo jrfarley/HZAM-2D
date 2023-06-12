@@ -69,8 +69,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                     K_total, max_generations,
                     total_loci, female_mating_trait_loci, male_mating_trait_loci,
                     competition_trait_loci, hybrid_survival_loci, neutral_loci,
-                    survival_fitness_method, per_reject_cost,
-                    starting_pop_ratio, do_plot=false, optimize)
+                    survival_fitness_method, per_reject_cost, do_plot=false, optimize)
 
 
                 if extinction  # whole simulation went extinct
@@ -102,7 +101,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
         end # of w_hyb loop   
     end # of replicate loop
 
-    if save_outcomes_JL
+    #=if save_outcomes_JL
         filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set", set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", total_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, ".jld2")
         @save filename outcome_array
     end
@@ -112,7 +111,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
             filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set", set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", total_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, "_rep", replications[i])
             CSV.write(filename, Tables.table(outcome_array[:, :, i]), writeheader=false)
         end
-    end
+    end=#
     return outcome_array
 end
 
