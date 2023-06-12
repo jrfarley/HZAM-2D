@@ -770,7 +770,11 @@ function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))=#
 end
 
-make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "Testing_Original", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:20))))
+#make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "Testing_Original", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:20))))
 
-
+@btime run_one_HZAM_sim(0.7, 1, 0, 1.1; # these values are 
+    # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
+    K_total=1000, max_generations=1000,
+    sigma_disp=0.01, sympatry=false,
+    sigma_comp=0.1, do_plot=false, plot_int=1)
 

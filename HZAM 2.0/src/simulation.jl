@@ -16,7 +16,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
-    starting_pop_ratio=1.0, sympatry=false, geographic_limits::Vector{Float64}=[0.0, 0.9999],
+    sympatry=false, geographic_limits::Vector{Float64}=[0.0, 0.9999],
     starting_range_pop0=[0.0, 0.48], starting_range_pop1=[0.52, 0.9999],
     sigma_disp=0.01, sigma_comp=0.01,
     do_plot=true, plot_int=10, optimize=true)
@@ -155,7 +155,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                 # if offspring, generate their genotypes and sexes
                 if offspring >= 1
                     for kid in 1:offspring
-                        kid_genotype = generate_offspring_genotype(pd.genotypes_F[mother], pd.genotypes_M[father], total_loci)
+                        kid_genotype = generate_offspring_genotype(pd.genotypes_F[mother], pd.genotypes_M[father])
                         kid_mitochondria = pd.mitochondria_F[mother]
                         survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
                         if survival_fitness > rand()
@@ -209,20 +209,24 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             ecolDiff,
             optimize)
 
-        # check if there are any remaining females in any of the active zones
-        if optimize && length(pd.active_F) == 0
-            println("EXITING EARLY")
-            readline()
-            break
-        end
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
             update_plot(pd, generation, optimize, functional_loci_range)
         end
+        
+        # check if there are any remaining females in any of the active zones
+        if optimize && length(pd.active_F) == 0
+            println("EXITING EARLY")
+            #readline()
+            break
+        end
     end # of loop through generations
 
-    return get_results(pd.genotypes_F, pd.genotypes_F, functional_loci_range, neutral_loci, extinction)
+    functional_HI_all_inds = calc_traits_additive([pd.genotypes_F; pd.genotypes_M], functional_loci_range)
+    HI_NL_all_inds = calc_traits_additive([pd.genotypes_F; pd.genotypes_M], neutral_loci)
+
+    return extinction, functional_HI_all_inds, HI_NL_all_inds
 end
 
 # This function calculates survival fitness of each individual according to heterozygosity.
