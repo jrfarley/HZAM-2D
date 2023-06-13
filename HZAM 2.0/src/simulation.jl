@@ -166,9 +166,9 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
                             if optimize
                                 genotype_sum = sum(kid_genotype)
-                                if genotype_sum > 0 && new_location < pd.left_boundary / 10
+                                if genotype_sum > 0 && new_location.x < pd.left_boundary / 10
                                     expand_left = true
-                                elseif genotype_sum < total_loci * 2 && new_location > (pd.right_boundary - 1) / 10
+                                elseif genotype_sum < total_loci * 2 && new_location.x > (pd.right_boundary - 1) / 10
                                     expand_right = true
                                 end
                             end

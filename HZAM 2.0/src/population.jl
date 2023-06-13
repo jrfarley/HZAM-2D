@@ -58,11 +58,14 @@ struct PopulationData
 
     growth_rates_F::Dict{Int64,Float64} # table of the female growth rates associated with each active female index
 
-    individuals_per_zone_F::Vector{Vector{Int32}} # indices of the females in each zone
-    individuals_per_zone_M::Vector{Vector{Int32}} # indices of the males in each zone
+    individuals_per_zone_F::Matrix{Vector{Int32}} # indices of the females in each zone
+    individuals_per_zone_M::Matrix{Vector{Int32}} # indices of the males in each zone
 
     left_boundary::Int8 # zone number of the furthest left active zone
     right_boundary::Int8 # zone number of the furthest right active zone
+
+    bottom_boundary::Int8
+    top_boundary::Int8
 
     active_F::Vector{Int32} # indices of the currently active females (in the genotypes_F, locations_F, and mitochondria_F arrays)
     active_M::Vector{Int32} # indices of the currently active males
@@ -71,8 +74,8 @@ struct PopulationData
     buffer_M::Vector{Vector{Int32}} # indices of the males in the buffer zone between active and inactive regions (in the inactive arrays)
 
     # data that only gets updated every 10 generations (used to store information about inactive individuals)
-    inactive_locations_F::Vector{Float32} # inactive female locations
-    inactive_locations_M::Vector{Float32} # inactive male locations
+    inactive_locations_F::Vector{Location} # inactive female locations
+    inactive_locations_M::Vector{Location} # inactive male locations
     inactive_genotypes_F::Vector{Matrix{Int8}} # inactive female genotypes
     inactive_genotypes_M::Vector{Matrix{Int8}} # inactive male genotypes
     inactive_mitochondria_F::Vector{Int8} # inactive female mitochondria types
@@ -154,12 +157,13 @@ struct PopulationData
             # individuals in the middle zones (5 and 6) become active whereas other individuals are inactive
             # males in zones adjacent to active zones become part of the buffer which is treated as active for mating, but remains fixed from generation to generation
             individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
-            active_F = vcat(individuals_per_zone_F[5:6]...)
-            inactive_F = vcat(individuals_per_zone_F[[(1:4); (7:10)]]...)
-            buffer_M = [individuals_per_zone_M[4], individuals_per_zone_M[7]]
-            active_M = vcat(individuals_per_zone_M[5:6]...)
+
+            active_F = vcat(individuals_per_zone_F[5:6, :]...)
+            inactive_F = vcat(individuals_per_zone_F[[(1:4); (7:10)], :]...)
+            buffer_M = [vcat(individuals_per_zone_M[4, :]...), vcat(individuals_per_zone_M[7, :]...), [], []]
+            active_M = vcat(individuals_per_zone_M[5:6, :]...)
             active_M = vcat(active_M, buffer_M[1], buffer_M[2])
-            inactive_M = vcat(individuals_per_zone_M[[(1:3); (8:10)]]...)
+            inactive_M = vcat(individuals_per_zone_M[[(1:3); (8:10)], :]...)
             inactive_locations_F, inactive_locations_M = (copy(locations_F), copy(locations_M))
 
             inactive_genotypes_F, inactive_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
@@ -188,6 +192,8 @@ struct PopulationData
                 individuals_per_zone_M,
                 5,
                 6,
+                1,
+                10,
                 active_F,
                 active_M,
                 inactive_F,
@@ -226,6 +232,7 @@ struct PopulationData
         individuals_per_zone_F = pd.individuals_per_zone_F
         individuals_per_zone_M = pd.individuals_per_zone_M
         left_boundary, right_boundary = pd.left_boundary, pd.right_boundary
+        bottom_boundary, top_boundary = pd.bottom_boundary, pd.top_boundary
         inactive_locations_F, inactive_locations_M = pd.inactive_locations_F, pd.inactive_locations_M
         inactive_genotypes_F, inactive_genotypes_M = pd.inactive_genotypes_F, pd.inactive_genotypes_M
         inactive_mitochondria_F, inactive_mitochondria_M = pd.inactive_mitochondria_F, pd.inactive_mitochondria_M
@@ -260,18 +267,21 @@ struct PopulationData
             # group population into zones
             individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
 
-            dead_zones = find_inactive_zones(individuals_per_zone_F,
+            left_boundary, right_boundary, bottom_boundary, top_boundary = find_active_zone_boundaries(individuals_per_zone_F,
                 individuals_per_zone_M,
                 genotypes_F,
                 genotypes_M,
                 mitochondria_F,
                 mitochondria_M)
-            active_zones = setdiff!(collect(1:10), dead_zones)
+
+            active_zones = [collect(left_boundary:right_boundary), collect(bottom_boundary:top_boundary)]
+
+            dead_zones = [[(1:left_boundary - 1); (right_boundary+1):10], (1:10)]
 
             # compile list of new inactive individuals
-            if dead_zones != []
-                inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones])
-                inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones])
+            if dead_zones[1] != [] && dead_zones[2] !=[]
+                inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones[1], dead_zones[2]])
+                inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones[1], dead_zones[2]])
             else
                 inactive_F = []
                 inactive_M = []
@@ -279,10 +289,8 @@ struct PopulationData
 
             # compile list of new active individuals
             if active_zones != []
-                active_F = reduce(vcat, individuals_per_zone_F[active_zones])
-                active_M = reduce(vcat, individuals_per_zone_M[active_zones])
-                left_boundary = minimum(vcat(10, active_zones))
-                right_boundary = maximum(vcat(1, active_zones))
+                active_F = reduce(vcat, individuals_per_zone_F[active_zones[1], active_zones[2]])
+                active_M = reduce(vcat, individuals_per_zone_M[active_zones[1], active_zones[2]])
             else
                 active_F = []
                 active_M = []
@@ -293,10 +301,10 @@ struct PopulationData
             # expands active zone and updates buffer if necessary
             if expand_left && left_boundary > 1 # expands the left boundary if not already at edge of range
                 left_boundary -= 1
-                new_active_F = individuals_per_zone_F[left_boundary]
-                new_active_M = individuals_per_zone_M[left_boundary]
+                new_active_F = vcat(individuals_per_zone_F[left_boundary, :]...)
+                new_active_M = vcat(individuals_per_zone_M[left_boundary, :]...)
                 if left_boundary > 1
-                    buffer_M[1] = individuals_per_zone_M[left_boundary-1]
+                    buffer_M[1] = vcat(individuals_per_zone_M[left_boundary-1, :]...)
                 else
                     buffer_M[1] = []
                 end
@@ -304,10 +312,10 @@ struct PopulationData
 
             if expand_right && right_boundary < 10 # expands the right boundary if not already at edge of range
                 right_boundary += 1
-                new_active_F = vcat(new_active_F, individuals_per_zone_F[right_boundary])
-                new_active_M = vcat(new_active_M, individuals_per_zone_M[right_boundary])
+                new_active_F = vcat(new_active_F, vcat(individuals_per_zone_F[right_boundary, :]...))
+                new_active_M = vcat(new_active_M, vcat(individuals_per_zone_M[right_boundary, :]...))
                 if right_boundary < 10
-                    buffer_M[2] = individuals_per_zone_M[right_boundary+1]
+                    buffer_M[2] = vcat(individuals_per_zone_M[right_boundary+1, :]...)
                 else
                     buffer_M[2] = []
                 end
@@ -386,6 +394,8 @@ struct PopulationData
             individuals_per_zone_M,
             left_boundary,
             right_boundary,
+            bottom_boundary,
+            top_boundary,
             active_F,
             active_M,
             inactive_F,
@@ -516,54 +526,70 @@ end
 
 # arranges the indices of each individual by location
 # zone 1 is [0,1), zone 2 is [1, 2), etc.
+# list of indices for a zone is stored at individuals_per_zone_F[zone_x_coordinate][zone_y_coordinate]
 function assign_zones(locations_F, locations_M)
-    individuals_per_zone_F = [[] for i in 1:10]
-    individuals_per_zone_M = [[] for i in 1:10]
+    individuals_per_zone_F = Matrix{Vector{Integer}}(undef, 10, 10)
+    individuals_per_zone_M = Matrix{Vector{Integer}}(undef, 10, 10)
+
+    # creates an empty vector to store the list of indices at each entry in the 10x10 matrix
+    for i in 1:10
+        for j in 1:10
+            individuals_per_zone_F[i, j] = Vector{Integer}(undef, 0)
+            individuals_per_zone_M[i, j] = Vector{Integer}(undef, 0)
+        end
+    end
 
     # assigns females
     for indv in eachindex(locations_F)
-        zone = trunc(Int, 10 * locations_F[indv]) + 1
-        push!(individuals_per_zone_F[zone], indv)
+        zone_x = trunc(Int, 10 * locations_F[indv].x) + 1
+        zone_y = trunc(Int, 10 * locations_F[indv].y) + 1
+        push!(individuals_per_zone_F[zone_x, zone_y], indv)
     end
 
     #assigns males
     for indv in eachindex(locations_M)
-        zone = trunc(Int, 10 * locations_M[indv]) + 1
-        push!(individuals_per_zone_M[zone], indv)
+        zone_x = trunc(Int, 10 * locations_M[indv].x) + 1
+        zone_y = trunc(Int, 10 * locations_M[indv].y) + 1
+        push!(individuals_per_zone_M[zone_x, zone_y], indv)
     end
 
     return individuals_per_zone_F, individuals_per_zone_M
 end
 
 # finds which parts of the range contain only individuals of one genotype
-function find_inactive_zones(indv_per_zone_F, indv_per_zone_M, genotypes_F, genotypes_M, mitochondria_F, mitochondria_M)
+function find_active_zone_boundaries(indv_per_zone_F, indv_per_zone_M, genotypes_F, genotypes_M, mitochondria_F, mitochondria_M)
     dead_zones = []
-    left_boundary = 11
-    right_boundary = 0
+    left_boundary, bottom_boundary = 11,11
+    right_boundary, top_boundary = 0,0
 
-    for zone in 1:10
-        genotypes = [genotypes_F[indv_per_zone_F[zone]]; genotypes_M[indv_per_zone_M[zone]]]
-        mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
+    for x_zone in 1:10
+        females = vcat(indv_per_zone_F[x_zone, :]...)
+        males = vcat(indv_per_zone_M[x_zone, :]...)
+
+        genotypes = [genotypes_F[females]; genotypes_M[males]]
+        mitochondria = [mitochondria_F[females]; mitochondria_M[males]]
 
         if length(mitochondria) == 0 || maximum(map(maximum, genotypes)) > 0 || maximum(mitochondria) > 0
-            left_boundary = max(zone - 1, 1)
+            left_boundary = max(x_zone, 1)
             break
         end
     end
-
-    for zone in 10:-1:left_boundary
-        genotypes = [genotypes_F[indv_per_zone_F[zone]]; genotypes_M[indv_per_zone_M[zone]]]
-        mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
+    for x_zone in 10:-1:left_boundary
+        females = vcat(indv_per_zone_F[x_zone, :]...)
+        males = vcat(indv_per_zone_M[x_zone, :]...)
+        
+        genotypes = [genotypes_F[females]; genotypes_M[males]]
+        mitochondria = [mitochondria_F[females]; mitochondria_M[males]]
 
         if length(mitochondria) == 0 || minimum(map(minimum, genotypes)) < 1 || minimum(mitochondria) < 1
-            right_boundary = min(zone + 1, 10)
+            right_boundary = min(x_zone, 10)
             break
         end
     end
 
-    active_zones = collect(left_boundary:right_boundary)
-
-    return setdiff(collect(1:10), active_zones)
+    print(string("left: ", left_boundary))
+    print(string("right: ", right_boundary))
+    return left_boundary, right_boundary, 1, 10
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
@@ -758,7 +784,7 @@ end
 
 # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
 function update_plot(pd, generation, optimize, functional_loci_range)
-    if optimize
+    if optimize 
         genotypes_active = [pd.genotypes_F[pd.active_F]; pd.genotypes_M[pd.active_M]]
         locations_active = [pd.locations_F[pd.active_F]; pd.locations_M[pd.active_M]]
         genotypes_inactive = [pd.inactive_genotypes_F[pd.inactive_F]; pd.inactive_genotypes_M[pd.inactive_M]]
