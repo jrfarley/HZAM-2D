@@ -188,6 +188,7 @@ end
 function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     cat_RunOutcomes = convert_to_cat_array(RunOutcomes)
     display(plot_all_outcomes(cat_RunOutcomes))
+    readline()
     savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.png"))
     #=savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
     most_common_outcomes = get_most_common_outcomes(cat_RunOutcomes)

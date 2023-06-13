@@ -594,9 +594,9 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     save_each_sim = false  # whether to save detailed data for each simulation
 
     # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1]#[1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
+    w_hyb_set = [0.7]#[1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
     # the set of assortative mating strengths (S_AM) that will be run
-    S_AM_set = [300]#[1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+    S_AM_set = [1]#[1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
     if survival_fitness_method == "epistasis"
         short_survFitnessMethod = "Ep"
@@ -672,7 +672,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
             end # of S_AM loop
         end # of w_hyb loop   
     end # of replicate loop
-
+#=
     if save_outcomes_JL
         filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set",set_name,"_surv",short_survFitnessMethod,"_ecolDiff",ecolDiff,"_growthrate",intrinsic_R,"_K",K_total,"_gen",max_generations,"_SC",per_reject_cost,".jld2")
         save_object(filename, outcome_array)
@@ -684,6 +684,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
             CSV.write(filename, Tables.table(outcome_array[:,:,i]), writeheader=false)
         end 
     end
+    =#
     return outcome_array
 end
 
@@ -762,6 +763,7 @@ end
 function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     cat_RunOutcomes = convert_to_cat_array(RunOutcomes)
     display(plot_all_outcomes(cat_RunOutcomes))
+    readline()
     savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.png"))
     #=savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
     most_common_outcomes = get_most_common_outcomes(cat_RunOutcomes)
@@ -772,9 +774,4 @@ end
 
 #make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "Testing_Original", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:20))))
 
-@btime run_one_HZAM_sim(0.7, 1, 0, 1.1; # these values are 
-    # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=1000, max_generations=1000,
-    sigma_disp=0.01, sympatry=false,
-    sigma_comp=0.1, do_plot=false, plot_int=1)
-
+make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "Testing_Optimized1.2", convert_to_cat_array(run_HZAM_set("test", 0, 1.1, collect(1:50))))

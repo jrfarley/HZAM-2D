@@ -16,8 +16,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
-    sympatry=false, geographic_limits::Vector{Float64}=[0.0, 0.9999],
-    starting_range_pop0=[0.0, 0.48], starting_range_pop1=[0.52, 0.9999],
+    sympatry=false, geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)],
+    starting_range_pop0=[Location(0.0f0, 0.0f0), Location(0.48f0, 1.0f0)], starting_range_pop1=[Location(0.52f0, 0.0f0), Location(1.0f0, 1.0f0)],
     sigma_disp=0.01, sigma_comp=0.01,
     do_plot=true, plot_int=10, optimize=true)
 
@@ -86,8 +86,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         mitochondria_daughters, mitochondria_sons = [], []
 
         # make empty arrays for storing locations of daughters and sons
-        locations_daughters = Array{Float32,1}(undef, 0)
-        locations_sons = Array{Float32,1}(undef, 0)
+        locations_daughters = Location[]
+        locations_sons = Location[]
 
         # create structures for recording indices of mother and father (for error checking, and potentially for tracking genealogies)
         # first column for mother index (3rd dim of genotypes_F) and second column for father index (3rd dim of genotypes_M) 
@@ -158,9 +158,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         kid_genotype = generate_offspring_genotype(pd.genotypes_F[mother], pd.genotypes_M[father])
                         kid_mitochondria = pd.mitochondria_F[mother]
                         survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
+
                         if survival_fitness > rand()
                             # determine sex and location of kid
-                            new_location = disperse_individual(pd.locations_F[mother], sigma_disp, geographic_limits)
+
+                            new_location = Location(pd.locations_F[mother], sigma_disp, geographic_limits)
+
                             if optimize
                                 genotype_sum = sum(kid_genotype)
                                 if genotype_sum > 0 && new_location < pd.left_boundary / 10
@@ -173,12 +176,13 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             if rand() > 0.5 # kid is daughter
                                 push!(genotypes_daughters, kid_genotype)
                                 push!(mitochondria_daughters, kid_mitochondria)
-                                locations_daughters = [locations_daughters; new_location]
+                                push!(locations_daughters, new_location)
                             else # kid is son
                                 push!(genotypes_sons, kid_genotype)
                                 push!(mitochondria_sons, kid_mitochondria)
-                                locations_sons = [locations_sons; new_location]
+                                push!(locations_sons, new_location)
                             end
+
                         end
                     end
                 end
@@ -191,7 +195,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             break # break out of current loop (this simulation) 
         end
 
-        if length(pd.active_F) < 100
+        if optimize == true && length(pd.active_F) < 100
             expand_left = true
             expand_right = true
         end
@@ -213,7 +217,6 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             intrinsic_R,
             ecolDiff,
             optimize)
-
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))

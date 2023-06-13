@@ -6,18 +6,53 @@ using .Plot_Data
 
 using Test
 
-export PopulationData
+export PopulationData, Location
 export initialize_population, update_population
 export choose_closest_male, calc_match_strength, generate_offspring_genotype, disperse_individual
 export plot_population, update_plot
 export calc_traits_additive
 
+# stores a location with an x coordinate and a y coordinate
+struct Location
+    x::Float32
+    y::Float32
+
+    # creates a location the with given x and y coordinates
+    function Location(x::Float32, y::Float32)
+        new(x, y)
+    end
+
+    # generates a random location within the range given
+    function Location(starting_range::Vector{Location})
+        x = rand() * (starting_range[2].x - starting_range[1].x) + starting_range[1].x
+        y = rand() * (starting_range[2].y - starting_range[1].y) + starting_range[1].y
+        new(x, y)
+    end
+
+    # generates a new location
+    # based on a normal distribution with width sigma_disp,
+    # centred on the given location location. Constrained to be within range. 
+    # geographic_limits should be a vector with two locations.
+    function Location(starting_location::Location, sigma_disp::Real, geographic_limits::Vector{Location})
+        x = -1
+        y = -1
+        while (x < geographic_limits[1].x) || (x > geographic_limits[2].x)
+            x = starting_location.x + (sigma_disp * randn())
+        end
+        while (y < geographic_limits[1].y) || (y > geographic_limits[2].y)
+            y = starting_location.y + (sigma_disp * randn())
+        end
+        new(x, y)
+    end
+end
+
+
 # stores all the population data (genotypes, locations, etc.) that get updated each generation
 struct PopulationData
     genotypes_F::Vector{Matrix{Int8}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
     genotypes_M::Vector{Matrix{Int8}} # the male genotypes
-    locations_F::Vector{Float32} # female locations
-    locations_M::Vector{Float32} # male locations
+    locations_F::Vector{Location} # female locations
+    locations_M::Vector{Location} # male locations
     mitochondria_F::Vector{Int8} # female mitochondria types (0 for species 0 and 1 for species 1)
     mitochondria_M::Vector{Int8} # male mitochondria types
 
@@ -65,9 +100,12 @@ struct PopulationData
         K_B = K_A   # EVEN NUMBER; carrying capacity (on resource beta) of entire range (for two sexes combined), regardless of species
 
 
-        pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * (starting_range_pop0[2] - starting_range_pop0[1]) / (geographic_limits[2] - geographic_limits[1]))
+        pop0_starting_area = (starting_range_pop0[2].x - starting_range_pop0[1].x) * (starting_range_pop0[2].y - starting_range_pop0[1].y)
+        pop1_starting_area = (starting_range_pop1[2].x - starting_range_pop1[1].x) * (starting_range_pop1[2].y - starting_range_pop1[1].y)
+        total_area = (geographic_limits[2].x - geographic_limits[1].x) * (geographic_limits[2].y - geographic_limits[1].y)
+        pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * pop0_starting_area / total_area)
         pop0_starting_N_half = Int(round(pop0_starting_N / 2))  # starting number for each sex
-        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * (starting_range_pop1[2] - starting_range_pop1[1]) / (geographic_limits[2] - geographic_limits[1]))
+        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * pop0_starting_area / total_area)
         pop1_starting_N_half = Int(round(pop1_starting_N / 2))
 
         # Generate genotype array for population of females:
@@ -366,8 +404,8 @@ struct PopulationData
         genotypes_sons,
         mitochondria_daughters,
         mitochondria_sons,
-        locations_daughters,
-        locations_sons,
+        locations_daughters::Vector{Location},
+        locations_sons::Vector{Location},
         competition_trait_loci,
         K_total,
         sigma_comp,
@@ -411,8 +449,8 @@ function update_population(pd,
     genotypes_sons,
     mitochondria_daughters,
     mitochondria_sons,
-    locations_daughters,
-    locations_sons,
+    locations_daughters::Vector{Location},
+    locations_sons::Vector{Location},
     expand_left,
     expand_right,
     generation,
@@ -456,12 +494,23 @@ function update_population(pd,
     end
 end
 
-# Generate breeding locations of individuals (vector in same order of individuals as D3 of the genotype array)
+# Generate breeding locations of individuals
 function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
-    locations_F_pop0 = Vector{Float32}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1])
-    locations_F_pop1 = Vector{Float32}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
-    locations_M_pop0 = Vector{Float32}((rand(pop0_starting_N_half) .* (starting_range_pop0[2] - starting_range_pop0[1])) .+ starting_range_pop0[1])
-    locations_M_pop1 = Vector{Float32}((rand(pop1_starting_N_half) .* (starting_range_pop1[2] - starting_range_pop1[1])) .+ starting_range_pop1[1])
+    locations_F_pop0 = Vector{Location}(undef, pop0_starting_N_half)
+    locations_M_pop0 = Vector{Location}(undef, pop0_starting_N_half)
+    locations_F_pop1 = Vector{Location}(undef, pop1_starting_N_half)
+    locations_M_pop1 = Vector{Location}(undef, pop1_starting_N_half)
+
+    for i in 1:pop0_starting_N_half
+        locations_F_pop0[i] = Location(starting_range_pop0)
+        locations_M_pop0[i] = Location(starting_range_pop0)
+    end
+
+    for i in 1:pop1_starting_N_half
+        locations_F_pop1[i] = Location(starting_range_pop1)
+        locations_M_pop1[i] = Location(starting_range_pop1)
+    end
+
     return [locations_F_pop0; locations_F_pop1], [locations_M_pop0; locations_M_pop1]
 end
 
@@ -497,7 +546,7 @@ function find_inactive_zones(indv_per_zone_F, indv_per_zone_M, genotypes_F, geno
         mitochondria = [mitochondria_F[indv_per_zone_F[zone]]; mitochondria_M[indv_per_zone_M[zone]]]
 
         if length(mitochondria) == 0 || maximum(map(maximum, genotypes)) > 0 || maximum(mitochondria) > 0
-            left_boundary = max(zone - 1, 0)
+            left_boundary = max(zone - 1, 1)
             break
         end
     end
@@ -538,10 +587,26 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        return K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location) / (sqrt(2) * sigma_comp)) + erf(location / (sqrt(2) * sigma_comp)))
+        x_density = K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location.x) / (sqrt(2) * sigma_comp)) + erf(location.x / (sqrt(2) * sigma_comp)))
+        y_density = K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location.y) / (sqrt(2) * sigma_comp)) + erf(location.y / (sqrt(2) * sigma_comp)))
+
+        return x_density + y_density
     end
 
     return map(calc_ideal_density, locations_F)
+end
+
+# calculates the distance between two points
+function distance(location1, location2)
+    return sqrt((location1.x - location2.x)^2 + (location1.y - location2.y)^2)
+end
+
+# calculates the squared distances from a set of points to a single point
+function get_squared_distances(location_list, focal_location)
+    dif_x = [l.x for l in location_list] .- focal_location.x
+    dif_y = [l.y for l in location_list] .- focal_location.y
+
+    return dif_x .^ 2 .+ dif_y .^ 2
 end
 
 # calculates growth rates in the spatial model
@@ -549,7 +614,7 @@ function calculate_growth_rates(ind_useResourceA_F,
     ind_useResourceB_F,
     ind_useResourceA_M,
     ind_useResourceB_M,
-    locations_F,
+    locations_F::Vector{Location},
     locations_M,
     K_total,
     sigma_comp,
@@ -558,7 +623,6 @@ function calculate_growth_rates(ind_useResourceA_F,
     # in spatial model, calculate growth rates based on local resource use
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
-
     ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F[active_F]) # this applies the above function to each geographic location
 
     ideal_densities_at_locations_F_resourceA = ideal_densities_at_locations_F ./ 2
@@ -572,13 +636,13 @@ function calculate_growth_rates(ind_useResourceA_F,
     ind_locations_real = [locations_F; locations_M]
 
     function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
-        sum(ind_useResourceA_all .* exp.(-((ind_locations_real .- focal_location) .^ 2) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
+        sum(ind_useResourceA_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
 
     real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F[active_F]) # this applies the above function to each geographic location
 
     function get_useResourceB_density_real(focal_location) # do the same for resource B
-        sum(ind_useResourceB_all .* exp.(-((ind_locations_real .- focal_location) .^ 2) ./ (2 * (sigma_comp^2))))
+        sum(ind_useResourceB_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2))))
     end
     real_densities_at_locations_F_resourceB = map(get_useResourceB_density_real, locations_F[active_F]) # this applies the above function to each geographic location 
 
@@ -625,8 +689,8 @@ end
 
 # Finds the closest male given a list of eligible males
 function choose_closest_male(elig_M, locations_M, location_mother)
-    focal_male = splice!(elig_M, argmin(abs.(locations_M[elig_M] .- location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
-    if (abs(location_mother - locations_M[focal_male]) >= 0.1)
+    focal_male = splice!(elig_M, argmin(get_squared_distances(locations_M[elig_M], location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
+    if (distance(location_mother, locations_M[focal_male]) >= 0.1)
         return focal_male, []
     end
     return focal_male, elig_M
