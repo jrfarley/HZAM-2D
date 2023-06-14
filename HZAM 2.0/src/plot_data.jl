@@ -55,7 +55,7 @@ function create_new_plot(hybrid_indices_active, mitochondria_active, locations_a
     display(fig)
 end
 
-function create_new_plot(hybrid_indices, mitochondria, locations)
+function create_new_plot(hybrid_indices, mitochondria, locations)#=
     locations = [l.x for l in locations]
     mitochondria = 0.25 .+ mitochondria ./ 2
     fontsize_theme = Theme(fontsize=60)
@@ -68,6 +68,18 @@ function create_new_plot(hybrid_indices, mitochondria, locations)
     global mitochondria_points = scatter!(ax, locations, jitter(mitochondria), color=(:green, 0.8))
     fit = curve_fit(sigmoid, locations, hybrid_indices, initial_par)
     global sigmoid_line = lines!(ax, spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)
+    display(fig)=#
+
+    locations_x = [l.x for l in locations]
+    locations_y = [l.y for l in locations]
+    
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    global ax = Axis(fig[1, 1], xlabel="location", ylabel="hybrid index", title=string("HZAM simulation, generation = ", 0), xticklabelsize=45, yticklabelsize=45, titlegap=30)
+    xlims!(-0.03, 1.03)
+    ylims!(-0.03, 1.03)
+    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices)
     display(fig)
 end
 
@@ -107,7 +119,7 @@ function update_population_plot(hybrid_indices_active, mitochondria_active, loca
 end
 
 function update_population_plot(hybrid_indices, mitochondria, locations, generation)
-    locations = [l.x for l in locations]
+    #=locations = [l.x for l in locations]
     mitochondria = 0.25 .+ mitochondria ./ 2
     # display(scatter([locations_F; locations_M], functionalLoci_HI_all_inds))
     # fit = curve_fit(sigmoid, [locations_F; locations_M], functionalLoci_HI_all_inds, initial_par)
@@ -119,6 +131,14 @@ function update_population_plot(hybrid_indices, mitochondria, locations, generat
     global mitochondria_points = scatter!(ax, locations, jitter(mitochondria), color=(:green, 0.8))
     fit = curve_fit(sigmoid, locations, hybrid_indices, initial_par)
     global sigmoid_line = lines!(spaced_locations, sigmoid(spaced_locations, fit.param), color=(:blue, 0.25), linewidth=20)  # add the sigmoid fit to the plot
+    ax.title = string("HZAM simulation, generation = ", generation)
+    println("generation: ", generation, "; individuals: ", length(locations))=#
+    locations_x = [l.x for l in locations]
+    locations_y = [l.y for l in locations]
+
+    delete!(ax, points)
+
+    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices)
     ax.title = string("HZAM simulation, generation = ", generation)
     println("generation: ", generation, "; individuals: ", length(locations))
 end

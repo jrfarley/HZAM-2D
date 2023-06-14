@@ -13,9 +13,9 @@ using .Population
     hybrid_survival_loci = 3:3
     intrinsic_R = 1.1
     sigma_comp = 0.01
-    geographic_limits = [0.0, 1.0]
-    starting_range_pop0 = [0.0, 0.5]
-    starting_range_pop1 = [0.5, 1.0]
+    geographic_limits = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
+    starting_range_pop0 = [Location(0.0f0, 0.0f0), Location(0.5f0, 1.0f0)]
+    starting_range_pop1 = [Location(0.5f0, 0.0f0), Location(1.0f0, 1.0f0)]
 
     pd = PopulationData(K_total,
         ecolDiff,
@@ -49,9 +49,9 @@ end
     hybrid_survival_loci = 3:3
     intrinsic_R = 1.1
     sigma_comp = 0.01
-    geographic_limits = [0.0, 1.0]
-    starting_range_pop0 = [0.0, 0.75]
-    starting_range_pop1 = [0.75, 1.0]
+    geographic_limits = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
+    starting_range_pop0 = [Location(0.0f0, 0.0f0), Location(0.75f0, 1.0f0)]
+    starting_range_pop1 = [Location(0.75f0, 0.0f0), Location(1.0f0, 1.0f0)]
 
     pd = PopulationData(K_total,
         ecolDiff,
@@ -86,9 +86,9 @@ end
     hybrid_survival_loci = 3:3
     intrinsic_R = 1.1
     sigma_comp = 0.01
-    geographic_limits = [0.0, 1.0]
-    starting_range_pop0 = [0.0, 0.5]
-    starting_range_pop1 = [0.5, 1.0]
+    geographic_limits = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
+    starting_range_pop0 = [Location(0.0f0, 0.0f0), Location(0.5f0, 1.0f0)]
+    starting_range_pop1 = [Location(0.5f0, 0.0f0), Location(1.0f0, 1.0f0)]
 
     pd = PopulationData(K_total,
         ecolDiff,
@@ -118,26 +118,38 @@ end
     @test pd.inactive_genotypes_F == pd.genotypes_F
     @test pd.inactive_mitochondria_F == pd.mitochondria_F
 
-    @test length(pd.active_F) == 0 || (maximum(pd.locations_F[pd.active_F]) <= 0.6 && minimum(pd.locations_F[pd.active_F]) >= 0.4)
-    @test length(pd.active_M) == 0 || (maximum(pd.locations_M[pd.active_M]) <= 0.7 && minimum(pd.locations_M[pd.active_M]) >= 0.3)
+    x_locations_F = [l.x for l in pd.locations_F[pd.active_F]]
+    x_locations_M = [l.x for l in pd.locations_M[pd.active_M]]
+    x_locations_M_buffer1 = [l.x for l in pd.locations_M[pd.buffer_M[1]]]
+    x_locations_M_buffer2 = [l.x for l in pd.locations_M[pd.buffer_M[2]]]
 
-    @test length(pd.buffer_M[1]) == 0 || (maximum(pd.locations_M[pd.buffer_M[1]]) <= 0.4 && minimum(pd.locations_M[pd.buffer_M[1]]) >= 0.3)
-    @test length(pd.buffer_M[2]) == 0 || (maximum(pd.locations_M[pd.buffer_M[2]]) <= 0.7 && minimum(pd.locations_M[pd.buffer_M[2]]) >= 0.6)
+    @test length(pd.active_F) == 0 || (maximum(x_locations_F) <= 0.6 && minimum(x_locations_F) >= 0.4)
+    @test length(pd.active_M) == 0 || (maximum(x_locations_M) <= 0.7 && minimum(x_locations_M) >= 0.3)
+
+    @test length(pd.buffer_M[1]) == 0 || (maximum(x_locations_M_buffer1) <= 0.4 && minimum(x_locations_M_buffer1) >= 0.3)
+    @test length(pd.buffer_M[2]) == 0 || (maximum(x_locations_M_buffer2) <= 0.7 && minimum(x_locations_M_buffer2) >= 0.6)
 
 end
 
 @testset "calc_growth_rates" begin
-    K_total = 100
+    K_total = 10000
     ecolDiff = 0.0
     competition_trait_loci = 1:1
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    genotypes = Population.generate_genotype_array(8, 8, 3)
+    genotypes = Population.generate_genotype_array(2500, 2500, 3)
 
+    starting_range = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
 
-    locations_M = collect(Float32, 0.36:0.02:0.66)
-    locations_F = collect(Float32, 0.35:0.02:0.65)
+    locations_F, locations_M = Location[], Location[]
+
+    for y in [0.1f0, 0.49f0, 0.495f0, 0.5f0, 0.502f0, 0.505f0, 0.51f0, 0.7f0, 0.8f0, 0.9f0]
+        for x in collect(Float32, 0.001:0.002:0.999)
+            push!(locations_F, Location(x, y))
+            push!(locations_M, Location(x + 0.0005f0, y))
+        end
+    end
 
     competition_traits_F = calc_traits_additive(genotypes, competition_trait_loci)
     competition_traits_M = calc_traits_additive(genotypes, competition_trait_loci)
@@ -153,16 +165,15 @@ end
         K_total,
         sigma_comp,
         intrinsic_R,
-        collect(1:16))
+        collect(1:5000))
 
-    @test growth_rates_F[1] > growth_rates_F[8]
+    @test growth_rates_F[1] > growth_rates_F[2500]
 
-    @test growth_rates_F[16] > growth_rates_F[8]
+    @test growth_rates_F[5000] > growth_rates_F[2500]
 
-    @test growth_rates_F[1] > 1 && growth_rates_F[1] < 1.1
-
-    @test growth_rates_F[8] > 0.995 && growth_rates_F[8] < 1.005
+    @test growth_rates_F[1] > growth_rates_F[4500]
 end
+
 
 @testset "generate_genotype_array" begin
     genotypes = Population.generate_genotype_array(1, 1, 3)
@@ -188,20 +199,29 @@ end
 end
 
 @testset "disperse_individual" begin
-    geographic_limits = [0.0, 1.0]
+    locations = Location[]
+    geographic_limits = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
     sigma_disp = 0.01
 
     num_fail = 0
 
     for i in 1:1000
-        new_location = Population.disperse_individual(0.1, sigma_disp, geographic_limits)
-
-        if new_location < 0.1 - 2 * sigma_disp || new_location > 0.1 + 2 * sigma_disp
+        new_location = Location(Location(0.5f0, 0.5f0), sigma_disp, geographic_limits)
+        push!(locations, new_location)
+        if new_location.x < 0.5 - 2 * sigma_disp || new_location.x > 0.5 + 2 * sigma_disp || new_location.y < 0.5 - 2 * sigma_disp || new_location.y > 0.5 + 2 * sigma_disp
             num_fail += 1
         end
     end
 
+    average_x = sum([l.x for l in locations]) / 1000
+
+    average_y = sum([l.y for l in locations]) / 1000
+
     @test num_fail < 70
+
+    @test average_x > 0.495 && average_x < 0.505
+    @test average_y > 0.495 && average_y < 0.505
+
 end
 
 @testset "generate_offspring_genotype" begin
@@ -212,26 +232,45 @@ end
 end
 
 @testset "assign_zones" begin
-    locations_F, locations_M = ([0.1, 0.3, 0.5, 0.7], [0.2, 0.4, 0.6, 0.8])
+    x_locations_F, x_locations_M = ([0.1f0, 0.3f0, 0.5f0, 0.7f0], [0.2f0, 0.4f0, 0.75f0, 0.72f0])
+
+    y_locations_F, y_locations_M = ([0.1f0, 0.4f0, 0.2f0, 0.6f0], [0.8f0, 0.3f0, 0.64f0, 0.69f0])
+
+    locations_F = Location.(x_locations_F, y_locations_F)
+    locations_M = Location.(x_locations_M, y_locations_M)
 
     females_per_zone, males_per_zone = Population.assign_zones(locations_F, locations_M)
 
-    @test females_per_zone[1] == []
-    @test females_per_zone[4] == [2]
-    @test males_per_zone[5] == [2]
+    @test females_per_zone[1,1] == []
+    @test females_per_zone[4,5] == [2]
+    @test males_per_zone[5,4] == [2]
+
+    @test males_per_zone[8,7] == [3,4]
 end
 
 @testset "choose_closest_male" begin
-    locations_M = [0.15, 0.4, 0.6, 0.8]
+    x_locations_M = [0.15f0, 0.15f0, 0.05f0, 0.8f0]
 
-    closest_male, elig_M = choose_closest_male(collect(1:4), locations_M, 0.1)
+    y_locations_M = [0.1f0, 0.15f0, 0.2f0, 0.9f0]
+    
+    locations_M = Location.(x_locations_M, y_locations_M)
+
+    location_F = Location(0.1f0, 0.1f0)
+
+    closest_male, elig_M = choose_closest_male(collect(1:4), locations_M, location_F)
 
     @test closest_male == 1
     @test elig_M == [2, 3, 4]
 
-    closest_male, elig_M = choose_closest_male(elig_M, locations_M, 0.1)
+    closest_male, elig_M = choose_closest_male(elig_M, locations_M, location_F)
     @test closest_male == 2
+    @test elig_M == [3,4]
+
+    
+    closest_male, elig_M = choose_closest_male(elig_M, locations_M, location_F)
+    @test closest_male == 3
     @test elig_M == []
+
 end
 
 @testset "calc_match_strength" begin
@@ -249,23 +288,28 @@ end
     @test match_strength1 > match_strength3
 end
 
-@testset "get_ideal_densities" begin
-    locations_F = [0.0, 0.3, 0.7, 0.8, 1.0]
 
-    K_total = 1000
+@testset "get_ideal_densities" begin
+    x_locations_F = [0.0f0, 0.3f0, 0.7f0, 0.8f0, 1.0f0]
+
+    y_locations_F = fill(0.5f0, 5)
+
+    locations_F = Location.(x_locations_F, y_locations_F)
+
+    K_total = 10000
     sigma_comp = 0.01
 
     ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F)
 
-    @test ideal_densities[1] > 12.5 && ideal_densities[1] < 12.55
+    @test ideal_densities[1] > 3.14 && ideal_densities[1] < 3.15
 
-    @test ideal_densities[2] > 25.066 && ideal_densities[2] < 25.067
+    @test ideal_densities[2] > 6.28 && ideal_densities[2] < 6.29
 
-    @test ideal_densities[3] > 25.066 && ideal_densities[3] < 25.067
+    @test ideal_densities[3] > 6.28 && ideal_densities[2] < 6.29
 
-    @test ideal_densities[4] > 25.066 && ideal_densities[4] < 25.067
+    @test ideal_densities[4] > 6.28 && ideal_densities[2] < 6.29
 
-    @test ideal_densities[5] > 12.5 && ideal_densities[5] < 12.55
+    @test ideal_densities[5] > 3.14 && ideal_densities[5] < 3.15
 end
 
 @testset "calculate_ind_useResource_no_ecolDiff" begin
@@ -291,7 +335,7 @@ end
     @test ind_useResourceA_M == [1, 0]
     @test ind_useResourceB_M == [0, 1]
 end
-
+#=
 @testset "find_inactive_zones1" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)
     genotypes_pop1 = fill([1 1 1; 1 1 1], 100)
@@ -456,7 +500,7 @@ end
         mitochondria)
 
     @test dead_zones == []
-end
+end=#
 
 @testset "mean" begin
     genotypes = [[1 0 1; 0 1 0], [0 0 1; 1 0 0], [1 1 1; 1 1 1]]

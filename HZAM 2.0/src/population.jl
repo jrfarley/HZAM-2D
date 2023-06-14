@@ -36,11 +36,11 @@ struct Location
     function Location(starting_location::Location, sigma_disp::Real, geographic_limits::Vector{Location})
         x = -1
         y = -1
-        while (x < geographic_limits[1].x) || (x > geographic_limits[2].x)
-            x = starting_location.x + (sigma_disp * randn())
-        end
-        while (y < geographic_limits[1].y) || (y > geographic_limits[2].y)
-            y = starting_location.y + (sigma_disp * randn())
+        while (x < geographic_limits[1].x) || (x > geographic_limits[2].x) || (y < geographic_limits[1].y) || (y > geographic_limits[2].y)
+            dist = sigma_disp * randn()
+            dir = rand() * 2 * pi
+            x = starting_location.x + dist * cos(dir)
+            y = starting_location.y + dist * sin(dir)
         end
         new(x, y)
     end
@@ -105,10 +105,11 @@ struct PopulationData
 
         pop0_starting_area = (starting_range_pop0[2].x - starting_range_pop0[1].x) * (starting_range_pop0[2].y - starting_range_pop0[1].y)
         pop1_starting_area = (starting_range_pop1[2].x - starting_range_pop1[1].x) * (starting_range_pop1[2].y - starting_range_pop1[1].y)
+
         total_area = (geographic_limits[2].x - geographic_limits[1].x) * (geographic_limits[2].y - geographic_limits[1].y)
         pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * pop0_starting_area / total_area)
         pop0_starting_N_half = Int(round(pop0_starting_N / 2))  # starting number for each sex
-        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * pop0_starting_area / total_area)
+        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * pop1_starting_area / total_area)
         pop1_starting_N_half = Int(round(pop1_starting_N / 2))
 
         # Generate genotype array for population of females:
@@ -276,10 +277,10 @@ struct PopulationData
 
             active_zones = [collect(left_boundary:right_boundary), collect(bottom_boundary:top_boundary)]
 
-            dead_zones = [[(1:left_boundary - 1); (right_boundary+1):10], (1:10)]
+            dead_zones = [[(1:left_boundary-1); (right_boundary+1):10], (1:10)]
 
             # compile list of new inactive individuals
-            if dead_zones[1] != [] && dead_zones[2] !=[]
+            if dead_zones[1] != [] && dead_zones[2] != []
                 inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones[1], dead_zones[2]])
                 inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones[1], dead_zones[2]])
             else
@@ -559,8 +560,8 @@ end
 # finds which parts of the range contain only individuals of one genotype
 function find_active_zone_boundaries(indv_per_zone_F, indv_per_zone_M, genotypes_F, genotypes_M, mitochondria_F, mitochondria_M)
     dead_zones = []
-    left_boundary, bottom_boundary = 11,11
-    right_boundary, top_boundary = 0,0
+    left_boundary, bottom_boundary = 11, 11
+    right_boundary, top_boundary = 0, 0
 
     for x_zone in 1:10
         females = vcat(indv_per_zone_F[x_zone, :]...)
@@ -577,7 +578,7 @@ function find_active_zone_boundaries(indv_per_zone_F, indv_per_zone_M, genotypes
     for x_zone in 10:-1:left_boundary
         females = vcat(indv_per_zone_F[x_zone, :]...)
         males = vcat(indv_per_zone_M[x_zone, :]...)
-        
+
         genotypes = [genotypes_F[females]; genotypes_M[males]]
         mitochondria = [mitochondria_F[females]; mitochondria_M[males]]
 
@@ -612,11 +613,12 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
         return tanh((sqrt(pi) * log(2)) * x)
     end
 
-    function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        x_density = K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location.x) / (sqrt(2) * sigma_comp)) + erf(location.x / (sqrt(2) * sigma_comp)))
-        y_density = K_total * sqrt(pi / 2) * sigma_comp * (erf((1 - location.y) / (sqrt(2) * sigma_comp)) + erf(location.y / (sqrt(2) * sigma_comp)))
+    function linear_density(w)
+        return sqrt(pi / 2) * sigma_comp * (erf((1 - w) / (sqrt(2) * sigma_comp)) + erf(w / (sqrt(2) * sigma_comp)))
+    end
 
-        return x_density + y_density
+    function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
+        return K_total * linear_density(location.x) * linear_density(location.y)
     end
 
     return map(calc_ideal_density, locations_F)
@@ -746,19 +748,6 @@ function generate_offspring_genotype(mother_genotype, father_genotype)
     return kid_genotype
 end
 
-# This function determines breeding location of one individual,
-# based on a normal distribution with width sigma_disp,
-# centred on birth location. Constrained to be within range. 
-# geographic_limits should be a vector with two numbers.
-function disperse_individual(female_location, sigma_disp::Real, geographic_limits::Vector{})::Float32
-    while true
-        new_location = female_location + (sigma_disp * randn())
-        if (new_location >= geographic_limits[1]) & (new_location <= geographic_limits[2]) # checks if location is in range
-            return new_location
-        end
-    end
-end
-
 # creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
 function plot_population(pd, optimize, functional_loci_range)
     if optimize
@@ -784,7 +773,7 @@ end
 
 # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
 function update_plot(pd, generation, optimize, functional_loci_range)
-    if optimize 
+    if optimize
         genotypes_active = [pd.genotypes_F[pd.active_F]; pd.genotypes_M[pd.active_M]]
         locations_active = [pd.locations_F[pd.active_F]; pd.locations_M[pd.active_M]]
         genotypes_inactive = [pd.inactive_genotypes_F[pd.inactive_F]; pd.inactive_genotypes_M[pd.inactive_M]]
