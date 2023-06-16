@@ -49,14 +49,14 @@ end
 
 # stores all the population data (genotypes, locations, etc.) that get updated each generation
 struct PopulationData
-    genotypes_F::Vector{Matrix{Int8}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
-    genotypes_M::Vector{Matrix{Int8}} # the male genotypes
-    locations_F::Vector{Location} # female locations
-    locations_M::Vector{Location} # male locations
-    mitochondria_F::Vector{Int8} # female mitochondria types (0 for species 0 and 1 for species 1)
-    mitochondria_M::Vector{Int8} # male mitochondria types
+    genotypes_F::Matrix{Vector{Matrix{Int8}}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
+    genotypes_M::Matrix{Vector{Matrix{Int8}}} # the male genotypes
+    locations_F::Matrix{Vector{Location}} # female locations
+    locations_M::Matrix{Vector{Location}} # male locations
+    mitochondria_F::Matrix{Vector{Int8}} # female mitochondria types (0 for species 0 and 1 for species 1)
+    mitochondria_M::Matrix{Vector{Int8}} # male mitochondria types
 
-    growth_rates_F::Dict{Int64,Float64} # table of the female growth rates associated with each active female index
+    growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
 
     individuals_per_zone_F::Matrix{Vector{Int32}} # indices of the females in each zone
     individuals_per_zone_M::Matrix{Vector{Int32}} # indices of the males in each zone
@@ -112,39 +112,42 @@ struct PopulationData
         pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * pop1_starting_area / total_area)
         pop1_starting_N_half = Int(round(pop1_starting_N / 2))
 
-        # Generate genotype array for population of females:
-        # this is a 3D array, where rows (D1) are alleles (row 1 from mother, row 2 from father),
-        # and columns (D2) are loci
-        # functional loci are first, followed by neutral location_index
-        genotypes_F = generate_genotype_array(pop0_starting_N_half, pop1_starting_N_half, total_loci)
-        genotypes_M = genotypes_F
-
-        # generate mitochondria array (0 for species 0 and 1 for species 1)
-        mitochondria_F = [fill(0, pop0_starting_N_half); fill(1, pop1_starting_N_half)]
-        mitochondria_M = mitochondria_F
 
         # Generate breeding locations of individuals
-        locations_F, locations_M = generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
+        locations_F, genotypes_F, locations_M, genotypes_M = generate_initial_locations_and_genotypes(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1, total_loci)
+
+        # generate mitochondria array (0 for species 0 and 1 for species 1)
+        function init_mitochondria(x, y, locations)
+            if x < 5
+                return fill(0, length(locations[x, y]))
+            else
+
+                return fill(1, length(locations[x, y]))
+            end
+        end
+
+        mitochondria_F = init_mitochondria.(collect(1:10), collect(1:10)', Ref(locations_F))
+        mitochondria_M = init_mitochondria.(collect(1:10), collect(1:10)', Ref(locations_M))
+
+        competition_traits_F = mitochondria_F
+        competition_traits_M = mitochondria_M
 
         # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-        ind_useResourceA_F = [fill(competAbility_useResourceA_pop0, pop0_starting_N_half); fill(competAbility_useResourceA_pop1, pop1_starting_N_half)]
-        ind_useResourceA_M = ind_useResourceA_F
-        ind_useResourceB_F = [fill(competAbility_useResourceB_pop0, pop0_starting_N_half); fill(competAbility_useResourceB_pop1, pop1_starting_N_half)]
-        ind_useResourceB_M = ind_useResourceB_F
-
-
+        ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, 0)
+        ind_useResourceA_M = calculate_ind_useResourceA.(competition_traits_M, 0)
+        ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, 0)
+        ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, 0)
 
         if !optimize # calculate growth rates of all individuals and initialize population without the active/inactive-zone-related variables
-            growth_rates_F = calculate_growth_rates(ind_useResourceA_F,
+            growth_rates_F = calculate_growth_rates.(ind_useResourceA_F,
                 ind_useResourceB_F,
                 ind_useResourceA_M,
                 ind_useResourceB_M,
                 locations_F,
                 locations_M,
-                K_total,
-                sigma_comp,
-                intrinsic_R,
-                1:length(locations_F))
+                Ref(K_total),
+                Ref(sigma_comp),
+                Ref(intrinsic_R))
 
             new(genotypes_F,
                 genotypes_M,
@@ -505,26 +508,60 @@ function update_population(pd,
     end
 end
 
+
 # Generate breeding locations of individuals
-function generate_initial_locations(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1)
-    locations_F_pop0 = Vector{Location}(undef, pop0_starting_N_half)
-    locations_M_pop0 = Vector{Location}(undef, pop0_starting_N_half)
-    locations_F_pop1 = Vector{Location}(undef, pop1_starting_N_half)
-    locations_M_pop1 = Vector{Location}(undef, pop1_starting_N_half)
+function generate_initial_locations_and_genotypes(pop0_starting_N_half::Integer, pop1_starting_N_half::Integer, starting_range_pop0::Vector{Location}, starting_range_pop1::Vector{Location}, num_loci::Integer)
+    locations_F = Array{Vector{Location}}(undef, 10, 10)
+    genotypes_F = Array{Vector{Matrix{Int8}}}(undef, 10, 10)
+    locations_M = Array{Vector{Location}}(undef, 10, 10)
+    genotypes_M = Array{Vector{Matrix{Int8}}}(undef, 10, 10)
+
+    for i in eachindex(locations_F)
+        locations_F[i] = Location[]
+        genotypes_F[i] = Matrix{Int8}[]
+        locations_M[i] = Location[]
+        genotypes_M[i] = Matrix{Int8}[]
+    end
+
+    genotype_pop0 = fill(0, 2, num_loci)
+    genotype_pop1 = fill(1, 2, num_loci)
 
     for i in 1:pop0_starting_N_half
-        locations_F_pop0[i] = Location(starting_range_pop0)
-        locations_M_pop0[i] = Location(starting_range_pop0)
+        l_f = Location(starting_range_pop0)
+        l_m = Location(starting_range_pop0)
+
+        zone_x = trunc(Int, 10 * l_f.x) + 1
+        zone_y = trunc(Int, 10 * l_f.y) + 1
+
+        push!(locations_F[zone_x, zone_y], l_f)
+        push!(genotypes_F[zone_x, zone_y], genotype_pop0)
+
+        zone_x = trunc(Int, 10 * l_m.x) + 1
+        zone_y = trunc(Int, 10 * l_m.y) + 1
+
+        push!(locations_M[zone_x, zone_y], l_m)
+        push!(genotypes_M[zone_x, zone_y], genotype_pop0)
     end
 
     for i in 1:pop1_starting_N_half
-        locations_F_pop1[i] = Location(starting_range_pop1)
-        locations_M_pop1[i] = Location(starting_range_pop1)
+        l_f = Location(starting_range_pop1)
+        l_m = Location(starting_range_pop1)
+
+        zone_x = trunc(Int, 10 * l_f.x) + 1
+        zone_y = trunc(Int, 10 * l_f.y) + 1
+
+        push!(locations_F[zone_x, zone_y], l_f)
+        push!(genotypes_F[zone_x, zone_y], genotype_pop1)
+
+        zone_x = trunc(Int, 10 * l_m.x) + 1
+        zone_y = trunc(Int, 10 * l_m.y) + 1
+
+        push!(locations_M[zone_x, zone_y], l_m)
+        push!(genotypes_M[zone_x, zone_y], genotype_pop1)
     end
 
-    return [locations_F_pop0; locations_F_pop1], [locations_M_pop0; locations_M_pop1]
+    return locations_F, genotypes_F, locations_M, genotypes_M
 end
-
 # arranges the indices of each individual by location
 # zone 1 is [0,1), zone 2 is [1, 2), etc.
 # list of indices for a zone is stored at individuals_per_zone_F[zone_x_coordinate][zone_y_coordinate]
@@ -594,17 +631,24 @@ function find_active_zone_boundaries(indv_per_zone_F, indv_per_zone_M, genotypes
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-function calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
+function calculate_ind_useResourceA(competition_traits, ecolDiff)
     # specify ecological resource competitive abilities for two resources A and B 
     # ecolDiff = 1.0 # this is "E" in the paper 
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
 
-    ind_useResourceA_F = competAbility .+ ((1 .- competition_traits_F) .* ecolDiff)
-    ind_useResourceB_F = competAbility .+ (competition_traits_F .* ecolDiff)
-    ind_useResourceA_M = competAbility .+ ((1 .- competition_traits_M) .* ecolDiff)
-    ind_useResourceB_M = competAbility .+ (competition_traits_M .* ecolDiff)
+    ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
 
-    return ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M
+    return ind_useResourceA
+end
+
+function calculate_ind_useResourceB(competition_traits, ecolDiff)
+    # specify ecological resource competitive abilities for two resources A and B 
+    # ecolDiff = 1.0 # this is "E" in the paper 
+    competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
+
+    ind_useResourceB = competAbility .+ (competition_traits .* ecolDiff)
+
+    return ind_useResourceB
 end
 
 # calculates the ideal density (assuming normal distribution) at the location of each female
@@ -642,16 +686,15 @@ function calculate_growth_rates(ind_useResourceA_F,
     ind_useResourceB_F,
     ind_useResourceA_M,
     ind_useResourceB_M,
-    locations_F::Vector{Location},
+    locations_F,
     locations_M,
     K_total,
     sigma_comp,
-    intrinsic_R,
-    active_F)
+    intrinsic_R)
     # in spatial model, calculate growth rates based on local resource use
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
-    ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F[active_F]) # this applies the above function to each geographic location
+    ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
 
     ideal_densities_at_locations_F_resourceA = ideal_densities_at_locations_F ./ 2
     ideal_densities_at_locations_F_resourceB = ideal_densities_at_locations_F_resourceA
@@ -667,24 +710,24 @@ function calculate_growth_rates(ind_useResourceA_F,
         sum(ind_useResourceA_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
 
-    real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F[active_F]) # this applies the above function to each geographic location
+    real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F) # this applies the above function to each geographic location
 
     function get_useResourceB_density_real(focal_location) # do the same for resource B
         sum(ind_useResourceB_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2))))
     end
-    real_densities_at_locations_F_resourceB = map(get_useResourceB_density_real, locations_F[active_F]) # this applies the above function to each geographic location 
+    real_densities_at_locations_F_resourceB = map(get_useResourceB_density_real, locations_F) # this applies the above function to each geographic location 
 
     # calculate local growth rates due to each resource (according to discrete time logistic growth equation)
 
     local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
     local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
 
-    growth_rateA = ind_useResourceA_F[active_F] .* local_growth_rates_resourceA
-    growth_rateB = ind_useResourceB_F[active_F] .* local_growth_rates_resourceB
+    growth_rateA = ind_useResourceA_F .* local_growth_rates_resourceA
+    growth_rateB = ind_useResourceB_F .* local_growth_rates_resourceB
 
     growth_rates = growth_rateA .+ growth_rateB
 
-    return Dict(active_F .=> growth_rates)
+    return growth_rates
 end
 
 # This function sets up the genotypes of the starting population
