@@ -133,10 +133,10 @@ struct PopulationData
         competition_traits_M = mitochondria_M
 
         # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-        ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, 0)
-        ind_useResourceA_M = calculate_ind_useResourceA.(competition_traits_M, 0)
-        ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, 0)
-        ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, 0)
+        ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, ecolDiff)
+        ind_useResourceA_M = calculate_ind_useResourceA.(competition_traits_M, ecolDiff)
+        ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, ecolDiff)
+        ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, ecolDiff)
 
         if !optimize # calculate growth rates of all individuals and initialize population without the active/inactive-zone-related variables
             growth_rates_F = calculate_growth_rates.(ind_useResourceA_F,
@@ -418,8 +418,8 @@ struct PopulationData
         genotypes_sons,
         mitochondria_daughters,
         mitochondria_sons,
-        locations_daughters::Vector{Location},
-        locations_sons::Vector{Location},
+        locations_daughters,
+        locations_sons,
         competition_trait_loci,
         K_total,
         sigma_comp,
@@ -427,25 +427,25 @@ struct PopulationData
         ecolDiff)
 
         # calculate new competition traits
-        competition_traits_F = calc_traits_additive(genotypes_daughters, competition_trait_loci)
-        competition_traits_M = calc_traits_additive(genotypes_sons, competition_trait_loci)
+        competition_traits_F = map(genotypes -> calc_traits_additive(genotypes, competition_trait_loci), genotypes_daughters)
+        competition_traits_M = map(genotypes -> calc_traits_additive(genotypes, competition_trait_loci), genotypes_sons)
 
         # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-
-        ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
-
+        ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, ecolDiff)
+        ind_useResourceA_M = calculate_ind_useResourceA.(competition_traits_M, ecolDiff)
+        ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, ecolDiff)
+        ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, ecolDiff)
 
         # calculate new growth rates
-        growth_rates_F = calculate_growth_rates(ind_useResourceA_F,
+        growth_rates_F = calculate_growth_rates.(ind_useResourceA_F,
             ind_useResourceB_F,
             ind_useResourceA_M,
             ind_useResourceB_M,
             locations_daughters,
             locations_sons,
-            K_total,
-            sigma_comp,
-            intrinsic_R,
-            1:length(locations_daughters))
+            Ref(K_total),
+            Ref(sigma_comp),
+            Ref(intrinsic_R))
 
         new(genotypes_daughters,
             genotypes_sons,
@@ -463,8 +463,8 @@ function update_population(pd,
     genotypes_sons,
     mitochondria_daughters,
     mitochondria_sons,
-    locations_daughters::Vector{Location},
-    locations_sons::Vector{Location},
+    locations_daughters,
+    locations_sons,
     expand_left,
     expand_right,
     generation,
@@ -662,7 +662,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        return K_total * linear_density(location.x) * linear_density(location.y)
+        return 400 * linear_density(location.x) * linear_density(location.y)
     end
 
     return map(calc_ideal_density, locations_F)
@@ -808,9 +808,14 @@ function plot_population(pd, optimize, functional_loci_range)
             mitochondria_inactive,
             locations_inactive)
     else
-        create_new_plot(calc_traits_additive([pd.genotypes_F; pd.genotypes_M], functional_loci_range),
-            [pd.mitochondria_F; pd.mitochondria_M],
-            [pd.locations_F; pd.locations_M])
+        genotypes_F = vcat(pd.genotypes_F...)
+        genotypes_M = vcat(pd.genotypes_M...)
+        locations_F = vcat(pd.locations_F...)
+        locations_M = vcat(pd.locations_M...)
+        
+        create_new_plot(calc_traits_additive([genotypes_F; genotypes_M], functional_loci_range),
+            [],
+            [locations_F; locations_M])
     end
 end
 
@@ -832,11 +837,10 @@ function update_plot(pd, generation, optimize, functional_loci_range)
             locations_inactive,
             generation)
     else
-        genotypes = [pd.genotypes_F; pd.genotypes_M]
-        locations = [pd.locations_F; pd.locations_M]
-        mitochondria = [pd.mitochondria_F; pd.mitochondria_M]
+        genotypes = [vcat(pd.genotypes_F...); vcat(pd.genotypes_M...)]
+        locations = [vcat(pd.locations_F...); vcat(pd.locations_M...)]
         update_population_plot(calc_traits_additive(genotypes, functional_loci_range),
-            mitochondria,
+            [],
             locations,
             generation)
     end
