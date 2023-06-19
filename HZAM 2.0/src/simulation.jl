@@ -16,7 +16,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
-    sympatry=false, geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)],
+    geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(0.999f0, 0.999f0)],
     starting_range_pop0=[Location(0.0f0, 0.0f0), Location(0.48f0, 1.0f0)], starting_range_pop1=[Location(0.52f0, 0.0f0), Location(1.0f0, 1.0f0)],
     sigma_disp=0.01, sigma_comp=0.01,
     do_plot=true, plot_int=10, optimize=true)
@@ -51,23 +51,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         ecolDiff,
         total_loci,
         intrinsic_R,
-        sigma_comp,
-        geographic_limits,
-        starting_range_pop0,
-        starting_range_pop1,
-        optimize)
+        sigma_comp)
 
     extinction = false  # if extinction happens later this will be set true
 
-    # Pick function for choosing potential male mate (these two functions defined above) 
-    if sympatry # if sympatry, then choose random male
-        pick_potential_mate = choose_random_male
-    else # if space matters, then choose closest male
-        pick_potential_mate = choose_closest_male
-    end
-
     if do_plot
-        plot_population(pd, optimize, functional_loci_range)
+        plot_population(pd, functional_loci_range)
     end
 
 
@@ -80,45 +69,39 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, 10, 10)
         mitochondria_sons_all = Matrix{Vector{Int8}}(undef, 10, 10)
 
+        for i in 1:10
+            for j in 1:10
+                genotypes_daughters_all[i, j] = []
+                genotypes_sons_all[i, j] = []
+                locations_daughters_all[i, j] = []
+                locations_sons_all[i, j] = []
+                mitochondria_daughters_all[i, j] = []
+                mitochondria_sons_all[i, j] = []
+            end
+        end
+
         for zone_x in 1:10
             for zone_y in 1:10
                 # Prepare for mating and reproduction
-                N_F, N_M = length(pd.locations_F[zone_x, zone_y]), length(pd.locations_M[zone_x, zone_y])
+                neighbourhood = pd.population[(max(zone_x - 1, 1):min(zone_x + 1, 10)), (max(zone_y - 1, 1):min(zone_y + 1, 10))]
 
-                ### NEED TO CAREFULLY PROOF THE ABOVE, PARTICULARLY IF ECOLDIF > 0
+                locations_F = pd.population[zone_x, zone_y].locations_F
+                locations_M = vcat([d.locations_M for d in neighbourhood]...)
+                genotypes_F = pd.population[zone_x, zone_y].genotypes_F
+                genotypes_M = vcat([d.genotypes_M for d in neighbourhood]...)
+                mitochondria_F = pd.population[zone_x, zone_y].mitochondria_F
+                growth_rates_F = pd.growth_rates_F[zone_x, zone_y]
 
-                # make empty arrays for storing genotypes of daughters and sons
-                genotypes_daughters = Matrix{Int8}[]
-                genotypes_sons = Matrix{Int8}[]
-
-                mitochondria_daughters, mitochondria_sons = [], []
-
-                # make empty arrays for storing locations of daughters and sons
-                locations_daughters = Location[]
-                locations_sons = Location[]
-
-                # flags for when it is necessary to expand the active region of the simulation
-                expand_left = false
-                expand_right = false
-
-                if !optimize
-                    elig_F = collect(1:N_F)
-                else
-                    elig_F = pd.active_F
-                end
+                N_F, N_M = length(locations_F), length(locations_M)
 
                 # loop through mothers, mating and reproducing
-                for mother in elig_F
+                for mother in 1:N_F
                     # initialize tracking variables
                     mate = false # becomes true when female is paired with male
                     rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
                     father = [] # will contain the index of the male mate
                     # make vector of indices of eligible males
-                    if optimize
-                        elig_M = copy(pd.active_M)
-                    else
-                        elig_M = collect(1:N_M)
-                    end
+                    elig_M = collect(1:N_M)
 
                     if length(elig_M) == 0 # check if there are any eligible males
                         break
@@ -127,11 +110,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     # determine male mate of female
                     while mate == false
                         # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
-                        focal_male, elig_M = choose_closest_male(elig_M, pd.locations_M[zone_x, zone_y], pd.locations_F[zone_x, zone_y][mother])
+                        focal_male, elig_M = choose_closest_male(elig_M, locations_M, locations_F[mother])
                         # compare male trait with female's trait (preference), and determine
                         # whether she accepts; note that match_strength is determined by a
                         # Gaussian, with a maximum of 1 and minimum of zero.
-                        match_strength = calc_match_strength(pd.genotypes_F[zone_x, zone_y][mother], pd.genotypes_M[zone_x, zone_y][focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+                        match_strength = calc_match_strength(genotypes_F[mother], genotypes_M[focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
                         if rand() < match_strength
                             # she accepts male, and mates
                             father = focal_male
@@ -151,54 +134,41 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         search_fitness = (1 - per_reject_cost)^rejects    # (in most of HZAM-Sym paper, per_reject_cost = 0)
 
                         #combine for total fitness:   
-                        reproductive_fitness = 2 * pd.growth_rates_F[zone_x, zone_y][mother] * search_fitness  # the 2 is because only females, not males, produce offspring
+                        reproductive_fitness = 2 * growth_rates_F[mother] * search_fitness  # the 2 is because only females, not males, produce offspring
 
                         offspring = rand(Poisson(reproductive_fitness))
 
                         # if offspring, generate their genotypes and sexes
                         if offspring >= 1
                             for kid in 1:offspring
-                                kid_genotype = generate_offspring_genotype(pd.genotypes_F[zone_x, zone_y][mother], pd.genotypes_M[zone_x, zone_y][father])
-                                kid_mitochondria = pd.mitochondria_F[zone_x, zone_y][mother]
+                                kid_genotype = generate_offspring_genotype(genotypes_F[mother], genotypes_M[father])
+                                kid_mitochondria = mitochondria_F[mother]
                                 survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
 
                                 if survival_fitness > rand()
                                     # determine sex and location of kid
 
-                                    new_location = Location(pd.locations_F[zone_x, zone_y][mother], sigma_disp, geographic_limits)
+                                    new_location = Location(locations_F[mother], sigma_disp, geographic_limits)
 
-                                    if optimize
-                                        genotype_sum = sum(kid_genotype)
-                                        if genotype_sum > 0 && new_location.x < pd.left_boundary / 10
-                                            expand_left = true
-                                        elseif genotype_sum < total_loci * 2 && new_location.x > (pd.right_boundary - 1) / 10
-                                            expand_right = true
+                                    if geographic_limits[1].x <= new_location.x <= geographic_limits[2].x &&
+                                       geographic_limits[1].y <= new_location.y <= geographic_limits[2].y
+                                        zone = assign_zone(new_location)
+
+                                        if rand() > 0.5 # kid is daughter
+                                            push!(genotypes_daughters_all[zone[1], zone[2]], kid_genotype)
+                                            push!(mitochondria_daughters_all[zone[1], zone[2]], kid_mitochondria)
+                                            push!(locations_daughters_all[zone[1], zone[2]], new_location)
+                                        else # kid is son
+                                            push!(genotypes_sons_all[zone[1], zone[2]], kid_genotype)
+                                            push!(mitochondria_sons_all[zone[1], zone[2]], kid_mitochondria)
+                                            push!(locations_sons_all[zone[1], zone[2]], new_location)
                                         end
                                     end
-
-                                    if rand() > 0.5 # kid is daughter
-                                        push!(genotypes_daughters, kid_genotype)
-                                        push!(mitochondria_daughters, kid_mitochondria)
-                                        push!(locations_daughters, new_location)
-                                    else # kid is son
-                                        push!(genotypes_sons, kid_genotype)
-                                        push!(mitochondria_sons, kid_mitochondria)
-                                        push!(locations_sons, new_location)
-                                    end
-
                                 end
                             end
                         end
                     end
                 end # of loop through mothers
-
-                genotypes_daughters_all[zone_x, zone_y] = genotypes_daughters
-                genotypes_sons_all[zone_x, zone_y] = genotypes_sons
-                locations_daughters_all[zone_x, zone_y] = locations_daughters
-                locations_sons_all[zone_x, zone_y] = locations_sons
-                mitochondria_daughters_all[zone_x, zone_y] = mitochondria_daughters
-                mitochondria_sons_all[zone_x, zone_y] = mitochondria_sons
-
             end # of loop through the rows of zones
         end # of loop through the columns of zones
 
@@ -208,45 +178,30 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             break # break out of current loop (this simulation) 
         end=#
 
-        if optimize == true && length(pd.active_F) < 100
-            expand_left = true
-            expand_right = true
-        end
 
         # assign surviving offspring to new adult population
-        pd = update_population(pd,
-            genotypes_daughters_all,
+        pd = PopulationData(genotypes_daughters_all,
             genotypes_sons_all,
             mitochondria_daughters_all,
             mitochondria_sons_all,
             locations_daughters_all,
             locations_sons_all,
-            expand_left,
-            expand_right,
-            generation,
             competition_trait_loci,
             K_total,
             sigma_comp,
             intrinsic_R,
-            ecolDiff,
-            optimize)
+            ecolDiff)
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
-            update_plot(pd, generation, optimize, functional_loci_range)
+            update_plot(pd, generation, functional_loci_range)
         end
 
-        # check if there are any remaining females in any of the active zones
-        if optimize && length(pd.active_F) == 0
-            println("EXITING EARLY")
-            plot_population(pd, optimize, functional_loci_range)
-            readline()
-            break
-        end
     end # of loop through generations
 
-    functional_HI_all_inds = calc_traits_additive([pd.genotypes_F; pd.genotypes_M], functional_loci_range)
-    HI_NL_all_inds = calc_traits_additive([pd.genotypes_F; pd.genotypes_M], neutral_loci)
+    genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)
+    functional_HI_all_inds = calc_traits_additive(genotypes, functional_loci_range)
+    HI_NL_all_inds = calc_traits_additive(genotypes, neutral_loci)
 
     return extinction, functional_HI_all_inds, HI_NL_all_inds
 end

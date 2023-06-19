@@ -8,9 +8,10 @@ using Test
 
 export PopulationData, Location
 export initialize_population, update_population
-export choose_closest_male, calc_match_strength, generate_offspring_genotype, disperse_individual
+export choose_closest_male, calc_match_strength, generate_offspring_genotype
 export plot_population, update_plot
 export calc_traits_additive
+export assign_zone
 
 # stores a location with an x coordinate and a y coordinate
 struct Location
@@ -47,90 +48,56 @@ struct Location
 end
 
 
-# stores all the population data (genotypes, locations, etc.) that get updated each generation
-struct PopulationData
-    genotypes_F::Matrix{Vector{Matrix{Int8}}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
-    genotypes_M::Matrix{Vector{Matrix{Int8}}} # the male genotypes
-    locations_F::Matrix{Vector{Location}} # female locations
-    locations_M::Matrix{Vector{Location}} # male locations
-    mitochondria_F::Matrix{Vector{Int8}} # female mitochondria types (0 for species 0 and 1 for species 1)
-    mitochondria_M::Matrix{Vector{Int8}} # male mitochondria types
+struct Deme
+    genotypes_F::Vector{Matrix{Int8}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
+    genotypes_M::Vector{Matrix{Int8}} # the male genotypes
+    locations_F::Vector{Location} # female locations
+    locations_M::Vector{Location} # male locations
+    mitochondria_F::Vector{Int8} # female mitochondria types (0 for species 0 and 1 for species 1)
+    mitochondria_M::Vector{Int8} # male mitochondria types
 
-    growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
+    ind_useResourceA_F
+    ind_useResourceA_M
+    ind_useResourceB_F
+    ind_useResourceB_M
 
-    individuals_per_zone_F::Matrix{Vector{Int32}} # indices of the females in each zone
-    individuals_per_zone_M::Matrix{Vector{Int32}} # indices of the males in each zone
-
-    left_boundary::Int8 # zone number of the furthest left active zone
-    right_boundary::Int8 # zone number of the furthest right active zone
-
-    bottom_boundary::Int8
-    top_boundary::Int8
-
-    active_F::Vector{Int32} # indices of the currently active females (in the genotypes_F, locations_F, and mitochondria_F arrays)
-    active_M::Vector{Int32} # indices of the currently active males
-    inactive_F::Vector{Int32} # indices of the currently inactive females (in the inactive_genotypes_F, inactive_locations_F, and inactive_mitochondria_F arrays)
-    inactive_M::Vector{Int32} # indices of the currently inactive males
-    buffer_M::Vector{Vector{Int32}} # indices of the males in the buffer zone between active and inactive regions (in the inactive arrays)
-
-    # data that only gets updated every 10 generations (used to store information about inactive individuals)
-    inactive_locations_F::Vector{Location} # inactive female locations
-    inactive_locations_M::Vector{Location} # inactive male locations
-    inactive_genotypes_F::Vector{Matrix{Int8}} # inactive female genotypes
-    inactive_genotypes_M::Vector{Matrix{Int8}} # inactive male genotypes
-    inactive_mitochondria_F::Vector{Int8} # inactive female mitochondria types
-    inactive_mitochondria_M::Vector{Int8} # inactive male mitochondria types
-
-    # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
-    function PopulationData(K_total,
-        ecolDiff,
+    # initialize population in deme
+    function Deme(starting_N,
         total_loci,
-        intrinsic_R,
-        sigma_comp,
-        geographic_limits,
-        starting_range_pop0,
-        starting_range_pop1,
-        optimize)
+        location,
+        size,
+        population, ecolDiff)
 
-        # specify ecological resource competitive abilities for two resources A and B 
-        # ecolDiff = 1.0 # this is "E" in the paper 
-        competAbility_useResourceA_pop0 = (1 + ecolDiff) / 2    # equals 1 when ecolDiff = 1   
-        competAbility_useResourceB_pop0 = 1 - competAbility_useResourceA_pop0
-        competAbility_useResourceA_pop1 = competAbility_useResourceB_pop0   # equals 0 when ecolDiff = 1
-        competAbility_useResourceB_pop1 = competAbility_useResourceA_pop0
+        N_half = trunc(Int, starting_N)
 
-        K_A = convert(Int64, K_total / 2)  # EVEN NUMBER; carrying capacity (on resource alpha) of entire range (for two sexes combined), regardless of species 
-        K_B = K_A   # EVEN NUMBER; carrying capacity (on resource beta) of entire range (for two sexes combined), regardless of species
+        deme_range = [location, Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))]
 
+        genotypes = fill(fill(population, 2, total_loci), N_half)
 
-        pop0_starting_area = (starting_range_pop0[2].x - starting_range_pop0[1].x) * (starting_range_pop0[2].y - starting_range_pop0[1].y)
-        pop1_starting_area = (starting_range_pop1[2].x - starting_range_pop1[1].x) * (starting_range_pop1[2].y - starting_range_pop1[1].y)
+        locations = [Location(deme_range) for i in 1:N_half]
 
-        total_area = (geographic_limits[2].x - geographic_limits[1].x) * (geographic_limits[2].y - geographic_limits[1].y)
-        pop0_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop0) + (K_B * competAbility_useResourceB_pop0)) * pop0_starting_area / total_area)
-        pop0_starting_N_half = Int(round(pop0_starting_N / 2))  # starting number for each sex
-        pop1_starting_N = round((2 - ecolDiff) * ((K_A * competAbility_useResourceA_pop1) + (K_B * competAbility_useResourceB_pop1)) * pop1_starting_area / total_area)
-        pop1_starting_N_half = Int(round(pop1_starting_N / 2))
+        mitochondria = fill(population, N_half)
 
+        # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
+        ind_useResourceA = calculate_ind_useResourceA.(mitochondria, ecolDiff) # at the beginning the mitochondria value is equal to the competition trait
+        ind_useResourceB = calculate_ind_useResourceB.(mitochondria, ecolDiff)
 
-        # Generate breeding locations of individuals
-        locations_F, genotypes_F, locations_M, genotypes_M = generate_initial_locations_and_genotypes(pop0_starting_N_half, pop1_starting_N_half, starting_range_pop0, starting_range_pop1, total_loci)
+        new(genotypes,
+            genotypes,
+            locations,
+            locations,
+            mitochondria,
+            mitochondria,
+            ind_useResourceA,
+            ind_useResourceA,
+            ind_useResourceB,
+            ind_useResourceB)
+    end
 
-        # generate mitochondria array (0 for species 0 and 1 for species 1)
-        function init_mitochondria(x, y, locations)
-            if x < 5
-                return fill(0, length(locations[x, y]))
-            else
-
-                return fill(1, length(locations[x, y]))
-            end
-        end
-
-        mitochondria_F = init_mitochondria.(collect(1:10), collect(1:10)', Ref(locations_F))
-        mitochondria_M = init_mitochondria.(collect(1:10), collect(1:10)', Ref(locations_M))
-
-        competition_traits_F = mitochondria_F
-        competition_traits_M = mitochondria_M
+    function Deme(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M, competition_trait_loci, ecolDiff)
+        # calculate new competition traits
+        competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
+        competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
 
         # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
         ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, ecolDiff)
@@ -138,279 +105,58 @@ struct PopulationData
         ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, ecolDiff)
         ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, ecolDiff)
 
-        if !optimize # calculate growth rates of all individuals and initialize population without the active/inactive-zone-related variables
-            growth_rates_F = calculate_growth_rates.(ind_useResourceA_F,
-                ind_useResourceB_F,
-                ind_useResourceA_M,
-                ind_useResourceB_M,
-                locations_F,
-                locations_M,
-                Ref(K_total),
-                Ref(sigma_comp),
-                Ref(intrinsic_R))
-
-            new(genotypes_F,
-                genotypes_M,
-                locations_F,
-                locations_M,
-                mitochondria_F,
-                mitochondria_M,
-                growth_rates_F)
-        else
-            # group individuals into zones
-            # individuals in the middle zones (5 and 6) become active whereas other individuals are inactive
-            # males in zones adjacent to active zones become part of the buffer which is treated as active for mating, but remains fixed from generation to generation
-            individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
-
-            active_F = vcat(individuals_per_zone_F[5:6, :]...)
-            inactive_F = vcat(individuals_per_zone_F[[(1:4); (7:10)], :]...)
-            buffer_M = [vcat(individuals_per_zone_M[4, :]...), vcat(individuals_per_zone_M[7, :]...), [], []]
-            active_M = vcat(individuals_per_zone_M[5:6, :]...)
-            active_M = vcat(active_M, buffer_M[1], buffer_M[2])
-            inactive_M = vcat(individuals_per_zone_M[[(1:3); (8:10)], :]...)
-            inactive_locations_F, inactive_locations_M = (copy(locations_F), copy(locations_M))
-
-            inactive_genotypes_F, inactive_genotypes_M = (copy(genotypes_F), copy(genotypes_M))
-            inactive_mitochondria_F, inactive_mitochondria_M = (copy(mitochondria_F), copy(mitochondria_M))
-
-            # calculate growth rates of active females only
-            growth_rates_F = calculate_growth_rates(ind_useResourceA_F,
-                ind_useResourceB_F,
-                ind_useResourceA_M,
-                ind_useResourceB_M,
-                locations_F,
-                locations_M,
-                K_total,
-                sigma_comp,
-                intrinsic_R,
-                active_F)
-
-            new(genotypes_F,
-                genotypes_M,
-                locations_F,
-                locations_M,
-                mitochondria_F,
-                mitochondria_M,
-                growth_rates_F,
-                individuals_per_zone_F,
-                individuals_per_zone_M,
-                5,
-                6,
-                1,
-                10,
-                active_F,
-                active_M,
-                inactive_F,
-                inactive_M,
-                buffer_M,
-                inactive_locations_F,
-                inactive_locations_M,
-                inactive_genotypes_F,
-                inactive_genotypes_M,
-                inactive_mitochondria_F,
-                inactive_mitochondria_M)
-        end
-    end
-
-    # initializes new collection of population data variables by replacing the old individuals with their offspring and updating the growth rates
-    # individuals in an inactive zone remain fixed and the boundaries for active/inactive zones are updated
-    function PopulationData(pd,
-        genotypes_daughters,
-        genotypes_sons,
-        mitochondria_daughters,
-        mitochondria_sons,
-        locations_daughters,
-        locations_sons,
-        expand_left,
-        expand_right,
-        generation,
-        competition_trait_loci,
-        K_total,
-        sigma_comp,
-        intrinsic_R,
-        ecolDiff)
-
-        new_active_F = [] # keeps track of inactive females that will be active in the next generation
-        new_active_M = [] # keeps track of inactive males that will be active in the next generation
-        buffer_M = pd.buffer_M
-        individuals_per_zone_F = pd.individuals_per_zone_F
-        individuals_per_zone_M = pd.individuals_per_zone_M
-        left_boundary, right_boundary = pd.left_boundary, pd.right_boundary
-        bottom_boundary, top_boundary = pd.bottom_boundary, pd.top_boundary
-        inactive_locations_F, inactive_locations_M = pd.inactive_locations_F, pd.inactive_locations_M
-        inactive_genotypes_F, inactive_genotypes_M = pd.inactive_genotypes_F, pd.inactive_genotypes_M
-        inactive_mitochondria_F, inactive_mitochondria_M = pd.inactive_mitochondria_F, pd.inactive_mitochondria_M
-
-        if generation % 10 == 0
-            # every 10 generations the active and inactive zones are reset to reflect current distribution of genotypes
-
-            # compile list of genotypes/locations of offspring and inactive individuals
-            genotypes_F = vcat(genotypes_daughters, inactive_genotypes_F[pd.inactive_F])
-            genotypes_M = vcat(genotypes_sons,
-                inactive_genotypes_M[buffer_M[1]],
-                inactive_genotypes_M[buffer_M[2]],
-                inactive_genotypes_M[pd.inactive_M])
-
-            mitochondria_F = vcat(mitochondria_daughters, inactive_mitochondria_F[pd.inactive_F])
-            mitochondria_M = vcat(mitochondria_sons,
-                inactive_mitochondria_M[buffer_M[1]],
-                inactive_mitochondria_M[buffer_M[2]],
-                inactive_mitochondria_M[pd.inactive_M])
-
-            locations_F = vcat(locations_daughters, inactive_locations_F[pd.inactive_F])
-            locations_M = vcat(locations_sons,
-                inactive_locations_M[buffer_M[1]],
-                inactive_locations_M[buffer_M[2]],
-                inactive_locations_M[pd.inactive_M])
-
-            # update inactive individuals to current population
-            inactive_locations_F, inactive_locations_M = copy(locations_F), copy(locations_M)
-            inactive_genotypes_F, inactive_genotypes_M = copy(genotypes_F), copy(genotypes_M)
-            inactive_mitochondria_F, inactive_mitochondria_M = copy(mitochondria_F), copy(mitochondria_M)
-
-            # group population into zones
-            individuals_per_zone_F, individuals_per_zone_M = assign_zones(locations_F, locations_M)
-
-            left_boundary, right_boundary, bottom_boundary, top_boundary = find_active_zone_boundaries(individuals_per_zone_F,
-                individuals_per_zone_M,
-                genotypes_F,
-                genotypes_M,
-                mitochondria_F,
-                mitochondria_M)
-
-            active_zones = [collect(left_boundary:right_boundary), collect(bottom_boundary:top_boundary)]
-
-            dead_zones = [[(1:left_boundary-1); (right_boundary+1):10], (1:10)]
-
-            # compile list of new inactive individuals
-            if dead_zones[1] != [] && dead_zones[2] != []
-                inactive_F = reduce(vcat, individuals_per_zone_F[dead_zones[1], dead_zones[2]])
-                inactive_M = reduce(vcat, individuals_per_zone_M[dead_zones[1], dead_zones[2]])
-            else
-                inactive_F = []
-                inactive_M = []
-            end
-
-            # compile list of new active individuals
-            if active_zones != []
-                active_F = reduce(vcat, individuals_per_zone_F[active_zones[1], active_zones[2]])
-                active_M = reduce(vcat, individuals_per_zone_M[active_zones[1], active_zones[2]])
-            else
-                active_F = []
-                active_M = []
-            end
-
-            buffer_M = [[], []]
-        else
-            # expands active zone and updates buffer if necessary
-            if expand_left && left_boundary > 1 # expands the left boundary if not already at edge of range
-                left_boundary -= 1
-                new_active_F = vcat(individuals_per_zone_F[left_boundary, :]...)
-                new_active_M = vcat(individuals_per_zone_M[left_boundary, :]...)
-                if left_boundary > 1
-                    buffer_M[1] = vcat(individuals_per_zone_M[left_boundary-1, :]...)
-                else
-                    buffer_M[1] = []
-                end
-            end
-
-            if expand_right && right_boundary < 10 # expands the right boundary if not already at edge of range
-                right_boundary += 1
-                new_active_F = vcat(new_active_F, vcat(individuals_per_zone_F[right_boundary, :]...))
-                new_active_M = vcat(new_active_M, vcat(individuals_per_zone_M[right_boundary, :]...))
-                if right_boundary < 10
-                    buffer_M[2] = vcat(individuals_per_zone_M[right_boundary+1, :]...)
-                else
-                    buffer_M[2] = []
-                end
-            end
-
-            new_active_M = vcat(new_active_M, buffer_M[1], buffer_M[2]) # add males in the buffer zone to the list of active males
-
-            try
-                # updates list of inactive individuals
-                inactive_F = setdiff(pd.inactive_F, new_active_F)
-                inactive_M = setdiff(pd.inactive_M, new_active_M)
-
-                # creates new lists of genotypes and locations so that the active individuals are first and the inactive individuals last 
-                genotypes_F = vcat(genotypes_daughters, inactive_genotypes_F[new_active_F], inactive_genotypes_F[inactive_F])
-                genotypes_M = vcat(genotypes_sons, inactive_genotypes_M[new_active_M], inactive_genotypes_M[inactive_M])
-
-                mitochondria_F = vcat(mitochondria_daughters, inactive_mitochondria_F[new_active_F], inactive_mitochondria_F[inactive_F])
-                mitochondria_M = vcat(mitochondria_sons, inactive_mitochondria_M[new_active_M], inactive_mitochondria_M[inactive_M])
-
-                locations_F = vcat(locations_daughters, inactive_locations_F[new_active_F], inactive_locations_F[inactive_F])
-                locations_M = vcat(locations_sons, inactive_locations_M[new_active_M], inactive_locations_M[inactive_M])
-            catch e
-                println(eachindex(locations_F))
-                println(eachindex(locations_M))
-
-                @testset "find_error" begin
-                    num_inactive_F = reduce(+, map(length, individuals_per_zone_F))
-                    num_inactive_M = reduce(+, map(length, individuals_per_zone_M))
-
-                    @test num_inactive_F == length(inactive_locations_F)
-                    @test num_inactive_M == length(inactive_locations_M)
-                    @test maximum(vcat(0, new_active_F)) <= length(inactive_locations_F)
-                    @test maximum(vcat(0, new_active_M)) <= length(inactive_locations_M)
-                    @test maximum(vcat(0, inactive_F)) <= length(inactive_locations_F)
-                    @test maximum(vcat(0, inactive_M)) <= length(inactive_locations_M)
-                end
-            end
-
-            # updates list of active individuals
-            num_active_F = length(locations_daughters) + length(new_active_F)
-            num_active_M = length(locations_sons) + length(new_active_M)
-
-            active_F = collect(1:num_active_F)
-            active_M = collect(1:num_active_M)
-        end
-
-        # calculate new competition traits
-        competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
-        competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
-
-        # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-
-        ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
-
-
-        # calculate new growth rates
-        growth_rates_F = calculate_growth_rates(ind_useResourceA_F,
-            ind_useResourceB_F,
+        new(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M,
+            ind_useResourceA_F,
             ind_useResourceA_M,
-            ind_useResourceB_M,
-            locations_F,
-            locations_M,
-            K_total,
-            sigma_comp,
-            intrinsic_R,
-            active_F)
+            ind_useResourceB_F,
+            ind_useResourceB_M)
+    end
+end
 
-        new(genotypes_F,
-            genotypes_M,
-            locations_F,
-            locations_M,
-            mitochondria_F,
-            mitochondria_M,
-            growth_rates_F,
-            individuals_per_zone_F,
-            individuals_per_zone_M,
-            left_boundary,
-            right_boundary,
-            bottom_boundary,
-            top_boundary,
-            active_F,
-            active_M,
-            inactive_F,
-            inactive_M,
-            buffer_M,
-            inactive_locations_F,
-            inactive_locations_M,
-            inactive_genotypes_F,
-            inactive_genotypes_M,
-            inactive_mitochondria_F,
-            inactive_mitochondria_M)
+
+# stores all the population data (genotypes, locations, etc.) that get updated each generation
+struct PopulationData
+    population::Matrix{Deme}
+
+    growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
+
+    # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
+    function PopulationData(K_total,
+        ecolDiff,
+        total_loci,
+        intrinsic_R,
+        sigma_comp)
+
+        num_individuals_per_deme = K_total / 100
+
+        intervals = collect(0.0f0:0.1f0:0.99f0)
+
+        deme_locations = Location.(intervals, intervals')
+
+        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
+
+        demes = Deme.(Ref(num_individuals_per_deme),
+            Ref(total_loci),
+            deme_locations,
+            Ref(0.1f0),
+            deme_populations,
+            Ref(ecolDiff))
+
+        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+
+        for zone_x in 1:10
+            for zone_y in 1:10
+                growth_rates_F[zone_x, zone_y] = calculate_growth_rates(demes,
+                    zone_x,
+                    zone_y,
+                    K_total,
+                    sigma_comp,
+                    intrinsic_R)
+            end
+        end
+
+        new(demes,
+            growth_rates_F)
     end
 
     # initializes new collection of population data variables by replacing the old individuals with their offspring and updating the growth rates
@@ -426,208 +172,36 @@ struct PopulationData
         intrinsic_R,
         ecolDiff)
 
-        # calculate new competition traits
-        competition_traits_F = map(genotypes -> calc_traits_additive(genotypes, competition_trait_loci), genotypes_daughters)
-        competition_traits_M = map(genotypes -> calc_traits_additive(genotypes, competition_trait_loci), genotypes_sons)
-
-        # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-        ind_useResourceA_F = calculate_ind_useResourceA.(competition_traits_F, ecolDiff)
-        ind_useResourceA_M = calculate_ind_useResourceA.(competition_traits_M, ecolDiff)
-        ind_useResourceB_F = calculate_ind_useResourceB.(competition_traits_F, ecolDiff)
-        ind_useResourceB_M = calculate_ind_useResourceB.(competition_traits_M, ecolDiff)
-
-        # calculate new growth rates
-        growth_rates_F = calculate_growth_rates.(ind_useResourceA_F,
-            ind_useResourceB_F,
-            ind_useResourceA_M,
-            ind_useResourceB_M,
-            locations_daughters,
-            locations_sons,
-            Ref(K_total),
-            Ref(sigma_comp),
-            Ref(intrinsic_R))
-
-        new(genotypes_daughters,
+        demes = Deme.(genotypes_daughters,
             genotypes_sons,
             locations_daughters,
             locations_sons,
             mitochondria_daughters,
             mitochondria_sons,
-            growth_rates_F)
-    end
-end
+            Ref(competition_trait_loci),
+            Ref(ecolDiff))
 
-# updates the genotypes, locations, and growth rates with the values for the next generation
-function update_population(pd,
-    genotypes_daughters,
-    genotypes_sons,
-    mitochondria_daughters,
-    mitochondria_sons,
-    locations_daughters,
-    locations_sons,
-    expand_left,
-    expand_right,
-    generation,
-    competition_trait_loci,
-    K_total,
-    sigma_comp,
-    intrinsic_R,
-    ecolDiff,
-    optimize)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
 
-    if optimize
-        # updates the population with active/inactive zones
-        return PopulationData(pd,
-            genotypes_daughters,
-            genotypes_sons,
-            mitochondria_daughters,
-            mitochondria_sons,
-            locations_daughters,
-            locations_sons,
-            expand_left,
-            expand_right,
-            generation,
-            competition_trait_loci,
-            K_total,
-            sigma_comp,
-            intrinsic_R,
-            ecolDiff)
-    else
-        # updates the population without active/inactive zones
-        return PopulationData(genotypes_daughters,
-            genotypes_sons,
-            mitochondria_daughters,
-            mitochondria_sons,
-            locations_daughters,
-            locations_sons,
-            competition_trait_loci,
-            K_total,
-            sigma_comp,
-            intrinsic_R,
-            ecolDiff)
-    end
-end
-
-
-# Generate breeding locations of individuals
-function generate_initial_locations_and_genotypes(pop0_starting_N_half::Integer, pop1_starting_N_half::Integer, starting_range_pop0::Vector{Location}, starting_range_pop1::Vector{Location}, num_loci::Integer)
-    locations_F = Array{Vector{Location}}(undef, 10, 10)
-    genotypes_F = Array{Vector{Matrix{Int8}}}(undef, 10, 10)
-    locations_M = Array{Vector{Location}}(undef, 10, 10)
-    genotypes_M = Array{Vector{Matrix{Int8}}}(undef, 10, 10)
-
-    for i in eachindex(locations_F)
-        locations_F[i] = Location[]
-        genotypes_F[i] = Matrix{Int8}[]
-        locations_M[i] = Location[]
-        genotypes_M[i] = Matrix{Int8}[]
-    end
-
-    genotype_pop0 = fill(0, 2, num_loci)
-    genotype_pop1 = fill(1, 2, num_loci)
-
-    for i in 1:pop0_starting_N_half
-        l_f = Location(starting_range_pop0)
-        l_m = Location(starting_range_pop0)
-
-        zone_x = trunc(Int, 10 * l_f.x) + 1
-        zone_y = trunc(Int, 10 * l_f.y) + 1
-
-        push!(locations_F[zone_x, zone_y], l_f)
-        push!(genotypes_F[zone_x, zone_y], genotype_pop0)
-
-        zone_x = trunc(Int, 10 * l_m.x) + 1
-        zone_y = trunc(Int, 10 * l_m.y) + 1
-
-        push!(locations_M[zone_x, zone_y], l_m)
-        push!(genotypes_M[zone_x, zone_y], genotype_pop0)
-    end
-
-    for i in 1:pop1_starting_N_half
-        l_f = Location(starting_range_pop1)
-        l_m = Location(starting_range_pop1)
-
-        zone_x = trunc(Int, 10 * l_f.x) + 1
-        zone_y = trunc(Int, 10 * l_f.y) + 1
-
-        push!(locations_F[zone_x, zone_y], l_f)
-        push!(genotypes_F[zone_x, zone_y], genotype_pop1)
-
-        zone_x = trunc(Int, 10 * l_m.x) + 1
-        zone_y = trunc(Int, 10 * l_m.y) + 1
-
-        push!(locations_M[zone_x, zone_y], l_m)
-        push!(genotypes_M[zone_x, zone_y], genotype_pop1)
-    end
-
-    return locations_F, genotypes_F, locations_M, genotypes_M
-end
-# arranges the indices of each individual by location
-# zone 1 is [0,1), zone 2 is [1, 2), etc.
-# list of indices for a zone is stored at individuals_per_zone_F[zone_x_coordinate][zone_y_coordinate]
-function assign_zones(locations_F, locations_M)
-    individuals_per_zone_F = Matrix{Vector{Integer}}(undef, 10, 10)
-    individuals_per_zone_M = Matrix{Vector{Integer}}(undef, 10, 10)
-
-    # creates an empty vector to store the list of indices at each entry in the 10x10 matrix
-    for i in 1:10
-        for j in 1:10
-            individuals_per_zone_F[i, j] = Vector{Integer}(undef, 0)
-            individuals_per_zone_M[i, j] = Vector{Integer}(undef, 0)
+        for zone_x in 1:10
+            for zone_y in 1:10
+                growth_rates_F[zone_x, zone_y] = calculate_growth_rates(demes,
+                    zone_x,
+                    zone_y,
+                    K_total,
+                    sigma_comp,
+                    intrinsic_R)
+            end
         end
-    end
 
-    # assigns females
-    for indv in eachindex(locations_F)
-        zone_x = trunc(Int, 10 * locations_F[indv].x) + 1
-        zone_y = trunc(Int, 10 * locations_F[indv].y) + 1
-        push!(individuals_per_zone_F[zone_x, zone_y], indv)
+        new(demes, growth_rates_F)
     end
-
-    #assigns males
-    for indv in eachindex(locations_M)
-        zone_x = trunc(Int, 10 * locations_M[indv].x) + 1
-        zone_y = trunc(Int, 10 * locations_M[indv].y) + 1
-        push!(individuals_per_zone_M[zone_x, zone_y], indv)
-    end
-
-    return individuals_per_zone_F, individuals_per_zone_M
 end
 
-# finds which parts of the range contain only individuals of one genotype
-function find_active_zone_boundaries(indv_per_zone_F, indv_per_zone_M, genotypes_F, genotypes_M, mitochondria_F, mitochondria_M)
-    dead_zones = []
-    left_boundary, bottom_boundary = 11, 11
-    right_boundary, top_boundary = 0, 0
-
-    for x_zone in 1:10
-        females = vcat(indv_per_zone_F[x_zone, :]...)
-        males = vcat(indv_per_zone_M[x_zone, :]...)
-
-        genotypes = [genotypes_F[females]; genotypes_M[males]]
-        mitochondria = [mitochondria_F[females]; mitochondria_M[males]]
-
-        if length(mitochondria) == 0 || maximum(map(maximum, genotypes)) > 0 || maximum(mitochondria) > 0
-            left_boundary = max(x_zone, 1)
-            break
-        end
-    end
-    for x_zone in 10:-1:left_boundary
-        females = vcat(indv_per_zone_F[x_zone, :]...)
-        males = vcat(indv_per_zone_M[x_zone, :]...)
-
-        genotypes = [genotypes_F[females]; genotypes_M[males]]
-        mitochondria = [mitochondria_F[females]; mitochondria_M[males]]
-
-        if length(mitochondria) == 0 || minimum(map(minimum, genotypes)) < 1 || minimum(mitochondria) < 1
-            right_boundary = min(x_zone, 10)
-            break
-        end
-    end
-
-    print(string("left: ", left_boundary))
-    print(string("right: ", right_boundary))
-    return left_boundary, right_boundary, 1, 10
+function assign_zone(location::Location)
+    zone_x = convert(Integer, trunc(10 * location.x) + 1)
+    zone_y = convert(Integer, trunc(10 * location.y) + 1)
+    return zone_x, zone_y
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
@@ -662,7 +236,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        return 400 * linear_density(location.x) * linear_density(location.y)
+        return K_total * linear_density(location.x) * linear_density(location.y)
     end
 
     return map(calc_ideal_density, locations_F)
@@ -682,16 +256,20 @@ function get_squared_distances(location_list, focal_location)
 end
 
 # calculates growth rates in the spatial model
-function calculate_growth_rates(ind_useResourceA_F,
-    ind_useResourceB_F,
-    ind_useResourceA_M,
-    ind_useResourceB_M,
-    locations_F,
-    locations_M,
+function calculate_growth_rates(population,
+    zone_x,
+    zone_y,
     K_total,
     sigma_comp,
     intrinsic_R)
     # in spatial model, calculate growth rates based on local resource use
+
+    locations_F = population[zone_x, zone_y].locations_F
+    neighbourhood = population[(max(zone_x - 1, 1):min(zone_x + 1, 10)), (max(zone_y - 1, 1):min(zone_y + 1, 10))]
+    ind_useResourceA_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
+    ind_useResourceB_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
+    locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)
+    locations_F = population[zone_x, zone_y].locations_F
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
     ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
@@ -701,19 +279,14 @@ function calculate_growth_rates(ind_useResourceA_F,
 
     # assume both resources have same constant density across range
 
-    # determine local resource use for each location across range
-    ind_useResourceA_all = [ind_useResourceA_F; ind_useResourceA_M]
-    ind_useResourceB_all = [ind_useResourceB_F; ind_useResourceB_M]
-    ind_locations_real = [locations_F; locations_M]
-
     function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
-        sum(ind_useResourceA_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
+        sum(ind_useResourceA_all .* exp.(-get_squared_distances(locations_all, focal_location) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
     end
 
     real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F) # this applies the above function to each geographic location
 
     function get_useResourceB_density_real(focal_location) # do the same for resource B
-        sum(ind_useResourceB_all .* exp.(-get_squared_distances(ind_locations_real, focal_location) ./ (2 * (sigma_comp^2))))
+        sum(ind_useResourceB_all .* exp.(-get_squared_distances(locations_all, focal_location) ./ (2 * (sigma_comp^2))))
     end
     real_densities_at_locations_F_resourceB = map(get_useResourceB_density_real, locations_F) # this applies the above function to each geographic location 
 
@@ -722,24 +295,12 @@ function calculate_growth_rates(ind_useResourceA_F,
     local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
     local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
 
-    growth_rateA = ind_useResourceA_F .* local_growth_rates_resourceA
-    growth_rateB = ind_useResourceB_F .* local_growth_rates_resourceB
+    growth_rateA = population[zone_x, zone_y].ind_useResourceA_F .* local_growth_rates_resourceA
+    growth_rateB = population[zone_x, zone_y].ind_useResourceB_F .* local_growth_rates_resourceB
 
     growth_rates = growth_rateA .+ growth_rateB
 
     return growth_rates
-end
-
-# This function sets up the genotypes of the starting population
-# in a 3D array, where:
-# rows (D1) are alleles (row 1 from mother, row 2 from father),
-# columns (D2) are loci, 
-# pages (D3) are individuals.  
-function generate_genotype_array(N_pop0::Integer, N_pop1::Integer, loci::Integer)
-    total_N = N_pop0 + N_pop1
-    genotypes = vcat([fill(0, 2, loci) for i in 1:N_pop0], [fill(1, 2, loci) for j in (N_pop0+1):total_N])
-
-    return genotypes
 end
 
 # calculates the mean value of the genotype across the list of loci given
@@ -791,58 +352,24 @@ function generate_offspring_genotype(mother_genotype, father_genotype)
     return kid_genotype
 end
 
-# creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function plot_population(pd, optimize, functional_loci_range)
-    if optimize
-        genotypes_active = [pd.genotypes_F[pd.active_F]; pd.genotypes_M[pd.active_M]]
-        locations_active = [pd.locations_F[pd.active_F]; pd.locations_M[pd.active_M]]
-        genotypes_inactive = [pd.inactive_genotypes_F[pd.inactive_F]; pd.inactive_genotypes_M[pd.inactive_M]]
-        locations_inactive = [pd.inactive_locations_F[pd.inactive_F]; pd.inactive_locations_M[pd.inactive_M]]
-        mitochondria_active = [pd.mitochondria_F[pd.active_F]; pd.mitochondria_M[pd.active_M]]
-        mitochondria_inactive = [pd.inactive_mitochondria_F[pd.inactive_F]; pd.inactive_mitochondria_M[pd.inactive_M]]
 
-        create_new_plot(calc_traits_additive(genotypes_active, functional_loci_range),
-            mitochondria_active,
-            locations_active,
-            calc_traits_additive(genotypes_inactive, functional_loci_range),
-            mitochondria_inactive,
-            locations_inactive)
-    else
-        genotypes_F = vcat(pd.genotypes_F...)
-        genotypes_M = vcat(pd.genotypes_M...)
-        locations_F = vcat(pd.locations_F...)
-        locations_M = vcat(pd.locations_M...)
-        
-        create_new_plot(calc_traits_additive([genotypes_F; genotypes_M], functional_loci_range),
-            [],
-            [locations_F; locations_M])
-    end
+# creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
+function plot_population(pd, functional_loci_range)
+    genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
+    locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+
+    create_new_plot(calc_traits_additive(genotypes, functional_loci_range),
+        [],
+        locations)
 end
 
 # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function update_plot(pd, generation, optimize, functional_loci_range)
-    if optimize
-        genotypes_active = [pd.genotypes_F[pd.active_F]; pd.genotypes_M[pd.active_M]]
-        locations_active = [pd.locations_F[pd.active_F]; pd.locations_M[pd.active_M]]
-        genotypes_inactive = [pd.inactive_genotypes_F[pd.inactive_F]; pd.inactive_genotypes_M[pd.inactive_M]]
-        locations_inactive = [pd.inactive_locations_F[pd.inactive_F]; pd.inactive_locations_M[pd.inactive_M]]
-        mitochondria_active = [pd.mitochondria_F[pd.active_F]; pd.mitochondria_M[pd.active_M]]
-        mitochondria_inactive = [pd.inactive_mitochondria_F[pd.inactive_F]; pd.inactive_mitochondria_M[pd.inactive_M]]
-
-        update_population_plot(calc_traits_additive(genotypes_active, functional_loci_range),
-            mitochondria_active,
-            locations_active,
-            calc_traits_additive(genotypes_inactive, functional_loci_range),
-            mitochondria_inactive,
-            locations_inactive,
-            generation)
-    else
-        genotypes = [vcat(pd.genotypes_F...); vcat(pd.genotypes_M...)]
-        locations = [vcat(pd.locations_F...); vcat(pd.locations_M...)]
-        update_population_plot(calc_traits_additive(genotypes, functional_loci_range),
-            [],
-            locations,
-            generation)
-    end
+function update_plot(pd, generation, functional_loci_range)
+    genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
+    locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+    update_population_plot(calc_traits_additive(genotypes, functional_loci_range),
+        [],
+        locations,
+        generation)
 end
 end
