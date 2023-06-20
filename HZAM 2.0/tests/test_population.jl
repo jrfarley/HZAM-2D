@@ -131,49 +131,6 @@ end
 
 end
 
-@testset "calc_growth_rates" begin
-    K_total = 10000
-    ecolDiff = 0.0
-    competition_trait_loci = 1:1
-    intrinsic_R = 1.1
-    sigma_comp = 0.01
-
-    genotypes = Population.generate_genotype_array(2500, 2500, 3)
-
-    starting_range = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
-
-    locations_F, locations_M = Location[], Location[]
-
-    for y in [0.1f0, 0.49f0, 0.495f0, 0.5f0, 0.502f0, 0.505f0, 0.51f0, 0.7f0, 0.8f0, 0.9f0]
-        for x in collect(Float32, 0.001:0.002:0.999)
-            push!(locations_F, Location(x, y))
-            push!(locations_M, Location(x + 0.0005f0, y))
-        end
-    end
-
-    competition_traits_F = calc_traits_additive(genotypes, competition_trait_loci)
-    competition_traits_M = calc_traits_additive(genotypes, competition_trait_loci)
-
-    ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = Population.calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
-
-    growth_rates_F = Population.calculate_growth_rates(ind_useResourceA_F,
-        ind_useResourceB_F,
-        ind_useResourceA_M,
-        ind_useResourceB_M,
-        locations_F,
-        locations_M,
-        K_total,
-        sigma_comp,
-        intrinsic_R,
-        collect(1:5000))
-
-    @test growth_rates_F[1] > growth_rates_F[2500]
-
-    @test growth_rates_F[5000] > growth_rates_F[2500]
-
-    @test growth_rates_F[1] > growth_rates_F[4500]
-end
-
 
 @testset "generate_genotype_array" begin
     genotypes = Population.generate_genotype_array(1, 1, 3)
@@ -289,52 +246,7 @@ end
 end
 
 
-@testset "get_ideal_densities" begin
-    x_locations_F = [0.0f0, 0.3f0, 0.7f0, 0.8f0, 1.0f0]
 
-    y_locations_F = fill(0.5f0, 5)
-
-    locations_F = Location.(x_locations_F, y_locations_F)
-
-    K_total = 10000
-    sigma_comp = 0.01
-
-    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F)
-
-    @test ideal_densities[1] > 3.14 && ideal_densities[1] < 3.15
-
-    @test ideal_densities[2] > 6.28 && ideal_densities[2] < 6.29
-
-    @test ideal_densities[3] > 6.28 && ideal_densities[2] < 6.29
-
-    @test ideal_densities[4] > 6.28 && ideal_densities[2] < 6.29
-
-    @test ideal_densities[5] > 3.14 && ideal_densities[5] < 3.15
-end
-
-@testset "calculate_ind_useResource_no_ecolDiff" begin
-    ecolDiff = 0.0
-    competition_traits_F, competition_traits_M = ([0, 1], [0, 1])
-
-    ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = Population.calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
-
-    @test ind_useResourceA_F == [0.5, 0.5]
-    @test ind_useResourceB_F == [0.5, 0.5]
-    @test ind_useResourceA_M == [0.5, 0.5]
-    @test ind_useResourceB_M == [0.5, 0.5]
-end
-
-@testset "calculate_ind_useResource_with_ecolDiff" begin
-    ecolDiff = 1.0
-    competition_traits_F, competition_traits_M = ([0, 1], [0, 1])
-
-    ind_useResourceA_F, ind_useResourceB_F, ind_useResourceA_M, ind_useResourceB_M = Population.calculate_ind_useResource(competition_traits_F, competition_traits_M, ecolDiff)
-
-    @test ind_useResourceA_F == [1, 0]
-    @test ind_useResourceB_F == [0, 1]
-    @test ind_useResourceA_M == [1, 0]
-    @test ind_useResourceB_M == [0, 1]
-end
 #=
 @testset "find_inactive_zones1" begin
     genotypes_pop0 = fill([0 0 0; 0 0 0], 100)

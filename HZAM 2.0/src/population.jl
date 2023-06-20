@@ -139,7 +139,7 @@ mutable struct PopulationData
 
         deme_locations = Location.(intervals, intervals')
 
-        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
+        deme_populations = map(l -> 1, deme_locations) #map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
 
         demes = Deme.(Ref(num_individuals_per_deme),
             Ref(total_loci),
