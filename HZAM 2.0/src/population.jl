@@ -115,10 +115,16 @@ end
 
 
 # stores all the population data (genotypes, locations, etc.) that get updated each generation
-struct PopulationData
+mutable struct PopulationData
     population::Matrix{Deme}
 
     growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
+
+    active_demes::Vector{CartesianIndex}
+
+    pop0_demes::Vector{CartesianIndex}
+
+    pop1_demes::Vector{CartesianIndex}
 
     # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
     function PopulationData(K_total,
@@ -144,64 +150,83 @@ struct PopulationData
 
         growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
 
-        for zone_x in 1:10
-            for zone_y in 1:10
-                growth_rates_F[zone_x, zone_y] = calculate_growth_rates(demes,
-                    zone_x,
-                    zone_y,
-                    K_total,
-                    sigma_comp,
-                    intrinsic_R)
-            end
+        active_demes = [CartesianIndex(x, y) for x in 1:10 for y in 1:10]
+
+        pop0_demes = [CartesianIndex(x, y) for x in 1:4 for y in 1:10]
+
+        pop1_demes = [CartesianIndex(x, y) for x in 7:10 for y in 1:10]
+
+        for deme_index in active_demes
+            growth_rates_F[deme_index] = calculate_growth_rates(demes,
+                deme_index,
+                K_total,
+                sigma_comp,
+                intrinsic_R)
         end
 
         new(demes,
-            growth_rates_F)
+            growth_rates_F,
+            active_demes,
+            pop0_demes,
+            pop1_demes)
+    end
+end
+
+# initializes new collection of population data variables by replacing the old individuals with their offspring and updating the growth rates
+function update_population(pd,
+    genotypes_daughters,
+    genotypes_sons,
+    mitochondria_daughters,
+    mitochondria_sons,
+    locations_daughters,
+    locations_sons,
+    new_active_demes,
+    competition_trait_loci,
+    K_total,
+    sigma_comp,
+    intrinsic_R,
+    ecolDiff)
+
+    for deme_index in pd.active_demes
+        pd.population[deme_index] = Deme(genotypes_daughters[deme_index],
+            genotypes_sons[deme_index],
+            locations_daughters[deme_index],
+            locations_sons[deme_index],
+            mitochondria_daughters[deme_index],
+            mitochondria_sons[deme_index],
+            competition_trait_loci,
+            ecolDiff)
     end
 
-    # initializes new collection of population data variables by replacing the old individuals with their offspring and updating the growth rates
-    function PopulationData(genotypes_daughters,
-        genotypes_sons,
-        mitochondria_daughters,
-        mitochondria_sons,
-        locations_daughters,
-        locations_sons,
-        competition_trait_loci,
-        K_total,
-        sigma_comp,
-        intrinsic_R,
-        ecolDiff)
+    pd.pop0_demes = setdiff(pd.pop0_demes, new_active_demes)
+    pd.pop1_demes = setdiff(pd.pop1_demes, new_active_demes)
+    pd.active_demes = union(pd.active_demes, new_active_demes)
 
-        demes = Deme.(genotypes_daughters,
-            genotypes_sons,
-            locations_daughters,
-            locations_sons,
-            mitochondria_daughters,
-            mitochondria_sons,
-            Ref(competition_trait_loci),
-            Ref(ecolDiff))
+    for deme_index in new_active_demes
+        pop = pd.population[deme_index]
+        pd.population[deme_index] = Deme([pop.genotypes_F; genotypes_daughters[deme_index]],
+            [pop.genotypes_M; genotypes_sons[deme_index]],
+            [pop.locations_F; locations_daughters[deme_index]],
+            [pop.locations_M; locations_sons[deme_index]],
+            [pop.mitochondria_F; mitochondria_daughters[deme_index]],
+            [pop.mitochondria_M; mitochondria_sons[deme_index]],
+            competition_trait_loci,
+            ecolDiff)
+    end
 
-        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
-
-        for zone_x in 1:10
-            for zone_y in 1:10
-                growth_rates_F[zone_x, zone_y] = calculate_growth_rates(demes,
-                    zone_x,
-                    zone_y,
-                    K_total,
-                    sigma_comp,
-                    intrinsic_R)
-            end
-        end
-
-        new(demes, growth_rates_F)
+    for deme_index in pd.active_demes
+        pd.growth_rates_F[deme_index] = calculate_growth_rates(pd.population,
+            deme_index,
+            K_total,
+            sigma_comp,
+            intrinsic_R)
     end
 end
 
 function assign_zone(location::Location)
     zone_x = convert(Integer, trunc(10 * location.x) + 1)
     zone_y = convert(Integer, trunc(10 * location.y) + 1)
-    return zone_x, zone_y
+    return CartesianIndex(zone_x, zone_y)
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
@@ -257,19 +282,22 @@ end
 
 # calculates growth rates in the spatial model
 function calculate_growth_rates(population,
-    zone_x,
-    zone_y,
+    deme_index,
     K_total,
     sigma_comp,
     intrinsic_R)
     # in spatial model, calculate growth rates based on local resource use
 
-    locations_F = population[zone_x, zone_y].locations_F
-    neighbourhood = population[(max(zone_x - 1, 1):min(zone_x + 1, 10)), (max(zone_y - 1, 1):min(zone_y + 1, 10))]
+    locations_F = population[deme_index].locations_F
+
+    lower_left = max(deme_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
+    upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(10, 10))
+    neighbourhood = population[lower_left:upper_right]
+
     ind_useResourceA_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
     ind_useResourceB_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
     locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)
-    locations_F = population[zone_x, zone_y].locations_F
+    locations_F = population[deme_index].locations_F
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
     ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
@@ -295,8 +323,8 @@ function calculate_growth_rates(population,
     local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
     local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
 
-    growth_rateA = population[zone_x, zone_y].ind_useResourceA_F .* local_growth_rates_resourceA
-    growth_rateB = population[zone_x, zone_y].ind_useResourceB_F .* local_growth_rates_resourceB
+    growth_rateA = population[deme_index].ind_useResourceA_F .* local_growth_rates_resourceA
+    growth_rateB = population[deme_index].ind_useResourceB_F .* local_growth_rates_resourceB
 
     growth_rates = growth_rateA .+ growth_rateB
 

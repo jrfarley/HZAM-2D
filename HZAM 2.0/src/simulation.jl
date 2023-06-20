@@ -68,6 +68,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         locations_sons_all = Matrix{Vector{Location}}(undef, 10, 10)
         mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, 10, 10)
         mitochondria_sons_all = Matrix{Vector{Int8}}(undef, 10, 10)
+        new_active_demes = CartesianIndex[]
 
         for i in 1:10
             for j in 1:10
@@ -80,90 +81,90 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             end
         end
 
-        for zone_x in 1:10
-            for zone_y in 1:10
-                # Prepare for mating and reproduction
-                neighbourhood = pd.population[(max(zone_x - 1, 1):min(zone_x + 1, 10)), (max(zone_y - 1, 1):min(zone_y + 1, 10))]
+        for zone_index in pd.active_demes
+            # Prepare for mating and reproduction
+            lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
+            upper_right = min(zone_index + CartesianIndex(1, 1), CartesianIndex(10, 10))
+            neighbourhood = pd.population[lower_left:upper_right]
 
-                locations_F = pd.population[zone_x, zone_y].locations_F
-                locations_M = vcat([d.locations_M for d in neighbourhood]...)
-                genotypes_F = pd.population[zone_x, zone_y].genotypes_F
-                genotypes_M = vcat([d.genotypes_M for d in neighbourhood]...)
-                mitochondria_F = pd.population[zone_x, zone_y].mitochondria_F
-                growth_rates_F = pd.growth_rates_F[zone_x, zone_y]
+            locations_F = pd.population[zone_index].locations_F
+            locations_M = vcat([d.locations_M for d in neighbourhood]...)
+            genotypes_F = pd.population[zone_index].genotypes_F
+            genotypes_M = vcat([d.genotypes_M for d in neighbourhood]...)
+            mitochondria_F = pd.population[zone_index].mitochondria_F
+            growth_rates_F = pd.growth_rates_F[zone_index]
 
-                N_F, N_M = length(locations_F), length(locations_M)
+            N_F, N_M = length(locations_F), length(locations_M)
 
-                # loop through mothers, mating and reproducing
-                for mother in 1:N_F
-                    # initialize tracking variables
-                    mate = false # becomes true when female is paired with male
-                    rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
-                    father = [] # will contain the index of the male mate
-                    # make vector of indices of eligible males
-                    elig_M = collect(1:N_M)
+            # loop through mothers, mating and reproducing
+            for mother in 1:N_F
+                # initialize tracking variables
+                mate = false # becomes true when female is paired with male
+                rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
+                father = [] # will contain the index of the male mate
+                # make vector of indices of eligible males
+                elig_M = collect(1:N_M)
 
-                    if length(elig_M) == 0 # check if there are any eligible males
-                        break
-                    end
+                if length(elig_M) == 0 # check if there are any eligible males
+                    break
+                end
 
-                    # determine male mate of female
-                    while mate == false
-                        # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
-                        focal_male, elig_M = choose_closest_male(elig_M, locations_M, locations_F[mother])
-                        # compare male trait with female's trait (preference), and determine
-                        # whether she accepts; note that match_strength is determined by a
-                        # Gaussian, with a maximum of 1 and minimum of zero.
-                        match_strength = calc_match_strength(genotypes_F[mother], genotypes_M[focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-                        if rand() < match_strength
-                            # she accepts male, and mates
-                            father = focal_male
-                            mate = true
-                        else
-                            # she rejects male
-                            rejects += 1
-                            if length(elig_M) == 0
-                                break
-                            end
+                # determine male mate of female
+                while mate == false
+                    # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
+                    focal_male, elig_M = choose_closest_male(elig_M, locations_M, locations_F[mother])
+                    # compare male trait with female's trait (preference), and determine
+                    # whether she accepts; note that match_strength is determined by a
+                    # Gaussian, with a maximum of 1 and minimum of zero.
+                    match_strength = calc_match_strength(genotypes_F[mother], genotypes_M[focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+                    if rand() < match_strength
+                        # she accepts male, and mates
+                        father = focal_male
+                        mate = true
+                    else
+                        # she rejects male
+                        rejects += 1
+                        if length(elig_M) == 0
+                            break
                         end
                     end
+                end
 
-                    # now draw the number of offspring from a poisson distribution with a mean of reproductive_fitness
-                    if !isempty(father)
-                        # determine fitness cost due to mate search (number of rejected males)
-                        search_fitness = (1 - per_reject_cost)^rejects    # (in most of HZAM-Sym paper, per_reject_cost = 0)
+                # now draw the number of offspring from a poisson distribution with a mean of reproductive_fitness
+                if !isempty(father)
+                    # determine fitness cost due to mate search (number of rejected males)
+                    search_fitness = (1 - per_reject_cost)^rejects    # (in most of HZAM-Sym paper, per_reject_cost = 0)
 
-                        #combine for total fitness:   
-                        reproductive_fitness = 2 * growth_rates_F[mother] * search_fitness  # the 2 is because only females, not males, produce offspring
+                    #combine for total fitness:   
+                    reproductive_fitness = 2 * growth_rates_F[mother] * search_fitness  # the 2 is because only females, not males, produce offspring
 
-                        offspring = rand(Poisson(reproductive_fitness))
+                    offspring = rand(Poisson(reproductive_fitness))
 
-                        # if offspring, generate their genotypes and sexes
-                        if offspring >= 1
-                            for kid in 1:offspring
-                                kid_genotype = generate_offspring_genotype(genotypes_F[mother], genotypes_M[father])
-                                kid_mitochondria = mitochondria_F[mother]
-                                survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
+                    # if offspring, generate their genotypes and sexes
+                    if offspring >= 1
+                        for kid in 1:offspring
+                            kid_genotype = generate_offspring_genotype(genotypes_F[mother], genotypes_M[father])
+                            kid_mitochondria = mitochondria_F[mother]
+                            survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
 
-                                if survival_fitness > rand()
-                                    # determine sex and location of kid
+                            if survival_fitness > rand()
+                                # determine sex and location of kid
+                                
+                                #genotype_average = sum(kid_genotype) / (2 * total_loci)
+                                #hybrid = genotype_average != kid_mitochondria
 
-                                    new_location = Location(locations_F[mother], sigma_disp, geographic_limits)
+                                new_location = Location(locations_F[mother], sigma_disp, geographic_limits)
 
-                                    if geographic_limits[1].x <= new_location.x <= geographic_limits[2].x &&
-                                       geographic_limits[1].y <= new_location.y <= geographic_limits[2].y
-                                        zone = assign_zone(new_location)
+                                zone = assign_zone(new_location)
 
-                                        if rand() > 0.5 # kid is daughter
-                                            push!(genotypes_daughters_all[zone[1], zone[2]], kid_genotype)
-                                            push!(mitochondria_daughters_all[zone[1], zone[2]], kid_mitochondria)
-                                            push!(locations_daughters_all[zone[1], zone[2]], new_location)
-                                        else # kid is son
-                                            push!(genotypes_sons_all[zone[1], zone[2]], kid_genotype)
-                                            push!(mitochondria_sons_all[zone[1], zone[2]], kid_mitochondria)
-                                            push!(locations_sons_all[zone[1], zone[2]], new_location)
-                                        end
-                                    end
+                                if rand() > 0.5 # kid is daughter
+                                    push!(genotypes_daughters_all[zone], kid_genotype)
+                                    push!(mitochondria_daughters_all[zone], kid_mitochondria)
+                                    push!(locations_daughters_all[zone], new_location)
+                                else # kid is son
+                                    push!(genotypes_sons_all[zone], kid_genotype)
+                                    push!(mitochondria_sons_all[zone], kid_mitochondria)
+                                    push!(locations_sons_all[zone], new_location)
                                 end
                             end
                         end
@@ -178,14 +179,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             break # break out of current loop (this simulation) 
         end=#
 
-
         # assign surviving offspring to new adult population
-        pd = PopulationData(genotypes_daughters_all,
+        update_population(pd,
+            genotypes_daughters_all,
             genotypes_sons_all,
             mitochondria_daughters_all,
             mitochondria_sons_all,
             locations_daughters_all,
             locations_sons_all,
+            new_active_demes,
             competition_trait_loci,
             K_total,
             sigma_comp,
