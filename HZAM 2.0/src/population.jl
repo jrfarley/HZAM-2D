@@ -139,7 +139,7 @@ mutable struct PopulationData
 
         deme_locations = Location.(intervals, intervals')
 
-        deme_populations = map(l -> 1, deme_locations) #map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
+        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
 
         demes = Deme.(Ref(num_individuals_per_deme),
             Ref(total_loci),
@@ -148,7 +148,7 @@ mutable struct PopulationData
             deme_populations,
             Ref(ecolDiff))
 
-        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+        # growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
 
         active_demes = [CartesianIndex(x, y) for x in 1:10 for y in 1:10]
 
@@ -156,13 +156,15 @@ mutable struct PopulationData
 
         pop1_demes = [CartesianIndex(x, y) for x in 7:10 for y in 1:10]
 
-        for deme_index in active_demes
+        #=for deme_index in active_demes
             growth_rates_F[deme_index] = calculate_growth_rates(demes,
                 deme_index,
                 K_total,
                 sigma_comp,
                 intrinsic_R)
-        end
+        end=#
+
+        growth_rates_F = map(d -> fill(0.5, length(d.locations_F)), demes)
 
         new(demes,
             growth_rates_F,
