@@ -58,7 +58,7 @@ end
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    deme = Population.Deme([fill(1, 2, 3)], [], [Location(0.5f0, 0.5f0)], [], [1], [], [1], 0)
+    deme = Population.Deme([fill(1, 2, 3), fill(1, 2, 3)], [], [Location(0.5f0, 0.5f0), Location(0f0, 0f0)], [], [1], [], [1], 0)
     empty_deme = Population.Deme([], [], [], [], [1], [], [1:1], 0)
 
     growth_rates_F = Population.calculate_growth_rates([empty_deme empty_deme empty_deme; empty_deme deme empty_deme; empty_deme empty_deme empty_deme],
@@ -68,4 +68,7 @@ end
         intrinsic_R)
 
     @test abs(growth_rates_F[1] - 1.1) < 0.01 
+
+    println(growth_rates_F[2])
+    @test abs(growth_rates_F[2]-0.55)<0.01
 end
