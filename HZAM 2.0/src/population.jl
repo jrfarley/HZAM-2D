@@ -261,7 +261,8 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        return Integer(trunc(1000*(1/sqrt(2*pi*0.01^2)))) * linear_density(location.x) * linear_density(location.y)
+        #Integer(trunc(1000*(1/sqrt(2*pi*0.01^2))))
+        return K_total * (pi/4) * linear_density(location.x) * linear_density(location.y)
     end
 
     return map(calc_ideal_density, locations_F)

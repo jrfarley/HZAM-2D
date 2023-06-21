@@ -45,7 +45,7 @@ function create_new_plot(hybrid_indices, mitochondria, locations)#=
     ylims!(-0.03, 1.03)
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices)
     display(fig)
-    readline()
+    
 end
 
 function update_population_plot(hybrid_indices, mitochondria, locations, generation)
@@ -71,7 +71,7 @@ function update_population_plot(hybrid_indices, mitochondria, locations, generat
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices)
     ax.title = string("HZAM simulation, generation = ", generation)
     println("generation: ", generation, "; individuals: ", length(locations))
-    readline()
+    
 end
 
 

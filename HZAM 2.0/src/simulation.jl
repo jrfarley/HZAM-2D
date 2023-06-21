@@ -23,6 +23,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     functional_loci_range = setdiff(collect(1:total_loci), collect(neutral_loci))
 
+    pop = []
 
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -199,11 +200,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             update_plot(pd, generation, functional_loci_range)
         end
 
+        push!(pop, sum([length(d.locations_F) for d in pd.population])+ sum([length(d.locations_M) for d in pd.population]))
+
     end # of loop through generations
 
     genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)
     functional_HI_all_inds = calc_traits_additive(genotypes, functional_loci_range)
     HI_NL_all_inds = calc_traits_additive(genotypes, neutral_loci)
+
+    println(string("average_pop: ", sum(pop)/length(pop)))
 
     return extinction, functional_HI_all_inds, HI_NL_all_inds
 end
