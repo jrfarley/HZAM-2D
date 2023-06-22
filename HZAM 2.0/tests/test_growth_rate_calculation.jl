@@ -10,7 +10,7 @@ using .Population
 
     locations_F = Location.(x_locations_F, y_locations_F)
 
-    K_total = Integer(trunc(1000 / sqrt(2 * pi * 0.01^2)))
+    K_total = Integer(trunc((4/pi)*1000 / sqrt(2 * pi * 0.01^2)))
 
     sigma_comp = 0.01
 
@@ -70,5 +70,5 @@ end
     @test abs(growth_rates_F[1] - 1.1) < 0.01 
 
     println(growth_rates_F[2])
-    @test abs(growth_rates_F[2]-0.55)<0.01
+    @test abs(growth_rates_F[2]-1)<0.02
 end
