@@ -82,7 +82,13 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             end
         end
 
-        for zone_index in pd.active_demes
+        if false
+            active_demes = pd.active_demes
+        else
+            active_demes = eachindex(IndexCartesian(), pd.population)
+        end
+
+        for zone_index in active_demes
             # Prepare for mating and reproduction
             lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
             upper_right = min(zone_index + CartesianIndex(1, 1), CartesianIndex(10, 10))
@@ -181,7 +187,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end=#
 
         # assign surviving offspring to new adult population
-        update_population(pd,
+        pd = update_population(pd,
             genotypes_daughters_all,
             genotypes_sons_all,
             mitochondria_daughters_all,
@@ -193,7 +199,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             K_total,
             sigma_comp,
             intrinsic_R,
-            ecolDiff)
+            ecolDiff,
+            false)
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))

@@ -68,13 +68,13 @@ struct Deme
         size,
         population, ecolDiff)
 
-        N_half = trunc(Int, starting_N)
+        N_half = trunc(Int, starting_N/2)
 
         deme_range = [location, Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))]
 
         genotypes = fill(fill(population, 2, total_loci), N_half)
 
-        locations = [Location(deme_range) for i in 1:N_half]
+        locations = [[Location(deme_range) for i in 1:N_half] for i in 1:2]
 
         mitochondria = fill(population, N_half)
 
@@ -84,8 +84,8 @@ struct Deme
 
         new(genotypes,
             genotypes,
-            locations,
-            locations,
+            locations[1],
+            locations[1],
             mitochondria,
             mitochondria,
             ind_useResourceA,
@@ -115,7 +115,7 @@ end
 
 
 # stores all the population data (genotypes, locations, etc.) that get updated each generation
-mutable struct PopulationData
+struct PopulationData
     population::Matrix{Deme}
 
     growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
@@ -141,6 +141,7 @@ mutable struct PopulationData
 
         deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
 
+
         demes = Deme.(Ref(num_individuals_per_deme),
             Ref(total_loci),
             deme_locations,
@@ -148,7 +149,7 @@ mutable struct PopulationData
             deme_populations,
             Ref(ecolDiff))
 
-        # growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
 
         active_demes = [CartesianIndex(x, y) for x in 1:10 for y in 1:10]
 
@@ -156,15 +157,119 @@ mutable struct PopulationData
 
         pop1_demes = [CartesianIndex(x, y) for x in 7:10 for y in 1:10]
 
-        #=for deme_index in active_demes
+        for deme_index in active_demes
             growth_rates_F[deme_index] = calculate_growth_rates(demes,
                 deme_index,
                 K_total,
                 sigma_comp,
                 intrinsic_R)
-        end=#
+        end
+        new(demes,
+            growth_rates_F,
+            active_demes,
+            pop0_demes,
+            pop1_demes)
+    end
 
-        growth_rates_F = map(d -> fill(0.5, length(d.locations_F)), demes)
+    function PopulationData(pd,
+        genotypes_daughters,
+        genotypes_sons,
+        mitochondria_daughters,
+        mitochondria_sons,
+        locations_daughters,
+        locations_sons,
+        competition_trait_loci,
+        K_total,
+        sigma_comp,
+        intrinsic_R,
+        ecolDiff)
+
+        demes = Matrix{Deme}(undef, 10, 10)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+
+        for deme_index in eachindex(IndexCartesian(), pd.population)
+            demes[deme_index] = Deme(genotypes_daughters[deme_index],
+                genotypes_sons[deme_index],
+                locations_daughters[deme_index],
+                locations_sons[deme_index],
+                mitochondria_daughters[deme_index],
+                mitochondria_sons[deme_index],
+                competition_trait_loci,
+                ecolDiff)
+        end
+
+        for deme_index in eachindex(IndexCartesian(), pd.population)
+            growth_rates_F[deme_index] = calculate_growth_rates(demes,
+                deme_index,
+                K_total,
+                sigma_comp,
+                intrinsic_R)
+        end
+
+        new(demes,
+            growth_rates_F)
+
+    end
+
+    function PopulationData(pd,
+        genotypes_daughters,
+        genotypes_sons,
+        mitochondria_daughters,
+        mitochondria_sons,
+        locations_daughters,
+        locations_sons,
+        new_active_demes,
+        competition_trait_loci,
+        K_total,
+        sigma_comp,
+        intrinsic_R,
+        ecolDiff)
+
+        demes = Matrix{Deme}(undef, 10, 10)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+
+        active_demes = union(pd.active_demes, new_active_demes)
+
+
+        for deme_index in pd.active_demes
+            demes[deme_index] = Deme(genotypes_daughters[deme_index],
+                genotypes_sons[deme_index],
+                locations_daughters[deme_index],
+                locations_sons[deme_index],
+                mitochondria_daughters[deme_index],
+                mitochondria_sons[deme_index],
+                competition_trait_loci,
+                ecolDiff)
+        end
+
+        for deme_index in new_active_demes
+            pop = pd.population[deme_index]
+            demes[deme_index] = Deme([pop.genotypes_F; genotypes_daughters[deme_index]],
+                [pop.genotypes_M; genotypes_sons[deme_index]],
+                [pop.locations_F; locations_daughters[deme_index]],
+                [pop.locations_M; locations_sons[deme_index]],
+                [pop.mitochondria_F; mitochondria_daughters[deme_index]],
+                [pop.mitochondria_M; mitochondria_sons[deme_index]],
+                competition_trait_loci,
+                ecolDiff)
+        end
+
+        inactive_demes = setdiff([CartesianIndex(x, y) for x in 1:10 for y in 1:10], active_demes)
+
+        for deme_index in inactive_demes
+            demes[deme_index] = pd.population[deme_index]
+        end
+
+        pop0_demes = setdiff(pd.pop0_demes, new_active_demes)
+        pop1_demes = setdiff(pd.pop1_demes, new_active_demes)
+
+        for deme_index in pd.active_demes
+            growth_rates_F[deme_index] = calculate_growth_rates(demes,
+                deme_index,
+                K_total,
+                sigma_comp,
+                intrinsic_R)
+        end
 
         new(demes,
             growth_rates_F,
@@ -187,41 +292,36 @@ function update_population(pd,
     K_total,
     sigma_comp,
     intrinsic_R,
-    ecolDiff)
+    ecolDiff,
+    optimize)
 
-    for deme_index in pd.active_demes
-        pd.population[deme_index] = Deme(genotypes_daughters[deme_index],
-            genotypes_sons[deme_index],
-            locations_daughters[deme_index],
-            locations_sons[deme_index],
-            mitochondria_daughters[deme_index],
-            mitochondria_sons[deme_index],
-            competition_trait_loci,
-            ecolDiff)
-    end
-
-    pd.pop0_demes = setdiff(pd.pop0_demes, new_active_demes)
-    pd.pop1_demes = setdiff(pd.pop1_demes, new_active_demes)
-    pd.active_demes = union(pd.active_demes, new_active_demes)
-
-    for deme_index in new_active_demes
-        pop = pd.population[deme_index]
-        pd.population[deme_index] = Deme([pop.genotypes_F; genotypes_daughters[deme_index]],
-            [pop.genotypes_M; genotypes_sons[deme_index]],
-            [pop.locations_F; locations_daughters[deme_index]],
-            [pop.locations_M; locations_sons[deme_index]],
-            [pop.mitochondria_F; mitochondria_daughters[deme_index]],
-            [pop.mitochondria_M; mitochondria_sons[deme_index]],
-            competition_trait_loci,
-            ecolDiff)
-    end
-
-    for deme_index in pd.active_demes
-        pd.growth_rates_F[deme_index] = calculate_growth_rates(pd.population,
-            deme_index,
-            K_total,
-            sigma_comp,
-            intrinsic_R)
+    if optimize
+        return PopulationData(pd,
+        genotypes_daughters,
+        genotypes_sons,
+        mitochondria_daughters,
+        mitochondria_sons,
+        locations_daughters,
+        locations_sons,
+        new_active_demes,
+        competition_trait_loci,
+        K_total,
+        sigma_comp,
+        intrinsic_R,
+        ecolDiff)
+    else
+        return PopulationData(pd,
+        genotypes_daughters,
+        genotypes_sons,
+        mitochondria_daughters,
+        mitochondria_sons,
+        locations_daughters,
+        locations_sons,
+        competition_trait_loci,
+        K_total,
+        sigma_comp,
+        intrinsic_R,
+        ecolDiff)
     end
 end
 
@@ -264,7 +364,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
         #Integer(trunc(1000*(1/sqrt(2*pi*0.01^2))))
-        return K_total * (pi/4) * linear_density(location.x) * linear_density(location.y)
+        return K_total * (pi / 4) * linear_density(location.x) * linear_density(location.y)
     end
 
     return map(calc_ideal_density, locations_F)
