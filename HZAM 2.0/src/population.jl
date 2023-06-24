@@ -68,7 +68,7 @@ struct Deme
         size,
         population, ecolDiff)
 
-        N_half = trunc(Int, starting_N/2)
+        N_half = trunc(Int, starting_N / 2)
 
         deme_range = [location, Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))]
 
@@ -297,31 +297,31 @@ function update_population(pd,
 
     if optimize
         return PopulationData(pd,
-        genotypes_daughters,
-        genotypes_sons,
-        mitochondria_daughters,
-        mitochondria_sons,
-        locations_daughters,
-        locations_sons,
-        new_active_demes,
-        competition_trait_loci,
-        K_total,
-        sigma_comp,
-        intrinsic_R,
-        ecolDiff)
+            genotypes_daughters,
+            genotypes_sons,
+            mitochondria_daughters,
+            mitochondria_sons,
+            locations_daughters,
+            locations_sons,
+            new_active_demes,
+            competition_trait_loci,
+            K_total,
+            sigma_comp,
+            intrinsic_R,
+            ecolDiff)
     else
         return PopulationData(pd,
-        genotypes_daughters,
-        genotypes_sons,
-        mitochondria_daughters,
-        mitochondria_sons,
-        locations_daughters,
-        locations_sons,
-        competition_trait_loci,
-        K_total,
-        sigma_comp,
-        intrinsic_R,
-        ecolDiff)
+            genotypes_daughters,
+            genotypes_sons,
+            mitochondria_daughters,
+            mitochondria_sons,
+            locations_daughters,
+            locations_sons,
+            competition_trait_loci,
+            K_total,
+            sigma_comp,
+            intrinsic_R,
+            ecolDiff)
     end
 end
 
@@ -451,12 +451,32 @@ function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3
 end
 
 # Finds the closest male given a list of eligible males
-function choose_closest_male(elig_M, locations_M, location_mother)
+function choose_closest_male(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
     focal_male = splice!(elig_M, argmin(get_squared_distances(locations_M[elig_M], location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
     if (distance(location_mother, locations_M[focal_male]) >= 0.1)
         return focal_male, []
     end
     return focal_male, elig_M
+end
+
+function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location)
+    elig_M_per_deme = Dict{CartesianIndex,Vector{Int64}}()
+    males = Dict{CartesianIndex,Int64}()
+    for deme_index in deme_indices
+        if (length(elig_M[deme_index]) > 0)
+            deme_focal_male, deme_elig_M = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother)
+            elig_M_per_deme[deme_index] = deme_elig_M
+            males[deme_index] = deme_focal_male
+        end
+    end
+    
+    index = reduce((x, y) -> distance(demes[x].locations_M[males[x]], location_mother) ≤ distance(demes[y].locations_M[males[y]], location_mother) ? x : y, keys(males))
+
+    output_elig_M = copy(elig_M)
+    output_elig_M[index] = elig_M_per_deme[index]
+
+    return males[index], output_elig_M, index
+
 end
 
 # compare male trait with female's trait (preference), and determine
