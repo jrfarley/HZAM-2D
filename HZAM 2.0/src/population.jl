@@ -5,6 +5,7 @@ include("plot_data.jl")
 using .Plot_Data
 
 using Test
+using SpecialFunctions
 
 export PopulationData, Location
 export initialize_population, update_population
@@ -12,6 +13,9 @@ export choose_closest_male, calc_match_strength, generate_offspring_genotype
 export plot_population, update_plot
 export calc_traits_additive
 export assign_zone
+export NUM_DEMES
+
+NUM_DEMES = 20
 
 # stores a location with an x coordinate and a y coordinate
 struct Location
@@ -133,9 +137,11 @@ struct PopulationData
         intrinsic_R,
         sigma_comp)
 
-        num_individuals_per_deme = K_total / 100
+        num_individuals_per_deme = K_total / (NUM_DEMES^2)
 
-        intervals = collect(0.0f0:0.1f0:0.99f0)
+        intervals = collect(0.0f0:Float32(1/NUM_DEMES):0.99f0)
+
+        println(intervals)
 
         deme_locations = Location.(intervals, intervals')
 
@@ -149,13 +155,13 @@ struct PopulationData
             deme_populations,
             Ref(ecolDiff))
 
-        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_DEMES, NUM_DEMES)
 
-        active_demes = [CartesianIndex(x, y) for x in 1:10 for y in 1:10]
+        active_demes = [CartesianIndex(x, y) for x in 1:NUM_DEMES for y in 1:NUM_DEMES]
 
-        pop0_demes = [CartesianIndex(x, y) for x in 1:4 for y in 1:10]
+        pop0_demes = [CartesianIndex(x, y) for x in 1:Int(trunc(NUM_DEMES/2-1)) for y in 1:NUM_DEMES]
 
-        pop1_demes = [CartesianIndex(x, y) for x in 7:10 for y in 1:10]
+        pop1_demes = [CartesianIndex(x, y) for x in 7:NUM_DEMES for y in 1:NUM_DEMES]
 
         for deme_index in active_demes
             growth_rates_F[deme_index] = calculate_growth_rates(demes,
@@ -184,8 +190,8 @@ struct PopulationData
         intrinsic_R,
         ecolDiff)
 
-        demes = Matrix{Deme}(undef, 10, 10)
-        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+        demes = Matrix{Deme}(undef, NUM_DEMES, NUM_DEMES)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_DEMES, NUM_DEMES)
 
         for deme_index in eachindex(IndexCartesian(), pd.population)
             demes[deme_index] = Deme(genotypes_daughters[deme_index],
@@ -225,8 +231,8 @@ struct PopulationData
         intrinsic_R,
         ecolDiff)
 
-        demes = Matrix{Deme}(undef, 10, 10)
-        growth_rates_F = Matrix{Vector{Float64}}(undef, 10, 10)
+        demes = Matrix{Deme}(undef, NUM_DEMES, NUM_DEMES)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_DEMES, NUM_DEMES)
 
         active_demes = union(pd.active_demes, new_active_demes)
 
@@ -254,7 +260,7 @@ struct PopulationData
                 ecolDiff)
         end
 
-        inactive_demes = setdiff([CartesianIndex(x, y) for x in 1:10 for y in 1:10], active_demes)
+        inactive_demes = setdiff([CartesianIndex(x, y) for x in 1:NUM_DEMES for y in 1:NUM_DEMES], active_demes)
 
         for deme_index in inactive_demes
             demes[deme_index] = pd.population[deme_index]
@@ -326,8 +332,8 @@ function update_population(pd,
 end
 
 function assign_zone(location::Location)
-    zone_x = convert(Integer, trunc(10 * location.x) + 1)
-    zone_y = convert(Integer, trunc(10 * location.y) + 1)
+    zone_x = convert(Integer, trunc(NUM_DEMES * location.x) + 1)
+    zone_y = convert(Integer, trunc(NUM_DEMES * location.y) + 1)
     return CartesianIndex(zone_x, zone_y)
 end
 
@@ -354,19 +360,15 @@ end
 
 # calculates the ideal density (assuming normal distribution) at the location of each female
 function get_ideal_densities(K_total, sigma_comp, locations_F)
-    function erf(x) # approximation of the error function
-        return tanh((sqrt(pi) * log(2)) * x)
-    end
-
     function linear_density(w)
-        return sqrt(pi / 2) * sigma_comp * (erf((1 - w) / (sqrt(2) * sigma_comp)) + erf(w / (sqrt(2) * sigma_comp)))
+        return sqrt(pi / 2) * sigma_comp * (erf((min(w + 0.03, 1) - w) / (sqrt(2) * sigma_comp)) - erf((max(w - 0.03, 0) - w) / (sqrt(2) * sigma_comp)))
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
         #Integer(trunc(1000*(1/sqrt(2*pi*0.01^2))))
-        return K_total * (pi / 4) * linear_density(location.x) * linear_density(location.y)
+        return K_total * linear_density(location.x) * linear_density(location.y)
     end
-
+    
     return map(calc_ideal_density, locations_F)
 end
 
@@ -394,7 +396,7 @@ function calculate_growth_rates(population,
     locations_F = population[deme_index].locations_F
 
     lower_left = max(deme_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
-    upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(10, 10))
+    upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(NUM_DEMES, NUM_DEMES))
     neighbourhood = population[lower_left:upper_right]
 
     ind_useResourceA_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)

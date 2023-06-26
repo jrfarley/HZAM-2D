@@ -63,16 +63,16 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     # loop throught the generations
     for generation in 1:max_generations
-        genotypes_daughters_all = Matrix{Vector{Matrix{Int8}}}(undef, 10, 10)
-        genotypes_sons_all = Matrix{Vector{Matrix{Int8}}}(undef, 10, 10)
-        locations_daughters_all = Matrix{Vector{Location}}(undef, 10, 10)
-        locations_sons_all = Matrix{Vector{Location}}(undef, 10, 10)
-        mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, 10, 10)
-        mitochondria_sons_all = Matrix{Vector{Int8}}(undef, 10, 10)
+        genotypes_daughters_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_DEMES, NUM_DEMES)
+        genotypes_sons_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_DEMES, NUM_DEMES)
+        locations_daughters_all = Matrix{Vector{Location}}(undef, NUM_DEMES, NUM_DEMES)
+        locations_sons_all = Matrix{Vector{Location}}(undef, NUM_DEMES, NUM_DEMES)
+        mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, NUM_DEMES, NUM_DEMES)
+        mitochondria_sons_all = Matrix{Vector{Int8}}(undef, NUM_DEMES, NUM_DEMES)
         new_active_demes = CartesianIndex[]
 
-        for i in 1:10
-            for j in 1:10
+        for i in 1:NUM_DEMES
+            for j in 1:NUM_DEMES
                 genotypes_daughters_all[i, j] = []
                 genotypes_sons_all[i, j] = []
                 locations_daughters_all[i, j] = []
@@ -104,9 +104,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
                 unused_deme_indices = eachindex(IndexCartesian(), pd.population)
 
-                for i in 0:9
-                    lower_left = max(zone_index - CartesianIndex(i, i), CartesianIndex(1, 1))
-                    upper_right = min(zone_index + CartesianIndex(i, 1), CartesianIndex(10, 10))
+                neighbourhood_size = 0
+
+                while mate==false
+                    lower_left = max(zone_index - CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(1, 1))
+                    upper_right = min(zone_index + CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(NUM_DEMES, NUM_DEMES))
                     neighbourhood = filter(e -> e ∈ unused_deme_indices, lower_left:upper_right) # remove used demes
 
                     for i in neighbourhood
@@ -140,6 +142,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             end
                         end
                     end
+                    neighbourhood_size += 1
                 end
 
                 # now draw the number of offspring from a poisson distribution with a mean of reproductive_fitness
