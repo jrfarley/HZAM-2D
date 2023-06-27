@@ -6,6 +6,7 @@ using .Plot_Data
 
 using Test
 using SpecialFunctions
+using QuadGK
 
 export PopulationData, Location
 export initialize_population, update_population
@@ -139,13 +140,11 @@ struct PopulationData
 
         num_individuals_per_deme = K_total / (NUM_DEMES^2)
 
-        intervals = collect(0.0f0:Float32(1/NUM_DEMES):0.99f0)
-
-        println(intervals)
+        intervals = collect(0.0f0:Float32(1 / NUM_DEMES):0.99f0)
 
         deme_locations = Location.(intervals, intervals')
 
-        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
+        deme_populations = map(l -> l.x < 0.5 ? 0 : 0, deme_locations)
 
 
         demes = Deme.(Ref(num_individuals_per_deme),
@@ -159,7 +158,7 @@ struct PopulationData
 
         active_demes = [CartesianIndex(x, y) for x in 1:NUM_DEMES for y in 1:NUM_DEMES]
 
-        pop0_demes = [CartesianIndex(x, y) for x in 1:Int(trunc(NUM_DEMES/2-1)) for y in 1:NUM_DEMES]
+        pop0_demes = [CartesianIndex(x, y) for x in 1:Int(trunc(NUM_DEMES / 2 - 1)) for y in 1:NUM_DEMES]
 
         pop1_demes = [CartesianIndex(x, y) for x in 7:NUM_DEMES for y in 1:NUM_DEMES]
 
@@ -365,10 +364,12 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        #Integer(trunc(1000*(1/sqrt(2*pi*0.01^2))))
-        return K_total * linear_density(location.x) * linear_density(location.y)
+        #a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
+        #b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
+        #return K_total * (-sqrt(pi / 2) * sigma_comp * quadgk(x -> (erf((a(x) - location.y) / (sqrt(2) * sigma_comp)) - erf((b(x) - location.y) / (sqrt(2) * sigma_comp))) * exp(-((x - location.x)^2) / (2 * sigma_comp^2)), max(0, location.x - 0.03), min(1, location.x + 0.03))[1])
+        return K_total * quadgk(x -> quadgk(y -> exp(-((location.x-x)^2+(location.y-y)^2)/(2*sigma_comp^2)), max(0, location.y - sqrt(0.03^2-(x-location.x)^2)), min(1, location.y + sqrt(0.03^2-(x-location.x)^2)))[1], max(0, location.x-0.03), min(1, location.x+0.03))[1]
     end
-    
+
     return map(calc_ideal_density, locations_F)
 end
 
@@ -412,29 +413,31 @@ function calculate_growth_rates(population,
 
     # assume both resources have same constant density across range
 
-    function get_useResourceA_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
-        sum(ind_useResourceA_all .* exp.(-get_squared_distances(locations_all, focal_location) ./ (2 * (sigma_comp^2)))) # because this function is within a function, it can use the variables within the larger function in its definition
+    function get_useResource_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
+        use_resourceA_density = 0
+        use_resourceB_density = 0
+        squared_distances = get_squared_distances(locations_all, focal_location)
+        for i in eachindex(locations_all)
+            if squared_distances[i] <= 0.0009
+                use_resourceA_density += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
+                use_resourceB_density += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
+            end
+        end
+        return use_resourceA_density, use_resourceB_density
     end
 
-    real_densities_at_locations_F_resourceA = map(get_useResourceA_density_real, locations_F) # this applies the above function to each geographic location
+    real_densities_at_locations_F = map(get_useResource_density_real, locations_F) # this applies the above function to each geographic location 
 
-    function get_useResourceB_density_real(focal_location) # do the same for resource B
-        sum(ind_useResourceB_all .* exp.(-get_squared_distances(locations_all, focal_location) ./ (2 * (sigma_comp^2))))
+    function get_growth_rate(i)
+        local_growth_rate_resourceA = intrinsic_R * ideal_densities_at_locations_F_resourceA[i] / (ideal_densities_at_locations_F_resourceA[i] + (real_densities_at_locations_F[i][1] * (intrinsic_R - 1)))
+        local_growth_rate_resourceB = intrinsic_R * ideal_densities_at_locations_F_resourceB[i] / (ideal_densities_at_locations_F_resourceB[i] + (real_densities_at_locations_F[i][2] * (intrinsic_R - 1)))
+
+        return population[deme_index].ind_useResourceA_F[i] * local_growth_rate_resourceA + population[deme_index].ind_useResourceB_F[i] * local_growth_rate_resourceB
     end
-    real_densities_at_locations_F_resourceB = map(get_useResourceB_density_real, locations_F) # this applies the above function to each geographic location 
 
-    # calculate local growth rates due to each resource (according to discrete time logistic growth equation)
-
-    local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
-    local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
-
-    growth_rateA = population[deme_index].ind_useResourceA_F .* local_growth_rates_resourceA
-    growth_rateB = population[deme_index].ind_useResourceB_F .* local_growth_rates_resourceB
-
-    growth_rates = growth_rateA .+ growth_rateB
-
-    return growth_rates
+    return map(get_growth_rate, eachindex(locations_F))
 end
+
 
 # calculates the mean value of the genotype across the list of loci given
 function mean(genotype, loci)
@@ -471,7 +474,7 @@ function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{Cartesian
             males[deme_index] = deme_focal_male
         end
     end
-    
+
     index = reduce((x, y) -> distance(demes[x].locations_M[males[x]], location_mother) ≤ distance(demes[y].locations_M[males[y]], location_mother) ? x : y, keys(males))
 
     output_elig_M = copy(elig_M)

@@ -106,7 +106,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
                 neighbourhood_size = 0
 
-                while mate==false
+                while mate==false && neighbourhood_size < 5
                     lower_left = max(zone_index - CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(1, 1))
                     upper_right = min(zone_index + CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(NUM_DEMES, NUM_DEMES))
                     neighbourhood = filter(e -> e ∈ unused_deme_indices, lower_left:upper_right) # remove used demes
@@ -116,6 +116,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     end
 
                     if sum(map(length, values(elig_M)))==0
+                        neighbourhood_size+=1
                         continue
                     end
 

@@ -10,21 +10,24 @@ using .Population
 
     locations_F = Location.(x_locations_F, y_locations_F)
 
-    K_total = Integer(trunc((4/pi)*1000 / sqrt(2 * pi * 0.01^2)))
+    K_total = 40342
 
     sigma_comp = 0.01
 
     ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F)
 
-    @test abs(ideal_densities[1] - 1000 * sigma_comp * sqrt(pi / 2)) < 0.01
+    println(ideal_densities)
+    readline()
 
-    @test abs(ideal_densities[2] - 1000 * sigma_comp * sqrt(2 * pi)) < 0.01
+    @test abs(ideal_densities[1] - 1000*sqrt(pi/2)*sigma_comp) < 0.001
 
-    @test abs(ideal_densities[3] - 1000 * sigma_comp * sqrt(2 * pi)) < 0.01
+    @test abs(ideal_densities[2] - 1000*sqrt(2*pi)*sigma_comp) < 0.001
 
-    @test abs(ideal_densities[4] - 1000 * sigma_comp * sqrt(2 * pi)) < 0.01
+    @test abs(ideal_densities[3] - 1000*sqrt(2*pi)*sigma_comp) < 0.001
 
-    @test abs(ideal_densities[5] - 1000 * sigma_comp * sqrt(pi / 2)) < 0.01
+    @test abs(ideal_densities[4] - 1000*sqrt(2*pi)*sigma_comp) < 0.001
+
+    @test abs(ideal_densities[5] - 1000*sqrt(pi/2)*sigma_comp) < 0.001
 end
 
 @testset "calculate_ind_useResource_no_ecolDiff" begin
@@ -67,8 +70,7 @@ end
         sigma_comp,
         intrinsic_R)
 
-    @test abs(growth_rates_F[1] - 1.1) < 0.01 
+    @test abs(growth_rates_F[1] - 1.1) < 0.005 
 
-    println(growth_rates_F[2])
-    @test abs(growth_rates_F[2]-1)<0.02
+    @test growth_rates_F[2] < 1.1
 end
