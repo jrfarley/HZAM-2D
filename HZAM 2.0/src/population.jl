@@ -144,7 +144,7 @@ struct PopulationData
 
         deme_locations = Location.(intervals, intervals')
 
-        deme_populations = map(l -> l.x < 0.5 ? 0 : 0, deme_locations)
+        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations)
 
 
         demes = Deme.(Ref(num_individuals_per_deme),
@@ -364,10 +364,9 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     end
 
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
-        #a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
-        #b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
-        #return K_total * (-sqrt(pi / 2) * sigma_comp * quadgk(x -> (erf((a(x) - location.y) / (sqrt(2) * sigma_comp)) - erf((b(x) - location.y) / (sqrt(2) * sigma_comp))) * exp(-((x - location.x)^2) / (2 * sigma_comp^2)), max(0, location.x - 0.03), min(1, location.x + 0.03))[1])
-        return K_total * quadgk(x -> quadgk(y -> exp(-((location.x-x)^2+(location.y-y)^2)/(2*sigma_comp^2)), max(0, location.y - sqrt(0.03^2-(x-location.x)^2)), min(1, location.y + sqrt(0.03^2-(x-location.x)^2)))[1], max(0, location.x-0.03), min(1, location.x+0.03))[1]
+        a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
+        b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
+        return (K_total+2500) * (-sqrt(pi / 2) * sigma_comp * quadgk(x -> (erf((a(x) - location.y) / (sqrt(2) * sigma_comp)) - erf((b(x) - location.y) / (sqrt(2) * sigma_comp))) * exp(-((x - location.x)^2) / (2 * sigma_comp^2)), max(0, location.x - 0.03), min(1, location.x + 0.03))[1])
     end
 
     return map(calc_ideal_density, locations_F)
@@ -400,7 +399,7 @@ function calculate_growth_rates(population,
     upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(NUM_DEMES, NUM_DEMES))
     neighbourhood = population[lower_left:upper_right]
 
-    ind_useResourceA_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
+    ind_useResourceA_all = vcat([[d.ind_useResourceA_F; d.ind_useResourceA_M] for d in neighbourhood]...)
     ind_useResourceB_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
     locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)
     locations_F = population[deme_index].locations_F
@@ -416,6 +415,7 @@ function calculate_growth_rates(population,
     function get_useResource_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
         use_resourceA_density = 0
         use_resourceB_density = 0
+
         squared_distances = get_squared_distances(locations_all, focal_location)
         for i in eachindex(locations_all)
             if squared_distances[i] <= 0.0009

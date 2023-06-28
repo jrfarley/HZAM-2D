@@ -10,7 +10,7 @@ using .Population
 
     locations_F = Location.(x_locations_F, y_locations_F)
 
-    K_total = 40342
+    K_total = 40233
 
     sigma_comp = 0.01
 
