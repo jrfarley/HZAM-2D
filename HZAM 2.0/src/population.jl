@@ -356,7 +356,7 @@ function calculate_ind_useResourceB(competition_traits, ecolDiff)
 
     return ind_useResourceB
 end
-
+#=
 # calculates the ideal density (assuming normal distribution) at the location of each female
 function get_ideal_densities(K_total, sigma_comp, locations_F)
     function linear_density(w)
@@ -366,7 +366,46 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
         a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
         b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
-        return (K_total+2500) * (-sqrt(pi / 2) * sigma_comp * quadgk(x -> (erf((a(x) - location.y) / (sqrt(2) * sigma_comp)) - erf((b(x) - location.y) / (sqrt(2) * sigma_comp))) * exp(-((x - location.x)^2) / (2 * sigma_comp^2)), max(0, location.x - 0.03), min(1, location.x + 0.03))[1])
+        return 1 + K_total * (-sqrt(pi / 2) * sigma_comp * quadgk(x -> (erf((a(x) - location.y) / (sqrt(2) * sigma_comp)) - erf((b(x) - location.y) / (sqrt(2) * sigma_comp))) * exp(-((x - location.x)^2) / (2 * sigma_comp^2)), max(0, location.x - 0.03), min(1, location.x + 0.03))[1])
+        #return 1.006 * K_total * quadgk(x -> quadgk(y -> exp(-((location.x-x)^2+(location.y-y)^2)/(2*sigma_comp^2)), max(0, location.y - sqrt(0.03^2-(x-location.x)^2)), min(1, location.y + sqrt(0.03^2-(x-location.x)^2)))[1], max(0, location.x-0.03), min(1, location.x+0.03))[1]
+        #return K_total * linear_density(location.x) * linear_density(location.y)
+    end
+
+    return map(calc_ideal_density, locations_F)
+end=#
+
+function max_radius(x, y, t)
+    if x > 0.97 && (t < pi / 2 || t > 3 * pi / 2)
+        max_x = min(0.03, sqrt(((1 - x) * tan(t))^2 + (1 - x)^2))
+    elseif x < 0.03 && (pi / 2 < t < 3 * pi / 2)
+        max_x = min(0.03, sqrt(((-x) * tan(t))^2 + (-x)^2))
+    else
+        max_x = 0.03
+    end
+
+    if y > 0.97 && t < pi
+        max_y = min(0.03, sqrt(((1 - y) * tan(pi / 2 - t))^2 + (1 - y)^2))
+    elseif y < 0.03 && t > pi
+        max_y = min(0.03, sqrt(((-y) * tan(pi / 2 - t))^2 + (-y)^2))
+    else
+        max_y = 0.03
+    end
+
+    return min(max_x, max_y)
+end
+
+
+# calculates the ideal density (assuming normal distribution) at the location of each female
+function get_ideal_densities(K_total, sigma_comp, locations_F)
+    function calc_ideal_density(location) # integral from 0 to 1 of K_total*exp(-(x-focal_location)^2/(2*sigma_comp^2)) with respect to x
+
+        if 0.03 < location.x < 0.97 && 0.03 < location.y <= 0.97
+            return 1 + K_total * 2 * pi * (1 - exp(-0.00045 / (sigma_comp^2))) * (sigma_comp^2)
+        else
+            a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
+            b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
+            return 1 + K_total * quadgk(t -> (sigma_comp^2) * (1 - exp(-(max_radius(location.x, location.y, t)^2 / (2 * sigma_comp^2)))), 0, 2 * pi)[1]
+        end
     end
 
     return map(calc_ideal_density, locations_F)
@@ -412,30 +451,34 @@ function calculate_growth_rates(population,
 
     # assume both resources have same constant density across range
 
-    function get_useResource_density_real(focal_location) # this function calculates local density according to a normal curve, weighted by individual resource use
-        use_resourceA_density = 0
-        use_resourceB_density = 0
-
+    function get_useResource_densities(focal_location)
         squared_distances = get_squared_distances(locations_all, focal_location)
-        for i in eachindex(locations_all)
-            if squared_distances[i] <= 0.0009
-                use_resourceA_density += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
-                use_resourceB_density += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
+        useResource_densities = [0.0, 0.0]
+        for i in eachindex(squared_distances)
+            if squared_distances[i] <= 0.03^2 && squared_distances[i] != 0
+                useResource_densities[1] += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
+                useResource_densities[2] += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
             end
         end
-        return use_resourceA_density, use_resourceB_density
+        return useResource_densities
     end
 
-    real_densities_at_locations_F = map(get_useResource_density_real, locations_F) # this applies the above function to each geographic location 
+    real_densities = get_useResource_densities.(locations_F)
 
-    function get_growth_rate(i)
-        local_growth_rate_resourceA = intrinsic_R * ideal_densities_at_locations_F_resourceA[i] / (ideal_densities_at_locations_F_resourceA[i] + (real_densities_at_locations_F[i][1] * (intrinsic_R - 1)))
-        local_growth_rate_resourceB = intrinsic_R * ideal_densities_at_locations_F_resourceB[i] / (ideal_densities_at_locations_F_resourceB[i] + (real_densities_at_locations_F[i][2] * (intrinsic_R - 1)))
+    real_densities_at_locations_F_resourceA = [d[1] for d in real_densities]
+    real_densities_at_locations_F_resourceB = [d[2] for d in real_densities]
 
-        return population[deme_index].ind_useResourceA_F[i] * local_growth_rate_resourceA + population[deme_index].ind_useResourceB_F[i] * local_growth_rate_resourceB
-    end
+    # calculate local growth rates due to each resource (according to discrete time logistic growth equation)
 
-    return map(get_growth_rate, eachindex(locations_F))
+    local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
+    local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
+
+    growth_rateA = population[deme_index].ind_useResourceA_F .* local_growth_rates_resourceA
+    growth_rateB = population[deme_index].ind_useResourceB_F .* local_growth_rates_resourceB
+
+    growth_rates = growth_rateA .+ growth_rateB
+
+    return growth_rates
 end
 
 
