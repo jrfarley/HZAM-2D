@@ -404,7 +404,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
         else
             a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
             b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
-            return 1 + K_total * quadgk(t -> (sigma_comp^2) * (1 - exp(-(max_radius(location.x, location.y, t)^2 / (2 * sigma_comp^2)))), 0, 2 * pi)[1]
+            return 1 + K_total * (sigma_comp^2) * (2*pi - quadgk(t -> exp(-(max_radius(location.x, location.y, t)^2 / (2 * sigma_comp^2))), 0, 2 * pi, rtol = 0.04)[1])
         end
     end
 
