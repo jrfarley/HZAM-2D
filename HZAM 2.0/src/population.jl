@@ -217,7 +217,7 @@ function assign_zone(location::Location)
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-function calculate_ind_useResourceA(competition_traits, ecolDiff)
+function calculate_ind_useResourceA(competition_traits, ecolDiff) 
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
 
     ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
@@ -295,12 +295,12 @@ function calculate_growth_rates(population,
     # demes that are further than 0.03 units away from all females in the current deme are unnecessary since the individuals there would have a negligible effect
     lower_left = max(deme_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
     upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(NUM_DEMES, NUM_DEMES))
-    neighbourhood = lower_left:upper_right
+    neighbourhood = population[lower_left:upper_right]
 
 
-    #=ind_useResourceA_all = vcat([[d.ind_useResourceA_F; d.ind_useResourceA_M] for d in neighbourhood]...)
+    ind_useResourceA_all = vcat([[d.ind_useResourceA_F; d.ind_useResourceA_M] for d in neighbourhood]...)
     ind_useResourceB_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
-    locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)=#
+    locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)
     locations_F = population[deme_index].locations_F
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
@@ -313,21 +313,12 @@ function calculate_growth_rates(population,
 
     # calculate the resource use density for each resource at a point
     function get_useResource_densities(focal_location)
+        squared_distances = get_squared_distances(locations_all, focal_location)
         useResource_densities = [0.0, 0.0]
-        for deme_index in neighbourhood
-            squared_distances = get_squared_distances(population[deme_index].locations_F, focal_location)
-            for i in eachindex(squared_distances)
-                if squared_distances[i] <= 0.03^2
-                    useResource_densities[1] += population[deme_index].ind_useResourceA_F[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
-                    useResource_densities[2] += population[deme_index].ind_useResourceB_F[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
-                end
-            end
-            squared_distances = get_squared_distances(population[deme_index].locations_M, focal_location)
-            for i in eachindex(squared_distances)
-                if squared_distances[i] <= 0.03^2
-                    useResource_densities[1] += population[deme_index].ind_useResourceA_M[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
-                    useResource_densities[2] += population[deme_index].ind_useResourceB_M[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
-                end
+        for i in eachindex(squared_distances)
+            if squared_distances[i] <= 0.03^2
+                useResource_densities[1] += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
+                useResource_densities[2] += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
             end
         end
         return useResource_densities
