@@ -17,13 +17,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
     geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(0.999f0, 0.999f0)],
-    starting_range_pop0=[Location(0.0f0, 0.0f0), Location(0.48f0, 1.0f0)], starting_range_pop1=[Location(0.52f0, 0.0f0), Location(1.0f0, 1.0f0)],
     sigma_disp=0.01, sigma_comp=0.01,
-    do_plot=true, plot_int=10, optimize=true)
+    do_plot=true, plot_int=10)
 
-    functional_loci_range = setdiff(collect(1:total_loci), collect(neutral_loci))
-
-    pop = []
+    functional_loci_range = setdiff(collect(1:total_loci), collect(neutral_loci)) # list of loci responsible for mating trait, competition trait, and hybrid survival
 
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -57,40 +54,36 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     extinction = false  # if extinction happens later this will be set true
 
     if do_plot
-        plot_population(pd, functional_loci_range)
+        plot_population(pd, functional_loci_range) # displays plot of individual locations and genotypes
     end
 
 
     # loop throught the generations
     for generation in 1:max_generations
+
+        # sets up empty matrices to store the offspring genotypes, locations, and mitochondria
         genotypes_daughters_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_DEMES, NUM_DEMES)
         genotypes_sons_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_DEMES, NUM_DEMES)
         locations_daughters_all = Matrix{Vector{Location}}(undef, NUM_DEMES, NUM_DEMES)
         locations_sons_all = Matrix{Vector{Location}}(undef, NUM_DEMES, NUM_DEMES)
         mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, NUM_DEMES, NUM_DEMES)
         mitochondria_sons_all = Matrix{Vector{Int8}}(undef, NUM_DEMES, NUM_DEMES)
-        new_active_demes = CartesianIndex[]
 
+        # fills all the matrices with empty vectors
         for i in 1:NUM_DEMES
             for j in 1:NUM_DEMES
-                genotypes_daughters_all[i, j] = []
-                genotypes_sons_all[i, j] = []
-                locations_daughters_all[i, j] = []
-                locations_sons_all[i, j] = []
-                mitochondria_daughters_all[i, j] = []
-                mitochondria_sons_all[i, j] = []
+                genotypes_daughters_all[i, j] = Matrix{Int8}[]
+                genotypes_sons_all[i, j] = Matrix{Int8}[]
+                locations_daughters_all[i, j] = Location[]
+                locations_sons_all[i, j] = Location[]
+                mitochondria_daughters_all[i, j] = Int8[]
+                mitochondria_sons_all[i, j] = Int8[]
             end
         end
 
-        if false
-            active_demes = pd.active_demes
-        else
-            active_demes = eachindex(IndexCartesian(), pd.population)
-        end
-
-        for zone_index in active_demes
+        for deme_index in eachindex(IndexCartesian(), pd.population)
             # Prepare for mating and reproduction
-            N_F = length(pd.population[zone_index].locations_F)
+            N_F = length(pd.population[deme_index].locations_F)
             father_deme = missing
 
             # loop through mothers, mating and reproducing
@@ -99,51 +92,64 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                 mate = false # becomes true when female is paired with male
                 rejects = 0 # will track number of rejected males (in cases there is cost--which there isn't in main HZAM-Sym paper)
                 father = [] # will contain the index of the male mate
-                # make vector of indices of eligible males
-                elig_M = Dict{CartesianIndex, Vector{Int64}}()
 
-                unused_deme_indices = eachindex(IndexCartesian(), pd.population)
 
-                neighbourhood_size = 0
+                # make dict where the keys are the deme indices and the values are vectors of indices of eligible males
+                elig_M = Dict{CartesianIndex,Vector{Int64}}()
 
-                while mate==false && neighbourhood_size < 5
-                    lower_left = max(zone_index - CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(1, 1))
-                    upper_right = min(zone_index + CartesianIndex(neighbourhood_size, neighbourhood_size), CartesianIndex(NUM_DEMES, NUM_DEMES))
-                    neighbourhood = filter(e -> e ∈ unused_deme_indices, lower_left:upper_right) # remove used demes
+                for i in eachindex(IndexCartesian(), pd.population)
+                    elig_M[i] = 1:length(pd.population[i].locations_M)
+                end
 
-                    for i in neighbourhood
-                        elig_M[i] = 1:length(pd.population[i].locations_M)
-                    end
+                neighbourhood_size = 0.01f0 # how far away the simulation is checking for eligible mates (0 means only the current deme)
 
-                    if sum(map(length, values(elig_M)))==0
-                        neighbourhood_size+=1
+
+                while mate == false && neighbourhood_size < 0.5
+
+                    # finds the coordinates for the deme that's the neighbourhood size away towards the bottom left
+                    lower_left = max(assign_zone(Location(pd.population[deme_index].locations_F[mother].x - neighbourhood_size,
+                            pd.population[deme_index].locations_F[mother].y - neighbourhood_size)),
+                        CartesianIndex(1, 1))
+
+
+                    # finds the coordinates for the deme that's the neighbourhood size away towards the top right
+                    upper_right = min(assign_zone(Location(pd.population[deme_index].locations_F[mother].x + neighbourhood_size,
+                            pd.population[deme_index].locations_F[mother].y + neighbourhood_size)),
+                        CartesianIndex(NUM_DEMES, NUM_DEMES))
+
+                    neighbourhood = filter(e -> length(elig_M[e]) > 0, lower_left:upper_right) # remove demes with no eligible males left
+
+                    if sum(map(length, values(elig_M))) == 0 # if there are no eligible males remaining increase the neighbourhood size by 0.01 to look for males slightly further away
+                        neighbourhood_size += 0.01f0
                         continue
                     end
 
-                    unused_deme_indices = filter(e -> e ∉ neighbourhood, unused_deme_indices) # remove used demes from list
-
                     # determine male mate of female
                     while mate == false
-                        # present female with random male (sympatric case) or closest male (spatial case), and remove him from list:
-                        focal_male, elig_M, male_deme = choose_closest_male(pd.population, neighbourhood, elig_M, pd.population[zone_index].locations_F[mother])
-                        # compare male trait with female's trait (preference), and determine
-                        # whether she accepts; note that match_strength is determined by a
-                        # Gaussian, with a maximum of 1 and minimum of zero.
-                        match_strength = calc_match_strength(pd.population[zone_index].genotypes_F[mother], pd.population[male_deme].genotypes_M[focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-                        if rand() < match_strength
-                            # she accepts male, and mates
-                            father = focal_male
-                            father_deme = male_deme
-                            mate = true
-                        else
-                            # she rejects male
-                            rejects += 1
-                            if sum(map(length, values(elig_M)))==0
-                                break
+                        # present female with closest male, and remove him from list:
+                        focal_male, elig_M, male_deme = choose_closest_male(pd.population, neighbourhood, elig_M, pd.population[deme_index].locations_F[mother], neighbourhood_size)
+                        if focal_male ≠ -1 # check if choose_closest_male returned a valid male index
+                            # compare male trait with female's trait (preference), and determine
+                            # whether she accepts; note that match_strength is determined by a
+                            # Gaussian, with a maximum of 1 and minimum of zero.
+                            match_strength = calc_match_strength(pd.population[deme_index].genotypes_F[mother], pd.population[male_deme].genotypes_M[focal_male], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+                            if rand() < match_strength
+                                # she accepts male, and mates
+                                father = focal_male
+                                father_deme = male_deme
+                                mate = true
+                            else
+                                # she rejects male
+                                rejects += 1
+                                if sum(map(length, values(elig_M))) == 0
+                                    break
+                                end
                             end
+                        else
+                            break # exit the loop since there are no eligible males left within the neighbourhood size distance
                         end
                     end
-                    neighbourhood_size += 1
+                    neighbourhood_size += 0.01f0 # increase the neighbourhood size to look for males slightly further away
                 end
 
                 # now draw the number of offspring from a poisson distribution with a mean of reproductive_fitness
@@ -152,79 +158,62 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     search_fitness = (1 - per_reject_cost)^rejects    # (in most of HZAM-Sym paper, per_reject_cost = 0)
 
                     #combine for total fitness:   
-                    reproductive_fitness = 2 * pd.growth_rates_F[zone_index][mother] * search_fitness  # the 2 is because only females, not males, produce offspring
+                    reproductive_fitness = 2 * pd.growth_rates_F[deme_index][mother] * search_fitness  # the 2 is because only females, not males, produce offspring
 
                     offspring = rand(Poisson(reproductive_fitness))
 
                     # if offspring, generate their genotypes and sexes
                     if offspring >= 1
                         for kid in 1:offspring
-                            kid_genotype = generate_offspring_genotype(pd.population[zone_index].genotypes_F[mother], pd.population[father_deme].genotypes_M[father])
-                            kid_mitochondria = pd.population[zone_index].mitochondria_F[mother]
-                            survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)#######
+                            kid_genotype = generate_offspring_genotype(pd.population[deme_index].genotypes_F[mother], pd.population[father_deme].genotypes_M[father])
+                            kid_mitochondria = pd.population[deme_index].mitochondria_F[mother]
+                            survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)
 
                             if survival_fitness > rand()
-                                # determine sex and location of kid
+                                new_location = Location(pd.population[deme_index].locations_F[mother], sigma_disp, geographic_limits) # generates offspring location based on dispersal distance, range, and location of mother
 
-                                #genotype_average = sum(kid_genotype) / (2 * total_loci)
-                                #hybrid = genotype_average != kid_mitochondria
+                                deme = assign_zone(new_location) # determines which deme the offspring dispersed into
 
-                                new_location = Location(pd.population[zone_index].locations_F[mother], sigma_disp, geographic_limits)
-
-                                zone = assign_zone(new_location)
-
+                                # add offspring data to the variables that track what the next generation's population will be
                                 if rand() > 0.5 # kid is daughter
-                                    push!(genotypes_daughters_all[zone], kid_genotype)
-                                    push!(mitochondria_daughters_all[zone], kid_mitochondria)
-                                    push!(locations_daughters_all[zone], new_location)
+                                    push!(genotypes_daughters_all[deme], kid_genotype)
+                                    push!(mitochondria_daughters_all[deme], kid_mitochondria)
+                                    push!(locations_daughters_all[deme], new_location)
                                 else # kid is son
-                                    push!(genotypes_sons_all[zone], kid_genotype)
-                                    push!(mitochondria_sons_all[zone], kid_mitochondria)
-                                    push!(locations_sons_all[zone], new_location)
+                                    push!(genotypes_sons_all[deme], kid_genotype)
+                                    push!(mitochondria_sons_all[deme], kid_mitochondria)
+                                    push!(locations_sons_all[deme], new_location)
                                 end
                             end
                         end
                     end
-                end # of loop through mothers
-            end # of loop through the rows of zones
-        end # of loop through the columns of zones
-
-        #= check if either no daughters or no sons, and end the simulation if so
-        if (size(genotypes_daughters, 3) == 0) || (size(genotypes_sons, 3) == 0)
-            extinction = true # record an extinction of whole population (both "species")
-            break # break out of current loop (this simulation) 
-        end=#
+                end
+            end # of loop through mothers
+        end # of loop through the demes
 
         # assign surviving offspring to new adult population
-        pd = update_population(pd,
-            genotypes_daughters_all,
+        pd = PopulationData(genotypes_daughters_all,
             genotypes_sons_all,
             mitochondria_daughters_all,
             mitochondria_sons_all,
             locations_daughters_all,
             locations_sons_all,
-            new_active_demes,
             competition_trait_loci,
             K_total,
             sigma_comp,
             intrinsic_R,
-            ecolDiff,
-            false)
+            ecolDiff)
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
             update_plot(pd, generation, functional_loci_range)
         end
 
-        push!(pop, sum([length(d.locations_F) for d in pd.population]) + sum([length(d.locations_M) for d in pd.population]))
-
     end # of loop through generations
 
     genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)
     functional_HI_all_inds = calc_traits_additive(genotypes, functional_loci_range)
     HI_NL_all_inds = calc_traits_additive(genotypes, neutral_loci)
-
-    println(string("average_pop: ", sum(pop) / length(pop)))
 
     return extinction, functional_HI_all_inds, HI_NL_all_inds
 end
