@@ -150,7 +150,7 @@ struct PopulationData
         demes = Deme.(Ref(num_individuals_per_deme),
             Ref(total_loci),
             deme_locations,
-            Ref(0.1f0),
+            Ref(Float32(1/NUM_DEMES)),
             deme_populations,
             Ref(ecolDiff))
 
@@ -374,24 +374,24 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
     return map(calc_ideal_density, locations_F)
 end=#
 
-function max_radius(x, y, t)
-    if x > 0.97 && (t < pi / 2 || t > 3 * pi / 2)
-        max_x = min(0.03, sqrt(((1 - x) * tan(t))^2 + (1 - x)^2))
-    elseif x < 0.03 && (pi / 2 < t < 3 * pi / 2)
-        max_x = min(0.03, sqrt(((-x) * tan(t))^2 + (-x)^2))
-    else
-        max_x = 0.03
-    end
-
+function max_radius_squared(x, y, t)
     if y > 0.97 && t < pi
-        max_y = min(0.03, sqrt(((1 - y) * tan(pi / 2 - t))^2 + (1 - y)^2))
+        y_dist = ((1 - y) / sin(t))^2
     elseif y < 0.03 && t > pi
-        max_y = min(0.03, sqrt(((-y) * tan(pi / 2 - t))^2 + (-y)^2))
+        y_dist = (y / sin(t))^2
     else
-        max_y = 0.03
+        y_dist = 0.0009
     end
 
-    return min(max_x, max_y)
+    if x > 0.97 && (t < pi / 2 || t > 3 * pi / 2)
+        x_dist = ((1 - x) / cos(t))^2
+    elseif x < 0.03 && (pi / 2 < t < 3 * pi / 2)
+        x_dist = (x / cos(pi - t))^2
+    else
+        x_dist = 0.0009
+    end
+    
+    return min(x_dist, y_dist)
 end
 
 
@@ -404,7 +404,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
         else
             a(x) = max(location.y - sqrt(0.03^2 - (x - location.x)^2), 0)
             b(x) = min(location.y + sqrt(0.03^2 - (x - location.x)^2), 1)
-            return 1 + K_total * (sigma_comp^2) * (2*pi - quadgk(t -> exp(-(max_radius(location.x, location.y, t)^2 / (2 * sigma_comp^2))), 0, 2 * pi, rtol = 0.04)[1])
+            return 1 + K_total * (sigma_comp^2) * (2*pi - quadgk(t -> exp(-(max_radius_squared(location.x, location.y, t) / (2 * sigma_comp^2))), 0, 2 * pi, rtol = 0.04)[1])
         end
     end
 
