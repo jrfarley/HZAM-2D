@@ -455,7 +455,7 @@ function calculate_growth_rates(population,
         squared_distances = get_squared_distances(locations_all, focal_location)
         useResource_densities = [0.0, 0.0]
         for i in eachindex(squared_distances)
-            if squared_distances[i] <= 0.03^2 && squared_distances[i] != 0
+            if squared_distances[i] <= 0.03^2
                 useResource_densities[1] += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
                 useResource_densities[2] += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
             end

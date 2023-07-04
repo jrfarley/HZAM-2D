@@ -12,5 +12,5 @@ println(K)
 
 run_one_HZAM_sim(0.9, 10, 0, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=K, max_generations=10000,
+    K_total=K, max_generations=100,
     sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=1)
