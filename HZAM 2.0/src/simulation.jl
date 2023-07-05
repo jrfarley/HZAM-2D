@@ -14,14 +14,15 @@ using LsqFit
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
     K_total::Int=1000, max_generations::Int=1000,
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
-    competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6,
+    competition_trait_loci=1:3, hybrid_survival_loci=1:3,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
     geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(0.999f0, 0.999f0)],
     sigma_disp=0.01, sigma_comp=0.01,
     do_plot=true, plot_int=10)
 
-    functional_loci_range = setdiff(collect(1:total_loci), collect(neutral_loci)) # list of loci responsible for mating trait, competition trait, and hybrid survival
+    functional_loci_range = union(female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)# list of loci responsible for mating trait, competition trait, and hybrid survival
 
+    #functional_loci_range = collect(1:total_loci)
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
         get_survival_fitness = get_survival_fitness_epistasis
@@ -127,7 +128,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     # determine male mate of female
                     while mate == false
                         # present female with closest male, and remove him from list:
-                        focal_male, elig_M, male_deme = choose_closest_male(pd.population, neighbourhood, elig_M, pd.population[deme_index].locations_F[mother], neighbourhood_size)
+                        focal_male, male_deme = choose_closest_male(pd.population, neighbourhood, elig_M, pd.population[deme_index].locations_F[mother], neighbourhood_size)
                         if focal_male ≠ -1 # check if choose_closest_male returned a valid male index
                             # compare male trait with female's trait (preference), and determine
                             # whether she accepts; note that match_strength is determined by a
@@ -144,6 +145,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                                 if sum(map(length, values(elig_M))) == 0
                                     break
                                 end
+                                deleteat!(elig_M[male_deme], focal_male) # remove rejected male from list of eligible males
                             end
                         else
                             break # exit the loop since there are no eligible males left within the neighbourhood size distance
@@ -174,6 +176,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
                                 deme = assign_zone(new_location) # determines which deme the offspring dispersed into
 
+                                #if deme in CartesianIndices((1:NUM_DEMES, 1:NUM_DEMES))
                                 # add offspring data to the variables that track what the next generation's population will be
                                 if rand() > 0.5 # kid is daughter
                                     push!(genotypes_daughters_all[deme], kid_genotype)
@@ -184,6 +187,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                                     push!(mitochondria_sons_all[deme], kid_mitochondria)
                                     push!(locations_sons_all[deme], new_location)
                                 end
+                            #end
                             end
                         end
                     end
@@ -210,6 +214,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         end
 
     end # of loop through generations
+
+    neutral_loci = setdiff(collect(1:total_loci), functional_loci_range)
 
     genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)
     functional_HI_all_inds = calc_traits_additive(genotypes, functional_loci_range)

@@ -264,6 +264,7 @@ function get_ideal_densities(K_total, sigma_comp, locations_F)
             return 1 + K_total * (sigma_comp^2) * (2 * pi - quadgk(t -> exp(-(max_radius_squared(location.x, location.y, t) / (2 * sigma_comp^2))), 0, 2 * pi, rtol=0.04)[1])
         end
     end
+    #return 1 + K_total * 2 * pi * (1 - exp(-0.00045 / (sigma_comp^2))) * (sigma_comp^2)
 
     return map(calc_ideal_density, locations_F)
 end
@@ -365,33 +366,28 @@ end
 function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
     shortest_distance = neighbourhood_size # males further than this distance are ignored
     output_male = -1
-    output_elig_M = elig_M
     output_deme = -1
     for deme_index in deme_indices # loop through the demes that are nearby
         if length(elig_M[deme_index]) == 0 # checks if there are any remaining males that have not been passed over already
             continue
         end
-
-        male_index, elig_M_in_deme = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother) # finds the closest male in that deme to the female
+        
+        male_index = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother) # finds the closest male in that deme to the female
         male_distance = distance(demes[deme_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
         if male_distance < shortest_distance # checks if the distance is smaller than the previous closest distance
             output_male = male_index
             output_deme = deme_index
-            output_elig_M = copy(elig_M)
-            output_elig_M[deme_index] = elig_M_in_deme # removes the current male from the list of eligible males
             shortest_distance = male_distance
         end
         # keeps track of the index and remaining eligible males if the male is within the cutoff distance
     end
 
-    return output_male, output_elig_M, output_deme
+    return output_male, output_deme
 end
 
 # Finds the closest male given a list of eligible males
 function choose_closest_male(elig_M::Vector{Int64}, locations_M, location_mother::Location)
-    focal_male = splice!(elig_M, argmin(get_squared_distances(locations_M[elig_M], location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
-
-    return focal_male, elig_M
+    return argmin(get_squared_distances(locations_M[elig_M], location_mother)) # this gets the index of a closest male, and removes that male from the list in elig_M
 end
 
 # compare male trait with female's trait (preference), and determine
