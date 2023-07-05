@@ -6,7 +6,7 @@ include("src/simulation.jl")
 
 # If there are fewer than a few thousand individuals the population will go extinct
 
-K = 5000
+K = 10000
 
 println(K)
 
