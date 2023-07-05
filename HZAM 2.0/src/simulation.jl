@@ -104,7 +104,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                 neighbourhood_size = 0.01f0 # how far away the simulation is checking for eligible mates (0 means only the current deme)
 
 
-                while mate == false && neighbourhood_size < 0.5
+                while mate == false && neighbourhood_size < 0.1
 
                     # finds the coordinates for the deme that's the neighbourhood size away towards the bottom left
                     lower_left = max(assign_zone(Location(pd.population[deme_index].locations_F[mother].x - neighbourhood_size,

@@ -364,9 +364,6 @@ end
 # Finds the closest male given a list of eligible males
 function choose_closest_male(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
     focal_male = splice!(elig_M, argmin(get_squared_distances(locations_M[elig_M], location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
-    if (distance(location_mother, locations_M[focal_male]) >= 0.1)
-        return focal_male, []
-    end
     return focal_male, elig_M
 end
 
