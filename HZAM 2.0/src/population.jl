@@ -363,38 +363,33 @@ end
 
 # finds the closest male and updates list of eligible males
 function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
-    elig_M_per_deme = Dict{CartesianIndex,Vector{Int64}}() # initializes empty dict to store a list of remaining eligible males in each deme
-    males = Dict{CartesianIndex,Int64}() # initializes empty dict to store the closest male in each deme
+    shortest_distance = neighbourhood_size # males further than this distance are ignored
+    output_male = -1
+    output_elig_M = elig_M
+    output_deme = -1
     for deme_index in deme_indices # loop through the demes that are nearby
-        if length(elig_M[deme_index]) > 0 # checks if there are any remaining males that have not been passed over already
-            males[deme_index], elig_M_per_deme[deme_index] = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother, neighbourhood_size) # finds the closest male in that deme to the female
-            # keeps track of the index and remaining eligible males if the male is within the cutoff distance
+        if length(elig_M[deme_index]) == 0 # checks if there are any remaining males that have not been passed over already
+            continue
         end
+
+        male_index, elig_M_in_deme = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother) # finds the closest male in that deme to the female
+        male_distance = distance(demes[deme_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
+        if male_distance < shortest_distance # checks if the distance is smaller than the previous closest distance
+            output_male = male_index
+            output_deme = deme_index
+            output_elig_M = copy(elig_M)
+            output_elig_M[deme_index] = elig_M_in_deme # removes the current male from the list of eligible males
+            shortest_distance = male_distance
+        end
+        # keeps track of the index and remaining eligible males if the male is within the cutoff distance
     end
 
-    # filter closest males to only keep the ones that are within the cutoff distance
-    males = filter(((k, v),) -> v ≠ -1, males)
-
-    if length(males) > 0 # checks that there are males within the cutoff distance
-        # get the deme with the closest male
-        index = reduce((x, y) -> distance(demes[x].locations_M[males[x]], location_mother) ≤ distance(demes[y].locations_M[males[y]], location_mother) ? x : y, keys(males))
-
-        # update the list of eligible males from that deme to remove the closest since it has already been chosen
-        elig_M[index] = elig_M_per_deme[index]
-
-        return males[index], elig_M, index # returns the index of the closest male, the remaining eligible males, and the index of the deme that the male was found in
-    else # if there are no males within the cutoff distance returns -1
-        return -1, elig_M, -1
-    end
+    return output_male, output_elig_M, output_deme
 end
 
 # Finds the closest male given a list of eligible males
-function choose_closest_male(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location, neighbourhood_size)
+function choose_closest_male(elig_M::Vector{Int64}, locations_M, location_mother::Location)
     focal_male = splice!(elig_M, argmin(get_squared_distances(locations_M[elig_M], location_mother))) # this gets the index of a closest male, and removes that male from the list in elig_M
-
-    if distance(locations_M[focal_male], location_mother) > neighbourhood_size # if closest male is beyond cutoff return -1
-        return -1, []
-    end
 
     return focal_male, elig_M
 end
