@@ -16,7 +16,7 @@ using QuadGK
 
     sigma_comp = 0.01
 
-    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F)
+    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F) .- Ref(1)
 
     max_density = 1000 * quadgk(x -> exp(-(x - 0.5)^2 / (2 * sigma_comp^2)), 0.47, 0.53)[1]
 

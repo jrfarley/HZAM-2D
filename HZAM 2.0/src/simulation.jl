@@ -120,7 +120,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
                     neighbourhood = filter(e -> length(elig_M[e]) > 0, lower_left:upper_right) # remove demes with no eligible males left
 
-                    if sum(map(length, values(elig_M))) == 0 # if there are no eligible males remaining increase the neighbourhood size by 0.01 to look for males slightly further away
+                    if length(neighbourhood) == 0 # if there are no eligible males remaining increase the neighbourhood size by 0.01 to look for males slightly further away
                         neighbourhood_size += 0.01f0
                         continue
                     end
@@ -142,10 +142,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             else
                                 # she rejects male
                                 rejects += 1
+                                deleteat!(elig_M[male_deme], findall(x->x==focal_male, elig_M[male_deme])) # remove rejected male from list of eligible males
                                 if sum(map(length, values(elig_M))) == 0
                                     break
                                 end
-                                deleteat!(elig_M[male_deme], focal_male) # remove rejected male from list of eligible males
                             end
                         else
                             break # exit the loop since there are no eligible males left within the neighbourhood size distance
@@ -228,7 +228,7 @@ end
 function get_survival_fitness_hetdisadvantage(genotype::Array{Int8,2}, w_hyb::Real)::Vector{Float32}
     num_loci = size(genotype, 2)
     s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
-    num_hetloci = sum(genotype[1, :] .!= genotype[2, :])
+    num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
 
     hetdisadvantage_fitness = (1 - s_per_locus)^num_hetloci
     return hetdisadvantage_fitness
