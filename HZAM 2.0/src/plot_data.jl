@@ -18,6 +18,7 @@ global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25), 
 
 global ax, points, points_active, points_inactive, mitochondria_points
 global sigmoid_lines = []
+global hybrid_zone_widths = []
 
 # creates the initial plot at the beginning of the simulation
 function create_new_plot(hybrid_indices, mitochondria, locations)
@@ -75,6 +76,14 @@ function update_population_plot(hybrid_indices, mitochondria, locations, generat
     println("generation: ", generation, "; individuals: ", length(locations))
     println("hybrid zone width: ", sum(hybrid_zone_widths)/10)
     println("hybrid zone length: ", calc_length(sigmoid_curves, spaced_locations))
+    if generation > 20
+        push!(hybrid_zone_widths, sum(hybrid_zone_widths)/10)
+    end
+    if generation==200
+        println("#########################################")
+        println(sum(hybrid_zone_widths)/length(hybrid_zone_widths))
+        println("########################################")
+    end
 end   
 
 

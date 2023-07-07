@@ -6,11 +6,11 @@ include("src/simulation.jl")
 
 # If there are fewer than a few thousand individuals the population will go extinct
 
-K = 10000
+K = 40000
 
 println(K)
 
 run_one_HZAM_sim(0.9, 1, 0, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=K, max_generations=10000,
+    K_total=K, max_generations=201,
     sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=10, total_loci = 6)
