@@ -1,7 +1,5 @@
 #=import Pkg
 Pkg.activate("./HZAM")
-import HZAM
-HZAM.demo()
 =#
 
 module HZAM
