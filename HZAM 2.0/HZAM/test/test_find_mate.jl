@@ -1,9 +1,4 @@
-using Test
-using BenchmarkTools
 using Random
-include("../src/population.jl")
-
-using .Population
 
 @testset "choose_closest_male_no_demes" begin
     elig_M = collect(1:1001)
@@ -13,7 +8,7 @@ using .Population
     male_loc = Location(0.5f0, 0.5f0)
     locations_M = shuffle(push!(locations_M, male_loc))
 
-    closest_male = choose_closest_male(elig_M, locations_M, location_mother)
+    closest_male = Mating.choose_closest_male_from_deme(elig_M, locations_M, location_mother)
 
     @test locations_M[closest_male] == male_loc
 
@@ -22,7 +17,7 @@ using .Population
         locations_M = Location.(Float32.(rand(1000) .* Ref(0.4)), Float32.(rand(1000) .* Ref(0.4) .+ Ref(0.55)))
         locations_M = shuffle(push!(locations_M, male_loc))
 
-        closest_male = choose_closest_male(elig_M, locations_M, location_mother)
+        closest_male = Mating.choose_closest_male_from_deme(elig_M, locations_M, location_mother)
 
         @test locations_M[closest_male] == male_loc
     end
@@ -98,4 +93,29 @@ end
         @test demes[deme_index].locations_M[closest_male] == location_mother
         @test deme_index == CartesianIndex(i, i)
     end
+end
+
+
+
+@testset "generate_offspring_genotype" begin
+    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
+
+    @test generate_offspring_genotype(genotypes[1], genotypes[2]) == [0 0 0; 1 1 1]
+    @test generate_offspring_genotype(genotypes[1], genotypes[1]) == [0 0 0; 0 0 0]
+end
+
+
+@testset "calc_match_strength" begin
+    female_mating_trait_loci = 2:2
+    male_mating_trait_loci = 3:3
+    pref_SD = sqrt(-1 / (2 * log(1 / (1 + 10^(-15)))))
+
+    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
+
+    match_strength1 = calc_match_strength(genotypes[1], genotypes[1], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+    match_strength2 = calc_match_strength(genotypes[2], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+    match_strength3 = calc_match_strength(genotypes[1], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+
+    @test match_strength1 == match_strength2
+    @test match_strength1 > match_strength3
 end

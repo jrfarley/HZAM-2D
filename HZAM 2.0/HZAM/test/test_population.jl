@@ -1,8 +1,3 @@
-using Test
-include("../src/population.jl")
-
-using .Population
-#=
 @testset "initialize_population_1" begin
     n = Population.NUM_DEMES
     K_total = 2 * (n^2)
@@ -45,7 +40,7 @@ using .Population
     [@test pd.population[i].genotypes_M[1]==[0 0 0; 0 0 0] && i[1]<=5 ||pd.population[i].genotypes_M[1]==[1 1 1; 1 1 1] && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
 
     [@test length(pd.growth_rates_F[i])==1 for i in eachindex(IndexCartesian(), pd.population)]
-end=#
+end
 
 @testset "calc_traits_additive" begin
     genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
@@ -81,29 +76,6 @@ end
     @test average_x > 0.495 && average_x < 0.505
     @test average_y > 0.495 && average_y < 0.505
 
-end
-
-@testset "generate_offspring_genotype" begin
-    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
-
-    @test Population.generate_offspring_genotype(genotypes[1], genotypes[2]) == [0 0 0; 1 1 1]
-    @test Population.generate_offspring_genotype(genotypes[1], genotypes[1]) == [0 0 0; 0 0 0]
-end
-
-
-@testset "calc_match_strength" begin
-    female_mating_trait_loci = 2:2
-    male_mating_trait_loci = 3:3
-    pref_SD = sqrt(-1 / (2 * log(1 / (1 + 10^(-15)))))
-
-    genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
-
-    match_strength1 = calc_match_strength(genotypes[1], genotypes[1], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    match_strength2 = calc_match_strength(genotypes[2], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    match_strength3 = calc_match_strength(genotypes[1], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-
-    @test match_strength1 == match_strength2
-    @test match_strength1 > match_strength3
 end
 
 @testset "mean" begin

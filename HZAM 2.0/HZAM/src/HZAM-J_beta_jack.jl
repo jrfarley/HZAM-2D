@@ -3,6 +3,10 @@ using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 using Plots
+using Statistics: mean  # needed for "mean" function
+using JLD2 # needed for saving / loading data in Julia format
+using CSV # for saving in csv format
+using DataFrames # for converting data to save as csv
 
 include("simulation.jl")
 
@@ -10,8 +14,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
     K_total::Int=1000, max_generations::Int=1000,
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3, neutral_loci=4:6, total_functional_loci=1:3, num_neutral_loci=3,
-    survival_fitness_method::String="epistasis", per_reject_cost=0,
-    starting_pop_ratio=1.0, optimize=true)
+    survival_fitness_method::String="epistasis", per_reject_cost=0, optimize=true)
     # ecolDiff should be from 0 to 1 (parameter "E" in the paper)
     # intrinsic_R is called "R" in the paper
     # replications should be somehting like "1:10" or just "1" for 1 replicate, or something like "2:5" to add replicates after 1 is done

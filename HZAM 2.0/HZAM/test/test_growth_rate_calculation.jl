@@ -1,11 +1,6 @@
-using Test
-include("../src/population.jl")
-
-using .Population
 using QuadGK
 
-
-@testset "get_ideal_densities" begin
+@testset "compare_ideal_densities_to_1D" begin
     x_locations_F = [0.0f0, 0.3f0, 0.7f0, 0.8f0, 1.0f0]
 
     y_locations_F = fill(0.5f0, 5)
@@ -16,7 +11,7 @@ using QuadGK
 
     sigma_comp = 0.01
 
-    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F) .- Ref(1)
+    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
 
     max_density = 1000 * quadgk(x -> exp(-(x - 0.5)^2 / (2 * sigma_comp^2)), 0.47, 0.53)[1]
 
@@ -29,6 +24,35 @@ using QuadGK
     @test abs(ideal_densities[4] - max_density) < 0.001
 
     @test abs(ideal_densities[5] - max_density / 2) < 0.001
+end
+
+
+@testset "ideal_density_approximation" begin
+    x_locations_F = [0.0f0, 0.3f0, 0.7f0, 0.8f0, 1.0f0]
+
+    y_locations_F = fill(0.5f0, 5)
+
+    locations_F = Location.(x_locations_F, y_locations_F)
+
+    K_total = 10000
+
+    sigma_comp = 0.01
+
+    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
+
+    max_density = K_total * quadgk(t->quadgk(r->r*exp(-(r^2)/(2*sigma_comp^2)), 0, 0.03)[1], 0, 2*pi)[1]
+
+    @test ideal_densities[1] ≈ max_density / 2
+
+    @test ideal_densities[2] ≈ max_density
+
+    @test ideal_densities[3] ≈ max_density
+
+    @test ideal_densities[4] ≈ max_density
+
+    @test ideal_densities[5] ≈ max_density / 2
+
+    @test Population.get_ideal_densities(K_total, sigma_comp, [Location(0f0, 0f0)], 0.03)[1] - 1 ≈ max_density / 4
 end
 
 @testset "calculate_ind_useResource_no_ecolDiff" begin

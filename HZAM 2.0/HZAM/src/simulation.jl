@@ -1,14 +1,4 @@
-include("population.jl")
-
-using .Population
-
-using Distributions # needed for "Poisson" function
-using Statistics  # needed for "mean" function
-using JLD2 # needed for saving / loading data in Julia format
-using CSV # for saving in csv format
-using DataFrames # for converting data to save as csv
-using LsqFit
-
+using Distributions: Poisson # needed for "Poisson" functiona
 
 # This is the function to run a single HZAM simulation
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
@@ -21,7 +11,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     do_plot=true, plot_int=10)
 
     functional_loci_range = union(female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)# list of loci responsible for mating trait, competition trait, and hybrid survival
-
+    
     #functional_loci_range = collect(1:total_loci)
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -55,7 +45,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     extinction = false  # if extinction happens later this will be set true
 
     if do_plot
-        plot_population(pd, functional_loci_range) # displays plot of individual locations and genotypes
+        plot_population(pd, functional_loci_range, total_loci) # displays plot of individual locations and genotypes
     end
 
 
@@ -102,7 +92,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     elig_M[i] = 1:length(pd.population[i].locations_M)
                 end
 
-                neighbourhood_size = 0.01f0 # how far away the simulation is checking for eligible mates (0 means only the current deme)
+                neighbourhood_size = 0.02f0 # how far away the simulation is checking for eligible mates (0 means only the current deme)
 
 
                 while mate == false && neighbourhood_size < 0.1
@@ -121,7 +111,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                     neighbourhood = filter(e -> length(elig_M[e]) > 0, lower_left:upper_right) # remove demes with no eligible males left
 
                     if length(neighbourhood) == 0 # if there are no eligible males remaining increase the neighbourhood size by 0.01 to look for males slightly further away
-                        neighbourhood_size += 0.01f0
+                        neighbourhood_size += 0.04f0
                         continue
                     end
 
@@ -169,7 +159,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         for kid in 1:offspring
                             kid_genotype = generate_offspring_genotype(pd.population[deme_index].genotypes_F[mother], pd.population[father_deme].genotypes_M[father])
                             kid_mitochondria = pd.population[deme_index].mitochondria_F[mother]
-                            survival_fitness = get_survival_fitness(kid_genotype[:, hybrid_survival_loci], w_hyb)
+                            survival_fitness = get_survival_fitness(kid_genotype, hybrid_survival_loci, w_hyb)
 
                             if survival_fitness > rand()
                                 new_location = Location(pd.population[deme_index].locations_F[mother], sigma_disp, geographic_limits) # generates offspring location based on dispersal distance, range, and location of mother
@@ -210,7 +200,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
         # update the plot
         if (do_plot && (generation % plot_int == 0))
-            update_plot(pd, generation, functional_loci_range)
+            update_plot(pd, generation, functional_loci_range, total_loci)
         end
 
     end # of loop through generations
@@ -236,8 +226,8 @@ end
 
 # This function calculates survival fitness of each individual according to epistasis,
 # with the beta parameter set to one as a default.
-function get_survival_fitness_epistasis(genotype::Array{Int8,2}, w_hyb::Real, beta=1::Real)::Float32
-    survival_HI = mean(genotype[:, :])
+function get_survival_fitness_epistasis(genotype::Array{Int8,2}, hybrid_survival_loci, w_hyb::Real, beta=1::Real)::Float32
+    survival_HI = mean(genotype, hybrid_survival_loci)
     epistasis_fitnesses = 1 - (1 - w_hyb) * (4 * survival_HI * (1 - survival_HI))^beta
     return epistasis_fitnesses
 end

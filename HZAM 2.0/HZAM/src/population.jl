@@ -8,13 +8,13 @@ using Test
 using SpecialFunctions
 using QuadGK
 
-export PopulationData, Location
+export PopulationData, Location, Deme
 export initialize_population, update_population
-export choose_closest_male, calc_match_strength, generate_offspring_genotype
 export plot_population, update_plot
 export calc_traits_additive
 export assign_zone
 export NUM_DEMES
+export mean
 
 NUM_DEMES = 10
 
@@ -135,7 +135,7 @@ struct PopulationData
 
         num_individuals_per_deme = K_total / (NUM_DEMES^2) # number of individuals per deme (innitially constant throughout range)
 
-        intervals = collect(0f0:Float32(1 / NUM_DEMES):0.99f0) # locations of the demes along an axis
+        intervals = collect(0.0f0:Float32(1 / NUM_DEMES):0.99f0) # locations of the demes along an axis
 
         deme_locations = Location.(intervals, intervals') # location of each deme (lower left corner)
 
@@ -217,7 +217,7 @@ function assign_zone(location::Location)
 end
 
 # calculate individual contributions to resource use, according to linear gradient between use of species 0 and species 1
-function calculate_ind_useResourceA(competition_traits, ecolDiff) 
+function calculate_ind_useResourceA(competition_traits, ecolDiff)
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
 
     ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
@@ -234,21 +234,21 @@ function calculate_ind_useResourceB(competition_traits, ecolDiff)
 end
 
 # calculate the distance from a point along an angle to the limit of the range
-function max_radius_squared(x, y, t)
-    if y > 0.97 && t < pi
+function max_radius_squared(x, y, t, max_dist)
+    if y > (1 - max_dist) && t < pi
         y_dist = ((1 - y) / sin(t))^2
-    elseif y < 0.03 && t > pi
+    elseif y < max_dist && t > pi
         y_dist = (y / sin(t))^2
     else
-        y_dist = 0.0009
+        y_dist = max_dist^2
     end
 
-    if x > 0.97 && (t < pi / 2 || t > 3 * pi / 2)
+    if x > (1 - max_dist) && (t < pi / 2 || t > 3 * pi / 2)
         x_dist = ((1 - x) / cos(t))^2
-    elseif x < 0.03 && (pi / 2 < t < 3 * pi / 2)
+    elseif x < max_dist && (pi / 2 < t < 3 * pi / 2)
         x_dist = (x / cos(pi - t))^2
     else
-        x_dist = 0.0009
+        x_dist = max_dist^2
     end
 
     return min(x_dist, y_dist)
@@ -256,22 +256,17 @@ end
 
 
 # calculates the ideal density (assuming normal distribution) at the location of each female
-function get_ideal_densities(K_total, sigma_comp, locations_F)
+function get_ideal_densities(K_total, sigma_comp, locations_F, max_dist)
     function calc_ideal_density(location) # integral of the gaussian distribution centred on the female's location with a standard deviation of sigma_comp and cut off at the range boundaries
-        if 0.03 < location.x < 0.97 && 0.03 < location.y <= 0.97 # the density is treated as constant further than 3 standard deviations from the edge of the range 
-            return 1 + K_total * 2 * pi * (1 - exp(-0.00045 / (sigma_comp^2))) * (sigma_comp^2)
+        if max_dist < location.x < (1-max_dist) && max_dist < location.y <= (1-max_dist) # the density is treated as constant further than 3 standard deviations from the edge of the range 
+            return 1 + K_total * 2 * pi * (1 - exp(-((max_dist^2) / 2) / (sigma_comp^2))) * (sigma_comp^2)
         else
-            return 1 + K_total * (sigma_comp^2) * (2 * pi - quadgk(t -> exp(-(max_radius_squared(location.x, location.y, t) / (2 * sigma_comp^2))), 0, 2 * pi, rtol=0.04)[1])
+            return 1 + K_total * (sigma_comp^2) * (2 * pi - quadgk(t -> exp(-(max_radius_squared(location.x, location.y, t, max_dist) / (2 * sigma_comp^2))), 0, 2 * pi)[1])
         end
     end
     #return 1 + K_total * 2 * pi * (1 - exp(-0.00045 / (sigma_comp^2))) * (sigma_comp^2)
 
     return map(calc_ideal_density, locations_F)
-end
-
-# calculates the distance between two points
-function distance(location1, location2)
-    return sqrt((location1.x - location2.x)^2 + (location1.y - location2.y)^2)
 end
 
 # calculates the squared distances from a set of points to a single point
@@ -288,6 +283,9 @@ function calculate_growth_rates(population,
     K_total,
     sigma_comp,
     intrinsic_R)
+
+    max_dist = 3 * sigma_comp #  maximum distance that the density calculation takes into account (3 standard deviations of the normal distribution)
+
     # in spatial model, calculate growth rates based on local resource use
 
     locations_F = population[deme_index].locations_F
@@ -305,7 +303,7 @@ function calculate_growth_rates(population,
     locations_F = population[deme_index].locations_F
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
-    ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F) # this applies the above function to each geographic location
+    ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F, max_dist) # this applies the above function to each geographic location
 
     ideal_densities_at_locations_F_resourceA = ideal_densities_at_locations_F ./ 2
     ideal_densities_at_locations_F_resourceB = ideal_densities_at_locations_F_resourceA
@@ -317,7 +315,7 @@ function calculate_growth_rates(population,
         squared_distances = get_squared_distances(locations_all, focal_location)
         useResource_densities = [0.0, 0.0]
         for i in eachindex(squared_distances)
-            if squared_distances[i] <= 0.03^2
+            if squared_distances[i] <= max_dist^2
                 useResource_densities[1] += ind_useResourceA_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
                 useResource_densities[2] += ind_useResourceB_all[i] * exp(-squared_distances[i] / (2 * (sigma_comp^2)))
             end
@@ -362,75 +360,25 @@ function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3
     return traits
 end
 
-# finds the closest male and updates list of eligible males
-function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
-
-    shortest_distance = neighbourhood_size # males further than this distance are ignored
-    output_male = -1
-    output_deme = -1
-    for deme_index in deme_indices # loop through the demes that are nearby
-        if length(elig_M[deme_index]) == 0 # checks if there are any remaining males that have not been passed over already
-            continue
-        end
-
-        male_index = choose_closest_male(elig_M[deme_index], demes[deme_index].locations_M, location_mother) # finds the closest male in that deme to the female
-        male_distance = distance(demes[deme_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
-        if male_distance < shortest_distance # checks if the distance is smaller than the previous closest distance
-            output_male = male_index
-            output_deme = deme_index
-            shortest_distance = male_distance
-        end
-        # keeps track of the index and remaining eligible males if the male is within the cutoff distance
-    end
-
-    return output_male, output_deme
-end
-
-# Finds the closest male given a list of eligible males
-function choose_closest_male(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
-    return elig_M[argmin(get_squared_distances(locations_M[elig_M], location_mother))] # this gets the index of a closest male, and removes that male from the list in elig_M
-end
-
-# compare male trait with female's trait (preference), and determine
-# whether she accepts; note that match_strength is determined by a
-# Gaussian, with a maximum of 1 and minimum of zero
-function calc_match_strength(female_genotype, male_genotype, pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    mating_trait_male = mean(male_genotype, male_mating_trait_loci)
-    mating_trait_female = mean(female_genotype, female_mating_trait_loci)
-
-    mating_trait_dif = mating_trait_male - mating_trait_female
-    return exp((-(mating_trait_dif^2)) / (2 * (pref_SD^2)))
-end
-
-# generates the genotype for an offspring based on its parents' genotypes
-function generate_offspring_genotype(mother_genotype, father_genotype)
-    total_loci = size(mother_genotype, 2)
-    # generate genotypes; for each locus (column), first row for allele from mother, second row for allele from father
-    kid_genotype = Array{Int8,2}(undef, 2, total_loci)
-    for locus in 1:total_loci
-        kid_genotype[1, locus] = mother_genotype[rand([1 2]), locus]  # for this locus, pick a random allele from the mother
-        kid_genotype[2, locus] = father_genotype[rand([1 2]), locus]  # and from the father
-    end
-
-    return kid_genotype
-end
 
 
 # creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function plot_population(pd, functional_loci_range)
+function plot_population(pd, functional_loci_range, total_loci)
     genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
     locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
 
-    create_new_plot(calc_traits_additive(genotypes, functional_loci_range),
+    create_new_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+        calc_traits_additive(genotypes, functional_loci_range),
         [],
         locations)
 end
 
 # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function update_plot(pd, generation, functional_loci_range)
+function update_plot(pd, generation, functional_loci_range, total_loci)
     genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
     locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
-    update_population_plot(calc_traits_additive(genotypes, functional_loci_range),
+    update_population_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+        calc_traits_additive(genotypes, functional_loci_range),
         [],
         locations,
         generation)
