@@ -11,7 +11,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     do_plot=true, plot_int=10)
 
     functional_loci_range = union(female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)# list of loci responsible for mating trait, competition trait, and hybrid survival
-    
+
     #functional_loci_range = collect(1:total_loci)
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
@@ -45,7 +45,14 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     extinction = false  # if extinction happens later this will be set true
 
     if do_plot
-        plot_population(pd, functional_loci_range, total_loci) # displays plot of individual locations and genotypes
+        # displays plot of individual locations and genotypes
+        genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
+        locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+
+        create_new_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+            calc_traits_additive(genotypes, functional_loci_range),
+            [],
+            locations)
     end
 
 
@@ -132,7 +139,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             else
                                 # she rejects male
                                 rejects += 1
-                                deleteat!(elig_M[male_deme], findall(x->x==focal_male, elig_M[male_deme])) # remove rejected male from list of eligible males
+                                deleteat!(elig_M[male_deme], findall(x -> x == focal_male, elig_M[male_deme])) # remove rejected male from list of eligible males
                                 if sum(map(length, values(elig_M))) == 0
                                     break
                                 end
@@ -177,7 +184,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                                     push!(mitochondria_sons_all[deme], kid_mitochondria)
                                     push!(locations_sons_all[deme], new_location)
                                 end
-                            #end
+                                #end
                             end
                         end
                     end
@@ -198,9 +205,15 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
             intrinsic_R,
             ecolDiff)
 
-        # update the plot
+        # updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
         if (do_plot && (generation % plot_int == 0))
-            update_plot(pd, generation, functional_loci_range, total_loci)
+            genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
+            locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+            update_population_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+                calc_traits_additive(genotypes, functional_loci_range),
+                [],
+                locations,
+                generation)
         end
 
     end # of loop through generations

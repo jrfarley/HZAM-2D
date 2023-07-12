@@ -1,9 +1,5 @@
 module Population
 
-include("plot_data.jl")
-
-using .Plot_Data
-
 using Test
 using SpecialFunctions
 using QuadGK
@@ -234,7 +230,7 @@ function calculate_ind_useResourceB(competition_traits, ecolDiff)
 end
 
 # calculate the distance from a point along an angle to the limit of the range
-function max_radius_squared(x, y, t, max_dist)
+function max_radius_squared(x, y, t, max_dist) #x,y are the coordinates, t is the angle, and max_dist is the maximum length of the line
     if y > (1 - max_dist) && t < pi
         y_dist = ((1 - y) / sin(t))^2
     elseif y < max_dist && t > pi
@@ -358,29 +354,5 @@ function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3
 
     traits = map(x -> mean(genotypes[x], loci), 1:N)
     return traits
-end
-
-
-
-# creates a plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function plot_population(pd, functional_loci_range, total_loci)
-    genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
-    locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
-
-    create_new_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
-        calc_traits_additive(genotypes, functional_loci_range),
-        [],
-        locations)
-end
-
-# updates the plot of locations and hybrid indices (plotting handled by the Plot_Data module)
-function update_plot(pd, generation, functional_loci_range, total_loci)
-    genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
-    locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
-    update_population_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
-        calc_traits_additive(genotypes, functional_loci_range),
-        [],
-        locations,
-        generation)
 end
 end
