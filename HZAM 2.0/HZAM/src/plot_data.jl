@@ -44,7 +44,7 @@ function create_new_plot(hybrid_indices_all, hybrid_indices_functional, mitochon
 end
 
 # updates the existing plot
-function update_population_plot(hybrid_indices_all, hybrid_indices_functional, mitochondria, locations, generation)
+function update_population_plot(hybrid_indices_all, hybrid_indices_functional, mitochondria, locations, generation, sigma_disp)
     locations_x = [l.x for l in locations] # x coordinates of all individuals in the simulation
     locations_y = [l.y for l in locations] # y coordinates of all individuals in the simulation
 
@@ -67,6 +67,7 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
     println("hybrid zone length: ", calc_length(sigmoid_curves))
     println("gene flow: ", sum(gene_flows) / 10)
+    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_all, sigma_disp))
 
     if generation > 20
         push!(hybrid_zone_widths, sum(hybrid_zone_widths) / 10)

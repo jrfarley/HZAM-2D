@@ -15,6 +15,8 @@ using .Plot_Data
 
 export DataAnalysis, Population, Mating, demo # export modules for testing
 
+global demo = 10
+
 include("simulation.jl") # main function for running a simulation
 
 end # module HZAM

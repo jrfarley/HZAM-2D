@@ -1,4 +1,7 @@
-using Distributions: Poisson # needed for "Poisson" functiona
+using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
+
+global init_plot = create_new_plot
+global update_plot = update_population_plot
 
 # This is the function to run a single HZAM simulation
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
@@ -49,7 +52,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
         locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
 
-        create_new_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+        init_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
             calc_traits_additive(genotypes, functional_loci_range),
             [],
             locations)
@@ -169,7 +172,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                             survival_fitness = get_survival_fitness(kid_genotype, hybrid_survival_loci, w_hyb)
 
                             if survival_fitness > rand()
-                                new_location = Location(pd.population[deme_index].locations_F[mother], sigma_disp, geographic_limits) # generates offspring location based on dispersal distance, range, and location of mother
+                                new_location = Location(pd.population[deme_index].locations_F[mother], sigma_disp) # generates offspring location based on dispersal distance, range, and location of mother
 
                                 deme = assign_zone(new_location) # determines which deme the offspring dispersed into
 
@@ -209,11 +212,12 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         if (do_plot && (generation % plot_int == 0))
             genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
             locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
-            update_population_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+            update_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
                 calc_traits_additive(genotypes, functional_loci_range),
                 [],
                 locations,
-                generation)
+                generation,
+                sigma_disp)
         end
 
     end # of loop through generations
@@ -225,23 +229,5 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     HI_NL_all_inds = calc_traits_additive(genotypes, neutral_loci)
 
     return extinction, functional_HI_all_inds, HI_NL_all_inds
-end
-
-# This function calculates survival fitness of each individual according to heterozygosity.
-function get_survival_fitness_hetdisadvantage(genotype::Array{Int8,2}, w_hyb::Real)::Vector{Float32}
-    num_loci = size(genotype, 2)
-    s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
-    num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
-
-    hetdisadvantage_fitness = (1 - s_per_locus)^num_hetloci
-    return hetdisadvantage_fitness
-end
-
-# This function calculates survival fitness of each individual according to epistasis,
-# with the beta parameter set to one as a default.
-function get_survival_fitness_epistasis(genotype::Array{Int8,2}, hybrid_survival_loci, w_hyb::Real, beta=1::Real)::Float32
-    survival_HI = mean(genotype, hybrid_survival_loci)
-    epistasis_fitnesses = 1 - (1 - w_hyb) * (4 * survival_HI * (1 - survival_HI))^beta
-    return epistasis_fitnesses
 end
 

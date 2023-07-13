@@ -1,5 +1,5 @@
 module DataAnalysis
-export calc_sigmoid_curve, calc_length, calc_gene_flow, calc_width, spaced_locations
+export calc_sigmoid_curve, calc_length, calc_gene_flow, calc_width, spaced_locations, calc_bimodality_overall
 
 using LsqFit
 
@@ -67,5 +67,20 @@ function calc_gene_flow(hybrid_indices, locations_x)
     gene_flow += mean(1 .- species_B_indices)
 
     return gene_flow
+end
+
+function calc_bimodality_in_range(sigmoid_curve, locations_x, hybrid_indices, sigma_disp)
+    center = spaced_locations[argmin(sigmoid_curve .- 0.5)]
+    left = center - (sigma_disp / 2)
+    right = center + (sigma_disp / 2)
+    hybrid_indices_at_center = hybrid_indices[filter(i -> left <= locations_x[i] <= right, eachindex(hybrid_indices))]
+
+    count(x -> x==0 || x==1, hybrid_indices_at_center) / length(hybrid_indices_at_center)
+end
+
+function calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices, sigma_disp)
+    bimodality_per_range = [calc_bimodality_in_range(sigmoid_curves[i], locations_x[sorted_indices[i]], hybrid_indices[sorted_indices[i]], sigma_disp) for i in eachindex(sorted_indices)]
+
+    return mean(bimodality_per_range)
 end
 end

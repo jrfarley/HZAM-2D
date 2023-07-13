@@ -5,12 +5,11 @@ using SpecialFunctions
 using QuadGK
 
 export PopulationData, Location, Deme
-export initialize_population, update_population
-export plot_population, update_plot
 export calc_traits_additive
 export assign_zone
 export NUM_DEMES
 export mean
+export get_survival_fitness_epistasis, get_survival_fitness_hetdisadvantage
 
 NUM_DEMES = 10
 
@@ -35,10 +34,10 @@ struct Location
     # based on a normal distribution with width sigma_disp,
     # centred on the given location location. Constrained to be within range. 
     # geographic_limits should be a vector with two locations.
-    function Location(starting_location::Location, sigma_disp::Real, geographic_limits::Vector{Location})
+    function Location(starting_location::Location, sigma_disp::Real)
         x = -1
         y = -1
-        while (x < geographic_limits[1].x) || (x > geographic_limits[2].x) || (y < geographic_limits[1].y) || (y > geographic_limits[2].y)
+        while ~(0<x<0.999 && 0<y<0.999)
             dist = sigma_disp * randn()
             dir = rand() * 2 * pi
             x = starting_location.x + dist * cos(dir)
@@ -354,5 +353,23 @@ function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3
 
     traits = map(x -> mean(genotypes[x], loci), 1:N)
     return traits
+end
+
+# This function calculates survival fitness of each individual according to heterozygosity.
+function get_survival_fitness_hetdisadvantage(genotype::Array{Int8,2}, w_hyb::Real)::Vector{Float32}
+    num_loci = size(genotype, 2)
+    s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
+    num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
+
+    hetdisadvantage_fitness = (1 - s_per_locus)^num_hetloci
+    return hetdisadvantage_fitness
+end
+
+# This function calculates survival fitness of each individual according to epistasis,
+# with the beta parameter set to one as a default.
+function get_survival_fitness_epistasis(genotype::Array{Int8,2}, hybrid_survival_loci, w_hyb::Real, beta=1::Real)::Float32
+    survival_HI = mean(genotype, hybrid_survival_loci)
+    epistasis_fitnesses = 1 - (1 - w_hyb) * (4 * survival_HI * (1 - survival_HI))^beta
+    return epistasis_fitnesses
 end
 end
