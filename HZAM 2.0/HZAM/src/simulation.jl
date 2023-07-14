@@ -222,6 +222,8 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     end # of loop through generations
 
+    readline()
+
     neutral_loci = setdiff(collect(1:total_loci), functional_loci_range)
 
     genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)

@@ -18,5 +18,6 @@ export DataAnalysis, Population, Mating, demo # export modules for testing
 global demo = 10
 
 include("simulation.jl") # main function for running a simulation
+include("HZAM-J_beta_jack.jl")
 
 end # module HZAM

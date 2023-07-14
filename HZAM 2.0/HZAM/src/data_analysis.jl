@@ -70,7 +70,7 @@ function calc_gene_flow(hybrid_indices, locations_x)
 end
 
 function calc_bimodality_in_range(sigmoid_curve, locations_x, hybrid_indices, sigma_disp)
-    center = spaced_locations[argmin(sigmoid_curve .- 0.5)]
+    center = spaced_locations[argmin(abs.(sigmoid_curve .- 0.5))]
     left = center - (sigma_disp / 2)
     right = center + (sigma_disp / 2)
     hybrid_indices_at_center = hybrid_indices[filter(i -> left <= locations_x[i] <= right, eachindex(hybrid_indices))]

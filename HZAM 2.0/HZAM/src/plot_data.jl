@@ -38,7 +38,7 @@ function create_new_plot(hybrid_indices_all, hybrid_indices_functional, mitochon
     global ax = Axis(fig[1, 1], xlabel="location_x", ylabel="location_y", title=string("HZAM simulation, generation = ", 0), xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
     xlims!(-0.03, 1.03) # sets the limits for the plotted area
     ylims!(-0.03, 1.03)
-    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_all) # adds the location of every individual to the plot
+    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional) # adds the location of every individual to the plot
 
     display(fig)
 end
@@ -54,11 +54,11 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
     [delete!(ax, sigmoid_line) for sigmoid_line in sigmoid_lines] # removes the sigmoid curves from the plot
     global sigmoid_lines = []
 
-    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_all, markersize=10) # adds the location of every individual to the plot
+    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional, markersize=10) # adds the location of every individual to the plot
 
     sigmoid_curves, hybrid_zone_widths = display_sigmoid_curves(locations_x, sorted_indices, hybrid_indices_functional)
 
-    [push!(sigmoid_lines, lines!(ax, spaced_locations, sigmoid_curves[i], color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
+    [push!(sigmoid_lines, lines!(ax, spaced_locations, scale_sigmoid_curve(sigmoid_curves[i], i), color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
 
     gene_flows = [calc_gene_flow(hybrid_indices_all[sorted_indices[i]], locations_x[sorted_indices[i]]) for i in 1:10]
 
@@ -67,8 +67,8 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
     println("hybrid zone length: ", calc_length(sigmoid_curves))
     println("gene flow: ", sum(gene_flows) / 10)
-    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_all, sigma_disp))
-
+    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, sigma_disp))
+    println("")
     if generation > 20
         push!(hybrid_zone_widths, sum(hybrid_zone_widths) / 10)
     end
@@ -105,7 +105,6 @@ function display_sigmoid_curves(locations_x, sorted_indices, hybrid_indices_func
     for i in 1:10
         push!(sigmoid_curves, calc_sigmoid_curve(locations_x[sorted_indices[i]], hybrid_indices_functional[sorted_indices[i]]))
         push!(hybrid_zone_widths, calc_width(sigmoid_curves[i]))
-        sigmoid_curves[i] = scale_sigmoid_curve(sigmoid_curves[i], i)
     end
 
     return sigmoid_curves, hybrid_zone_widths

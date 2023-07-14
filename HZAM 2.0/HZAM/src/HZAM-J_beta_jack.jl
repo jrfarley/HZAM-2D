@@ -1,10 +1,10 @@
 # this file is not integrated yet
 
-using BenchmarkTools
 using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
-using Plots
+#using Plots.PlotMeasures  # needed for plot margin adjustment
+using GLMakie
 using Statistics: mean  # needed for "mean" function
 using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
@@ -73,8 +73,8 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
                 extinction, functional_HI_all_inds, HI_NL_all_inds = run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
                     K_total, max_generations,
                     total_loci, female_mating_trait_loci, male_mating_trait_loci,
-                    competition_trait_loci, hybrid_survival_loci, neutral_loci,
-                    survival_fitness_method, per_reject_cost, do_plot=false, optimize)
+                    competition_trait_loci, hybrid_survival_loci,
+                    survival_fitness_method, per_reject_cost, do_plot=false)
 
 
                 if extinction  # whole simulation went extinct
@@ -106,7 +106,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
         end # of w_hyb loop   
     end # of replicate loop
 
-    #=if save_outcomes_JL
+    if save_outcomes_JL
         filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set", set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", total_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, ".jld2")
         @save filename outcome_array
     end
@@ -116,7 +116,7 @@ function run_HZAM_set(set_name::String, ecolDiff, intrinsic_R, replications;  # 
             filename = string("HZAM_Sym_Julia_results_GitIgnore/outcomeArray_set", set_name, "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", total_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, "_rep", replications[i])
             CSV.write(filename, Tables.table(outcome_array[:, :, i]), writeheader=false)
         end
-    end=#
+    end
     return outcome_array
 end
 
@@ -195,9 +195,9 @@ function make_and_save_figs(ResultsFolder, RunName, RunOutcomes)
     display(plot_all_outcomes(cat_RunOutcomes))
     readline()
     savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.png"))
-    #=savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
+    savefig(string(ResultsFolder,"/",RunName,"_AllOutcomes.pdf"))
     most_common_outcomes = get_most_common_outcomes(cat_RunOutcomes)
     display(plot_common_outcomes(most_common_outcomes))
     savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.png"))
-    savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))=#
+    savefig(string(ResultsFolder,"/",RunName,"_MostCommonOutcomes.pdf"))
 end
