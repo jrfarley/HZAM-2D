@@ -28,5 +28,6 @@ Manifest.toml
 **/.DS_Store
 
 
-*.git_ignore.jl
+*git_ignore.jl
+*GitIgnore.jl
 HZAM_Sym_Julia_results_GitIgnore/
