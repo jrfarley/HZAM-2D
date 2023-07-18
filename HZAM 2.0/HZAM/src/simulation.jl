@@ -10,9 +10,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     competition_trait_loci=1:3, hybrid_survival_loci=1:3,
     survival_fitness_method::String="epistasis", per_reject_cost=0,
     geographic_limits::Vector{Location}=[Location(0.0f0, 0.0f0), Location(0.999f0, 0.999f0)],
-    sigma_disp=0.01, sigma_comp=0.01,
+    sigma_disp=0.05, sigma_comp=0.01,
     do_plot=true, plot_int=10)
 
+    output_data = []
     functional_loci_range = union(female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)# list of loci responsible for mating trait, competition trait, and hybrid survival
 
     #functional_loci_range = collect(1:total_loci)
@@ -220,16 +221,26 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                 sigma_disp)
         end
 
+        if generation > max_generations - 20
+            genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
+            locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+
+            hybrid_indices_all = calc_traits_additive(genotypes, collect(1:total_loci))
+            hybrid_indices_functional = calc_traits_additive(genotypes, functional_loci_range)
+
+            push!(output_data, calc_output_data(hybrid_indices_all, hybrid_indices_functional, locations, sigma_disp))
+        end
+
     end # of loop through generations
-
-    readline()
-
+#=
     neutral_loci = setdiff(collect(1:total_loci), functional_loci_range)
 
     genotypes = vcat([[d.genotypes_F; d.genotypes_M] for d in pd.population]...)
     functional_HI_all_inds = calc_traits_additive(genotypes, functional_loci_range)
     HI_NL_all_inds = calc_traits_additive(genotypes, neutral_loci)
 
-    return extinction, functional_HI_all_inds, HI_NL_all_inds
+    return extinction, functional_HI_all_inds, HI_NL_all_inds=#
+
+    return average_output_data(output_data)
 end
 

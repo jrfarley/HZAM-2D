@@ -2,8 +2,6 @@ module Plot_Data
 
 export create_new_plot, update_population_plot
 
-include("data_analysis.jl")
-
 # for plotting:
 #using Plots
 #gr()  # use GR backend for graphs
@@ -12,7 +10,7 @@ using Colors, ColorSchemes
 import ColorSchemes.plasma
 #using Plots.PlotMeasures  # needed for plot margin adjustment
 using GLMakie
-using .DataAnalysis
+using ..DataAnalysis
 
 GLMakie.activate!(inline=false)
 
@@ -21,16 +19,12 @@ global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25), 
 global ax, points, points_active, points_inactive, mitochondria_points
 global sigmoid_lines = []
 global hybrid_zone_widths = []
+global hybrid_zone_positions = [0.5]
 
 # creates the initial plot at the beginning of the simulation
 function create_new_plot(hybrid_indices_all, hybrid_indices_functional, mitochondria, locations)
     locations_x = [l.x for l in locations] # x coordinates of all individuals in the simulation
     locations_y = [l.y for l in locations] # y coordinates of all individuals in the simulation
-
-    sorted_indices = sort_y(locations_y) # sorts the indices of the y coordinates so that sorted_indices[1] is all the indices matched with y coordinates between 0 and 0.1
-    # sorted indices[2] corresponds to y coordinates between 0.1 and 0.2 and so on 
-
-    sigmoid_curves, hybrid_zone_widths = display_sigmoid_curves(locations_x, sorted_indices, hybrid_indices_functional)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
@@ -56,19 +50,20 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
 
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional, markersize=10) # adds the location of every individual to the plot
 
-    sigmoid_curves, hybrid_zone_widths = display_sigmoid_curves(locations_x, sorted_indices, hybrid_indices_functional)
+    
+    sigmoid_curves = [calc_sigmoid_curve(locations_x[sorted_indices[i]], hybrid_indices_functional[sorted_indices[i]]) for i in eachindex(sorted_indices)]
+
+    hybrid_zone_widths = [calc_width(sigmoid_curves[i]) for i in eachindex(sigmoid_curves)]
 
     [push!(sigmoid_lines, lines!(ax, spaced_locations, scale_sigmoid_curve(sigmoid_curves[i], i), color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
 
-    gene_flows = [calc_gene_flow(hybrid_indices_all[sorted_indices[i]], locations_x[sorted_indices[i]]) for i in 1:10]
+    gene_flow = calc_gene_flow(hybrid_indices_all, hybrid_indices_functional)
 
     ax.title = string("HZAM simulation, generation = ", generation)
-    println("generation: ", generation, "; individuals: ", length(locations))
-    println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
-    println("hybrid zone length: ", calc_length(sigmoid_curves))
-    println("gene flow: ", sum(gene_flows) / 10)
-    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, sigma_disp))
-    println("")
+
+    
+    push!(hybrid_zone_positions, calc_position(sigmoid_curves))
+    
     if generation > 20
         push!(hybrid_zone_widths, sum(hybrid_zone_widths) / 10)
     end
@@ -77,37 +72,22 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
         println(sum(hybrid_zone_widths) / length(hybrid_zone_widths))
         println("########################################")
     end
+
+
+    println("generation: ", generation, "; individuals: ", length(locations))
+    println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
+    println("hybrid zone length: ", calc_length(sigmoid_curves))
+    println("gene flow: ", gene_flow)
+    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, sigma_disp))
+    println("overlap: ", calc_overlap_overall(locations_x, hybrid_indices_functional, sorted_indices))
+    println("variance: ", calc_variance(hybrid_zone_positions))
+    println("")
 end
 
 
 # This function adds jitter (small random shifts in position, to better visualize overlapping points)
 function jitter(n, factor=0.02)
     n .+ (0.5 .- rand(length(n))) .* factor
-end
-
-# sorts the y coordinate indices into 10 vectors [0, 0.1), [0.1, 0.2), etc.
-function sort_y(y_locations)
-    bins = collect(0.1:0.1:1)
-
-    function get_indices(bin)
-        return findall(y -> bin - 0.1 <= y < bin, y_locations)
-    end
-
-    return map(get_indices, bins)
-end
-
-# calculates sigmoid curves that model hybrid index vs location on the x axis
-# returns the output of the sigmoid curve function and the widths of the hybrid zones
-function display_sigmoid_curves(locations_x, sorted_indices, hybrid_indices_functional)
-    sigmoid_curves = []
-    hybrid_zone_widths = [] # stores the width of the hybrid zone for each interval on the y Axis
-    # width is determined by the distance between where the sigmoid curve passes through 0.1 and where it passes through 0.9
-    for i in 1:10
-        push!(sigmoid_curves, calc_sigmoid_curve(locations_x[sorted_indices[i]], hybrid_indices_functional[sorted_indices[i]]))
-        push!(hybrid_zone_widths, calc_width(sigmoid_curves[i]))
-    end
-
-    return sigmoid_curves, hybrid_zone_widths
 end
 
 # scales the sigmoid curve to show up on the plot at the corresponding y-axis range
