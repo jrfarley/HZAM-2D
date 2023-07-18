@@ -121,6 +121,13 @@ struct PopulationData
 
     growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
 
+    
+    function calc_deme_population(K_total, ecolDiff)
+        effective_K = K_total/(1+ecolDiff)
+
+        effective_K / (NUM_DEMES^2)
+    end
+
     # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
     function PopulationData(K_total,
         ecolDiff,
@@ -128,7 +135,7 @@ struct PopulationData
         intrinsic_R,
         sigma_comp)
 
-        num_individuals_per_deme = K_total / (NUM_DEMES^2) # number of individuals per deme (innitially constant throughout range)
+        num_individuals_per_deme = calc_deme_population(K_total, ecolDiff) # number of individuals per deme (innitially constant throughout range)
 
         intervals = collect(0.0f0:Float32(1 / NUM_DEMES):0.99f0) # locations of the demes along an axis
 
