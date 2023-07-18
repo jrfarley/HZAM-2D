@@ -16,6 +16,14 @@ struct OutputData
     overlap
 end
 
+struct GeneFlows
+    female_mating_trait_gene_flow
+    male_mating_trait_gene_flow
+    competition_trait_gene_flow
+    hybrid_survival_gene_flow
+    neutral_gene_flow
+end
+
 function calc_position(sigmoid_curves)
     function midpoint(sigmoid_curve)
         return spaced_locations[argmin(abs.(sigmoid_curve.-0.5))]
@@ -64,6 +72,16 @@ end
 
 # calculates gene flow by finding the proportion of genes that originated in the other population among all phenotypically pure individuals
 function calc_gene_flow(hybrid_indices_all, hybrid_indices_functional)
+    species_A_indices = hybrid_indices_all[filter(x -> hybrid_indices_functional[x] == 0, eachindex(hybrid_indices_all))]
+    species_B_indices = hybrid_indices_all[filter(x -> hybrid_indices_functional[x] == 1, eachindex(hybrid_indices_all))]
+
+    gene_flow = (mean(species_A_indices) + mean(1 .- species_B_indices)) / 2
+
+    return gene_flow
+end
+
+# calculates gene flow by finding the proportion of genes that originated in the other population among all phenotypically pure individuals
+function calc_all_gene_flow(genotypes, female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)
     species_A_indices = hybrid_indices_all[filter(x -> hybrid_indices_functional[x] == 0, eachindex(hybrid_indices_all))]
     species_B_indices = hybrid_indices_all[filter(x -> hybrid_indices_functional[x] == 1, eachindex(hybrid_indices_all))]
 

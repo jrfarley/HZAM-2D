@@ -2,9 +2,9 @@ include("HZAM/src/HZAM.jl")
 
 import .HZAM
 
-#outcomes, sim_params = HZAM.run_HZAM_set("testing_filesystem", 1.1, 0.5, K_total=20000, max_generations=1)
+outcomes, sim_params = HZAM.run_HZAM_set("testing_filesystem", 1.1, 0.5, K_total=20000, max_generations=100)
 
-sim_params, outcomes = HZAM.load_from_file("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/testing_filesystem")
+#sim_params, outcomes = HZAM.load_from_file("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/testing_filesystem")
 
 HZAM.make_and_save_figs("HZAM_Sym_Julia_results_GitIgnore", "testing_filesystem", outcomes, sim_params)
 

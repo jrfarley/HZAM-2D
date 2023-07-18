@@ -73,7 +73,6 @@ function run_HZAM_set(set_name::String, intrinsic_R, ecolDiff;  # the semicolon 
     
     dir = mkpath(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", set_name))
 
-    println(dir)
     # Loop through the different simulation sets
     Threads.@threads for i in eachindex(w_hyb_set)
         for j in eachindex(S_AM_set)
@@ -136,12 +135,13 @@ function plot_bimodality(outcomes, sim_params, run_name)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0,1))
     ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string("Bimodality--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, w_hybs, S_AMs, color=bimodalities, markersize=50) # adds the location of every individual to the plot
+    points = scatter!(ax, w_hybs, S_AMs, color=bimodalities, markersize=50, colorrange=(0,1)) # adds the location of every individual to the plot
 
-    Colorbar(fig[1, 4], points, label="bimodality", height=Relative(0.5))
+    cbar = Colorbar(fig[1, 4], points, label="bimodality", height=Relative(0.5))
+
 
     fig
 end
@@ -153,10 +153,10 @@ function plot_gene_flow(outcomes, sim_params, run_name)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0,0.15))
     ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string("Gene Flow--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, w_hybs, S_AMs, color=gene_flow, markersize=50) # adds the location of every individual to the plot
+    points = scatter!(ax, w_hybs, S_AMs, color=gene_flow, markersize=50, colorrange=(0,0.15)) # adds the location of every individual to the plot
 
     Colorbar(fig[1, 4], points, label="gene flow", height=Relative(0.5))
 
@@ -170,10 +170,10 @@ function plot_width(outcomes, sim_params, run_name)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0,1))
     ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string("Hybrid Zone Width--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, w_hybs, S_AMs, color=hybrid_zone_width, markersize=50) # adds the location of every individual to the plot
+    points = scatter!(ax, w_hybs, S_AMs, color=hybrid_zone_width, markersize=50, colorrange=(0,1)) # adds the location of every individual to the plot
 
     Colorbar(fig[1, 4], points, label="cline width", height=Relative(0.5))
 
@@ -188,10 +188,10 @@ function plot_overlap(outcomes, sim_params, run_name)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0,1))
     ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string("Overlap--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, w_hybs, S_AMs, color=overlap, markersize=50) # adds the location of every individual to the plot
+    points = scatter!(ax, w_hybs, S_AMs, color=overlap, markersize=50, colorrange=(0,1)) # adds the location of every individual to the plot
 
     Colorbar(fig[1, 4], points, label="overlap", height=Relative(0.5))
 
