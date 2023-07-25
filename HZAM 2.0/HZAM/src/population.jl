@@ -4,14 +4,14 @@ using Test
 using SpecialFunctions
 using QuadGK
 
-export PopulationData, Location, Deme
+export PopulationData, Location, Zone
 export calc_traits_additive
 export assign_zone
-export NUM_DEMES
+export NUM_ZONES
 export mean
 export get_survival_fitness_epistasis, get_survival_fitness_hetdisadvantage
 
-NUM_DEMES = 10
+NUM_ZONES = 10
 
 # stores a location with an x coordinate and a y coordinate
 struct Location
@@ -48,7 +48,7 @@ struct Location
 end
 
 # stores genotype, location, mitochondria, and resource use data for all individuals in part of the range
-struct Deme
+struct Zone
     genotypes_F::Vector{Matrix{Int8}} # the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci 
     genotypes_M::Vector{Matrix{Int8}} # the male genotypes
     locations_F::Vector{Location} # female locations
@@ -61,8 +61,8 @@ struct Deme
     ind_useResourceB_F::Vector{Float64}
     ind_useResourceB_M::Vector{Float64}
 
-    # initialize population in deme
-    function Deme(starting_N,
+    # initialize population in zone
+    function Zone(starting_N,
         total_loci,
         location,
         size,
@@ -70,11 +70,11 @@ struct Deme
 
         N_half = trunc(Int, starting_N / 2)
 
-        deme_range = [location, Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))]
+        zone_range = [location, Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))]
 
         genotypes = fill(fill(population, 2, total_loci), N_half)
 
-        locations = [[Location(deme_range) for i in 1:N_half] for i in 1:2]
+        locations = [[Location(zone_range) for i in 1:N_half] for i in 1:2]
 
         mitochondria = fill(population, N_half)
 
@@ -94,8 +94,8 @@ struct Deme
             ind_useResourceB)
     end
 
-    # updates population in deme with the offspring genotypes, locations, and mitochondria
-    function Deme(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M, competition_trait_loci, ecolDiff)
+    # updates population in zone with the offspring genotypes, locations, and mitochondria
+    function Zone(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M, competition_trait_loci, ecolDiff)
         # calculate new competition traits
         competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
         competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
@@ -117,15 +117,15 @@ end
 
 # stores all the population data (genotypes, locations, etc.) that get updated each generation
 struct PopulationData
-    population::Matrix{Deme}
+    population::Matrix{Zone}
 
     growth_rates_F::Matrix{Vector{Float64}} # table of the female growth rates associated with each active female index
 
     
-    function calc_deme_population(K_total, ecolDiff)
+    function calc_zone_population(K_total, ecolDiff)
         effective_K = K_total/(1+ecolDiff)
 
-        effective_K / (NUM_DEMES^2)
+        effective_K / (NUM_ZONES^2)
     end
 
     # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
@@ -135,35 +135,35 @@ struct PopulationData
         intrinsic_R,
         sigma_comp)
 
-        num_individuals_per_deme = calc_deme_population(K_total, ecolDiff) # number of individuals per deme (innitially constant throughout range)
+        num_individuals_per_zone = calc_zone_population(K_total, ecolDiff) # number of individuals per zone (innitially constant throughout range)
 
-        intervals = collect(0.0f0:Float32(1 / NUM_DEMES):0.99f0) # locations of the demes along an axis
+        intervals = collect(0.0f0:Float32(1 / NUM_ZONES):0.99f0) # locations of the zones along an axis
 
-        deme_locations = Location.(intervals, intervals') # location of each deme (lower left corner)
+        zone_locations = Location.(intervals, intervals') # location of each zone (lower left corner)
 
-        deme_populations = map(l -> l.x < 0.5 ? 0 : 1, deme_locations) # assigns 0 to each deme occupied by population A and 1 to each deme occupied by population B (dividing line down the middle at the beginning)
+        zone_populations = map(l -> l.x < 0.5 ? 0 : 1, zone_locations) # assigns 0 to each zone occupied by population A and 1 to each zone occupied by population B (dividing line down the middle at the beginning)
 
-        # initializes the genotypes, locations, and mitochondria for each deme
-        demes = Deme.(Ref(num_individuals_per_deme),
+        # initializes the genotypes, locations, and mitochondria for each zone
+        zones = Zone.(Ref(num_individuals_per_zone),
             Ref(total_loci),
-            deme_locations,
-            Ref(Float32(1 / NUM_DEMES)),
-            deme_populations,
+            zone_locations,
+            Ref(Float32(1 / NUM_ZONES)),
+            zone_populations,
             Ref(ecolDiff))
 
-        # empty matrix for storing a list of growth rates of every female per deme
-        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_DEMES, NUM_DEMES)
+        # empty matrix for storing a list of growth rates of every female per zone
+        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_ZONES, NUM_ZONES)
 
         # initializes growth rates for every female
-        for deme_index in CartesianIndices((1:NUM_DEMES, 1:NUM_DEMES))
-            growth_rates_F[deme_index] = calculate_growth_rates(demes,
-                deme_index,
+        for zone_index in CartesianIndices((1:NUM_ZONES, 1:NUM_ZONES))
+            growth_rates_F[zone_index] = calculate_growth_rates(zones,
+                zone_index,
                 K_total,
                 sigma_comp,
                 intrinsic_R)
         end
 
-        new(demes,
+        new(zones,
             growth_rates_F)
     end
 
@@ -180,41 +180,41 @@ struct PopulationData
         intrinsic_R,
         ecolDiff)
 
-        # set up empty matrices for storing the deme data (genotypes, locations, and mitochondria for every individual in the deme) and the female growth rates
-        demes = Matrix{Deme}(undef, NUM_DEMES, NUM_DEMES)
-        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_DEMES, NUM_DEMES)
+        # set up empty matrices for storing the zone data (genotypes, locations, and mitochondria for every individual in the zone) and the female growth rates
+        zones = Matrix{Zone}(undef, NUM_ZONES, NUM_ZONES)
+        growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_ZONES, NUM_ZONES)
 
-        # initialize each deme with the offspring data
-        for deme_index in CartesianIndices((1:NUM_DEMES, 1:NUM_DEMES))
-            demes[deme_index] = Deme(genotypes_daughters[deme_index],
-                genotypes_sons[deme_index],
-                locations_daughters[deme_index],
-                locations_sons[deme_index],
-                mitochondria_daughters[deme_index],
-                mitochondria_sons[deme_index],
+        # initialize each zone with the offspring data
+        for zone_index in CartesianIndices((1:NUM_ZONES, 1:NUM_ZONES))
+            zones[zone_index] = Zone(genotypes_daughters[zone_index],
+                genotypes_sons[zone_index],
+                locations_daughters[zone_index],
+                locations_sons[zone_index],
+                mitochondria_daughters[zone_index],
+                mitochondria_sons[zone_index],
                 competition_trait_loci,
                 ecolDiff)
         end
 
-        # calculate growth rates for every female in each deme
-        for deme_index in CartesianIndices((1:NUM_DEMES, 1:NUM_DEMES))
-            growth_rates_F[deme_index] = calculate_growth_rates(demes,
-                deme_index,
+        # calculate growth rates for every female in each zone
+        for zone_index in CartesianIndices((1:NUM_ZONES, 1:NUM_ZONES))
+            growth_rates_F[zone_index] = calculate_growth_rates(zones,
+                zone_index,
                 K_total,
                 sigma_comp,
                 intrinsic_R)
         end
 
-        new(demes,
+        new(zones,
             growth_rates_F)
 
     end
 end
 
-# determine which deme a location falls in
+# determine which zone a location falls in
 function assign_zone(location::Location)
-    zone_x = convert(Integer, trunc(NUM_DEMES * location.x) + 1)
-    zone_y = convert(Integer, trunc(NUM_DEMES * location.y) + 1)
+    zone_x = convert(Integer, trunc(NUM_ZONES * location.x) + 1)
+    zone_y = convert(Integer, trunc(NUM_ZONES * location.y) + 1)
     return CartesianIndex(zone_x, zone_y)
 end
 
@@ -281,7 +281,7 @@ end
 
 # calculates female growth rates
 function calculate_growth_rates(population,
-    deme_index,
+    zone_index,
     K_total,
     sigma_comp,
     intrinsic_R)
@@ -290,19 +290,19 @@ function calculate_growth_rates(population,
 
     # in spatial model, calculate growth rates based on local resource use
 
-    locations_F = population[deme_index].locations_F
+    locations_F = population[zone_index].locations_F
 
-    # determines which demes are needed to calculate growth rates
-    # demes that are further than 0.03 units away from all females in the current deme are unnecessary since the individuals there would have a negligible effect
-    lower_left = max(deme_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
-    upper_right = min(deme_index + CartesianIndex(1, 1), CartesianIndex(NUM_DEMES, NUM_DEMES))
+    # determines which zones are needed to calculate growth rates
+    # zones that are further than 0.03 units away from all females in the current zone are unnecessary since the individuals there would have a negligible effect
+    lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
+    upper_right = min(zone_index + CartesianIndex(1, 1), CartesianIndex(NUM_ZONES, NUM_ZONES))
     neighbourhood = population[lower_left:upper_right]
 
 
     ind_useResourceA_all = vcat([[d.ind_useResourceA_F; d.ind_useResourceA_M] for d in neighbourhood]...)
     ind_useResourceB_all = vcat([[d.ind_useResourceB_F; d.ind_useResourceB_M] for d in neighbourhood]...)
     locations_all = vcat([[d.locations_F; d.locations_M] for d in neighbourhood]...)
-    locations_F = population[deme_index].locations_F
+    locations_F = population[zone_index].locations_F
 
     # set up expected local densities, based on geographically even distribution of individuals at carrying capacity
     ideal_densities_at_locations_F = get_ideal_densities(K_total, sigma_comp, locations_F, max_dist) # this applies the above function to each geographic location
@@ -337,8 +337,8 @@ function calculate_growth_rates(population,
     local_growth_rates_resourceA = intrinsic_R .* ideal_densities_at_locations_F_resourceA ./ (ideal_densities_at_locations_F_resourceA .+ ((real_densities_at_locations_F_resourceA) .* (intrinsic_R - 1)))
     local_growth_rates_resourceB = intrinsic_R .* ideal_densities_at_locations_F_resourceB ./ (ideal_densities_at_locations_F_resourceB .+ ((real_densities_at_locations_F_resourceB) .* (intrinsic_R - 1)))
 
-    growth_rateA = population[deme_index].ind_useResourceA_F .* local_growth_rates_resourceA
-    growth_rateB = population[deme_index].ind_useResourceB_F .* local_growth_rates_resourceB
+    growth_rateA = population[zone_index].ind_useResourceA_F .* local_growth_rates_resourceA
+    growth_rateB = population[zone_index].ind_useResourceB_F .* local_growth_rates_resourceB
 
     growth_rates = growth_rateA .+ growth_rateB
 

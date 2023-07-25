@@ -9,8 +9,8 @@ include("mating.jl") # functions for finding a mate and determining match streng
 include("plot_data.jl")
 include("data_analysis.jl")
 
-using .DataAnalysis
 using .Population
+using .DataAnalysis
 using .Mating
 using .Plot_Data
 

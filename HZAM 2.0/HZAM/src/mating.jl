@@ -8,31 +8,31 @@ function distance(location1, location2)
 end
 
 # finds the closest male and updates list of eligible males
-function choose_closest_male(demes::Matrix{Deme}, deme_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
+function choose_closest_male(zones::Matrix{Zone}, zone_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
 
     shortest_distance = neighbourhood_size # males further than this distance are ignored
     output_male = -1
-    output_deme = -1
-    for deme_index in deme_indices # loop through the demes that are nearby
-        if length(elig_M[deme_index]) == 0 # checks if there are any remaining males that have not been passed over already
+    output_zone = -1
+    for zone_index in zone_indices # loop through the zones that are nearby
+        if length(elig_M[zone_index]) == 0 # checks if there are any remaining males that have not been passed over already
             continue
         end
 
-        male_index = choose_closest_male_from_deme(elig_M[deme_index], demes[deme_index].locations_M, location_mother) # finds the closest male in that deme to the female
-        male_distance = distance(demes[deme_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
+        male_index = choose_closest_male_from_zone(elig_M[zone_index], zones[zone_index].locations_M, location_mother) # finds the closest male in that zone to the female
+        male_distance = distance(zones[zone_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
         if male_distance < shortest_distance # checks if the distance is smaller than the previous closest distance
             output_male = male_index
-            output_deme = deme_index
+            output_zone = zone_index
             shortest_distance = male_distance
         end
         # keeps track of the index and remaining eligible males if the male is within the cutoff distance
     end
 
-    return output_male, output_deme
+    return output_male, output_zone
 end
 
 # Finds the closest male given a list of eligible males
-function choose_closest_male_from_deme(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
+function choose_closest_male_from_zone(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
     return elig_M[argmin(Population.get_squared_distances(locations_M[elig_M], location_mother))] # this gets the index of a closest male, and removes that male from the list in elig_M
 end
 
