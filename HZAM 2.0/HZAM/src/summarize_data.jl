@@ -334,6 +334,10 @@ function calc_linkage_diseq(genotypes, l1, l2)
         p_AB = count(h -> h == [0, 0], haplotypes) / length(haplotypes)
         D = (p_AB - (p_A * p_B))
         pearson_coefficient = (D^2) / (p_A * (1 - p_A) * p_B * (1 - p_B))
+
+        if isnan(pearson_coefficient)
+            pearson_coefficient = 1
+        end
         return pearson_coefficient
     else
         return 1
@@ -352,6 +356,8 @@ function calc_linkage_diseq_all(path, plot_title)
 
     rows = (1:num_loci)
     cols = (1:num_loci)'
+
+    calc_linkage_diseq(genotypes, 5, 6)
 
     linkage_diseq = calc_linkage_diseq.(Ref(genotypes), rows, cols)
 
