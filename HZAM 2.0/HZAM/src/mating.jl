@@ -1,6 +1,6 @@
 "Functions involved in mate selection and generating the offspring genotype."
 module Mating
-using ..Population: Location, Zone, genotype_mean, get_squared_distances
+using ..Population: Location, Zone, genotype_mean, calc_squared_distances
 export choose_closest_male, calc_match_strength, generate_offspring_genotype
 
 """
@@ -91,7 +91,7 @@ function choose_closest_male_from_zone(
     locations_M::Vector{Location},
     location_mother::Location)
     return elig_M[argmin(
-        get_squared_distances(
+        calc_squared_distances(
             locations_M[elig_M],
             location_mother
         )
@@ -142,6 +142,7 @@ Generate the offspring genotype from the parent genotypes. For each locus (colum
 row for allele from mother, second row for allele from father. The number of loci in each 
 genotype must be equal.
     
+# Example
 ```jldoctest
 julia> generate_offspring_genotype([0 0 0; 0 0 0], [1 1 1; 1 1 1])
 2×3 Matrix:

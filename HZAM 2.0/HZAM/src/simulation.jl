@@ -20,10 +20,10 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
     #functional_loci_range = collect(1:total_loci)
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
-        get_survival_fitness = get_survival_fitness_epistasis
+        calc_survival_fitness = calc_survival_fitness_epistasis
         short_survFitnessMethod = "Ep"
     elseif survival_fitness_method == "hetdisadvantage"
-        get_survival_fitness = get_survival_fitness_hetdisadvantage
+        calc_survival_fitness = calc_survival_fitness_hetdisadvantage
         short_survFitnessMethod = "Het"
     else
         println("ERROR--no survival fitness method chosen--should be either epistasis or hetdisadvantage")
@@ -171,7 +171,7 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
                         for kid in 1:offspring
                             kid_genotype = generate_offspring_genotype(pd.population[zone_index].genotypes_F[mother], pd.population[father_zone].genotypes_M[father])
                             kid_mitochondria = pd.population[zone_index].mitochondria_F[mother]
-                            survival_fitness = get_survival_fitness(kid_genotype, hybrid_survival_loci, w_hyb)
+                            survival_fitness = calc_survival_fitness(kid_genotype, hybrid_survival_loci, w_hyb)
 
                             if survival_fitness > rand()
                                 new_location = Location(pd.population[zone_index].locations_F[mother], sigma_disp) # generates offspring location based on dispersal distance, range, and location of mother
