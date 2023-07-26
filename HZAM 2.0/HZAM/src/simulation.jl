@@ -1,7 +1,5 @@
 using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
 
-global init_plot = create_new_plot
-global update_plot = update_population_plot
 
 # This is the function to run a single HZAM simulation
 function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon makes the following optional keyword arguments  
@@ -51,13 +49,19 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
 
     if do_plot
         # displays plot of individual locations and genotypes
-        genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
-        locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
+        genotypes = [
+            vcat([d.genotypes_F for d in pd.population]...)
+            vcat([d.genotypes_M for d in pd.population]...)
+        ]
+        locations = [
+            vcat([d.locations_F for d in pd.population]...)
+            vcat([d.locations_M for d in pd.population]...)
+        ]
 
-        init_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+        create_new_plot(
             calc_traits_additive(genotypes, functional_loci_range),
-            [],
-            locations)
+            locations
+        )
     end
 
 
@@ -214,12 +218,11 @@ function run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;   # the semicolon 
         if (do_plot && (generation % plot_int == 0))
             genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
             locations = [vcat([d.locations_F for d in pd.population]...); vcat([d.locations_M for d in pd.population]...)]
-            update_plot(calc_traits_additive(genotypes, collect(1:total_loci)),
+            update_population_plot(
                 calc_traits_additive(genotypes, functional_loci_range),
-                [],
                 locations,
-                generation,
-                sigma_disp)
+                generation
+            )
         end
 
         if generation > max_generations - 20

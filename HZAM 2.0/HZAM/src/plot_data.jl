@@ -1,3 +1,4 @@
+"Functions for plotting data while the simulation is running."
 module Plot_Data
 
 export create_new_plot, update_population_plot
@@ -12,33 +13,78 @@ import ColorSchemes.plasma
 using GLMakie
 using ..DataAnalysis
 
-GLMakie.activate!(inline=false)
+GLMakie.activate!(inline=false) # set up the plot to display in its own window
 
-global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25), (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25), (:black, 0.25)]
-
-global ax, points, points_active, points_inactive, mitochondria_points
+"Colors for cline curves"
+global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25),
+    (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25),
+    (:black, 0.25)]
+"Axes on which the locations are plotted"
+global ax
+"Points showing the location and hybrid index of every individual"
+global points
+"Sigmoid curves representing the clines"
 global sigmoid_lines = []
-global hybrid_zone_widths = []
-global hybrid_zone_positions = [0.5]
 
-# creates the initial plot at the beginning of the simulation
-function create_new_plot(hybrid_indices_all, hybrid_indices_functional, mitochondria, locations)
-    locations_x = [l.x for l in locations] # x coordinates of all individuals in the simulation
-    locations_y = [l.y for l in locations] # y coordinates of all individuals in the simulation
+"""
+    create_new_plot(
+        hybrid_indices_functional::Vector,
+        locations::Vector
+    )
+
+Initialize the plot of locations and hybrid indices.
+"""
+function create_new_plot(
+    hybrid_indices_functional::Vector,
+    locations::Vector
+)
+    locations_x = [l.x for l in locations] # x coordinates of all individuals
+    locations_y = [l.y for l in locations] # y coordinates of all individuals
 
     fontsize_theme = Theme(fontsize=60)
-    set_theme!(fontsize_theme)  # this sets the standard font size
+    set_theme!(fontsize_theme)  # set the standard font size
     fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    global ax = Axis(fig[1, 1], xlabel="location_x", ylabel="location_y", title=string("HZAM simulation, generation = ", 0), xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
-    xlims!(-0.03, 1.03) # sets the limits for the plotted area
+    # create the axis and labels
+    global ax = Axis(
+        fig[1, 1],
+        xlabel="location_x",
+        ylabel="location_y",
+        title=string("HZAM simulation, generation = ", 0),
+        xticklabelsize=45,
+        yticklabelsize=45,
+        titlegap=30
+    )
+    # set the limits for the plotted area
+    xlims!(-0.03, 1.03)
     ylims!(-0.03, 1.03)
-    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional) # adds the location of every individual to the plot
+
+    # add the location of every individual to the plot
+    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional)
 
     display(fig)
 end
 
-# updates the existing plot
-function update_population_plot(hybrid_indices_all, hybrid_indices_functional, mitochondria, locations, generation, sigma_disp)
+"""
+    function update_population_plot(
+        hybrid_indices_functional::Vector,
+        locations::Vector,
+        generation::Integer
+    )
+
+Update the existing plot with new locations and hybrid indices.
+
+# Arguments
+- `hybrid_indices_functional::Vector`: list of the hybrid index (value between 0 and 1) of 
+every individual.
+- `locations::Vector`: the location of every individual 
+(must be in the same order as the hybrid indices).
+- `generation::Integer`: the number of elapsed generations.
+"""
+function update_population_plot(
+    hybrid_indices_functional::Vector,
+    locations::Vector,
+    generation::Integer
+)
     locations_x = [l.x for l in locations] # x coordinates of all individuals in the simulation
     locations_y = [l.y for l in locations] # y coordinates of all individuals in the simulation
 
@@ -50,42 +96,34 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
 
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional, markersize=10) # adds the location of every individual to the plot
 
-    
+
     sigmoid_curves = [calc_sigmoid_curve(locations_x[sorted_indices[i]], hybrid_indices_functional[sorted_indices[i]]) for i in eachindex(sorted_indices)]
 
     hybrid_zone_widths = [calc_width(sigmoid_curves[i]) for i in eachindex(sigmoid_curves)]
 
-    [push!(sigmoid_lines, lines!(ax, spaced_locations, scale_sigmoid_curve(sigmoid_curves[i], i), color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
-
-    gene_flow = calc_gene_flow(hybrid_indices_all, hybrid_indices_functional)
+    [push!(sigmoid_lines, lines!(ax, spaced_locations, scale_curve(sigmoid_curves[i], i), color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
 
     ax.title = string("HZAM simulation, generation = ", generation)
-
-    
-    push!(hybrid_zone_positions, calc_position(sigmoid_curves))
-    
-    if generation > 20
-        push!(hybrid_zone_widths, sum(hybrid_zone_widths) / 10)
-    end
 
     println("generation: ", generation, "; individuals: ", length(locations))
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
     println("hybrid zone length: ", calc_length(sigmoid_curves))
-    println("gene flow: ", gene_flow)
-    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, sigma_disp))
+    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, 0.05))
     println("overlap: ", calc_overlap_overall(locations_x, hybrid_indices_functional, sorted_indices))
-    println("variance: ", calc_variance(hybrid_zone_positions))
     println("")
 end
 
+"""
+    scale_curve(curve, index::Real)
 
-# This function adds jitter (small random shifts in position, to better visualize overlapping points)
-function jitter(n, factor=0.02)
-    n .+ (0.5 .- rand(length(n))) .* factor
-end
+Scale the curve output to display on the plot over the corresponding y-axis range.
 
-# scales the sigmoid curve to show up on the plot at the corresponding y-axis range
-function scale_sigmoid_curve(sigmoid_curve, index)
-    (sigmoid_curve .* 0.1) .+ Ref((index - 1) * 0.1)
+# Arguments
+- `curve`: the output of a function approximating the data whose range is [0,1]
+- `index::Integer`: the index of the corresponding range on the y-axis. 1 refers to 
+[0, 0.1), 2 to [0.1, 0.2) and so on.
+"""
+function scale_curve(curve, index::Integer)
+    (curve .* 0.1) .+ Ref((index - 1) * 0.1)
 end
-end
+end # end of Plot_Data module
