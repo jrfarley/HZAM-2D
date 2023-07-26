@@ -376,7 +376,7 @@ function calc_linkage_diseq_all(path, plot_title)
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
     fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    ax = Axis(fig[1, 1], xlabel="trait", ylabel="trait", title=plot_title, xticklabelsize=45, yticklabelsize=45, xticks = (1:5, traits), yticks = (1:5, traits), xticklabelrotation = pi/2, titlegap=30) # creates the axes and labels
+    ax = Axis(fig[1, 1], xlabel="trait", ylabel="trait", title=plot_title, xticklabelsize=45, yticklabelsize=45, xticks=(1:5, traits), yticks=(1:5, traits), xticklabelrotation=pi / 2, titlegap=30) # creates the axes and labels
 
 
     points = scatter!(ax, xs, ys, color=output, markersize=50) # adds the location of every individual to the plot
@@ -385,43 +385,114 @@ function calc_linkage_diseq_all(path, plot_title)
 
     display(fig)
     dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/gene_linkages")
-    filepath = string(dir, "/", plot_title,".png")
+    filepath = string(dir, "/", plot_title, ".png")
 
     save(filepath, fig)
 end
 
 # creates and saves a graph showing the competition trait cline
 function check_competition_trait(path)
-    @load path genotypes 
+    @load path genotypes
     hybrid_indices = calc_traits_additive(genotypes, 9:12)
     sort!(hybrid_indices)
 
-    
+
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
     fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    ax = Axis(fig[1, 1], title="competition_trait", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
+    ax = Axis(fig[1, 1], title="competition_trait, ecolDiff=1", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices,markersize=20) # adds the location of every individual to the plot
+    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices, markersize=20) # adds the location of every individual to the plot
 
     display(fig)
-    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/competition_trait-", path,".png"), fig)
+    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/competition_trait-ecolDiff1_w_hyb_0.8_S_AM100.png"), fig)
+end
+
+# creates and saves a graph showing the competition trait cline
+function check_neutral_trait(path)
+    @load path genotypes
+    hybrid_indices = calc_traits_additive(genotypes, 17:20)
+    sort!(hybrid_indices)
+
+
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    ax = Axis(fig[1, 1], title="neutral trait, ecolDiff=1", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
+
+    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices, markersize=20) # adds the location of every individual to the plot
+
+    display(fig)
+    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/neutral_trait_ecolDiff_1_w_hyb_0.8_S_AM100.png"), fig)
 end
 
 # creates and saves a graph showing the male mating trait cline
 function check_male_mating_trait(path)
-    @load path genotypes 
+    @load path genotypes
     hybrid_indices = calc_traits_additive(genotypes, 5:8)
     sort!(hybrid_indices)
 
-    
+
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
     fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    ax = Axis(fig[1, 1], title="male_mating_trait", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
+    ax = Axis(fig[1, 1], title="male_mating_trait, ecolDiff=1", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices,markersize=20) # adds the location of every individual to the plot
+    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices, markersize=20) # adds the location of every individual to the plot
 
     display(fig)
-    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/male_mating_trait-", path,".png"), fig)
+    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/male_mating_trait_ecolDiff_1_w_hyb_0.8_S_AM100.png"), fig)
+end
+
+
+# creates and saves a graph showing the male mating trait cline
+function check_female_mating_trait(path)
+    @load path genotypes
+    hybrid_indices = calc_traits_additive(genotypes, 5:8)
+    sort!(hybrid_indices)
+
+
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    ax = Axis(fig[1, 1], title="female_mating_trait, ecolDiff=1", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
+
+    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices, markersize=20) # adds the location of every individual to the plot
+
+    display(fig)
+    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/female_mating_trait_ecolDiff_1_w_hyb_0.8_S_AM100.png"), fig)
+end
+
+
+# creates and saves a graph showing the male mating trait cline
+function check_hybrid_survival(path)
+    @load path genotypes
+    hybrid_indices = calc_traits_additive(genotypes, 5:8)
+    sort!(hybrid_indices)
+
+
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    ax = Axis(fig[1, 1], title="hybrid_survival, ecolDiff=1", xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
+
+    points = scatter!(ax, collect(eachindex(hybrid_indices)), hybrid_indices, markersize=20) # adds the location of every individual to the plot
+
+    display(fig)
+    save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/hybrid_survival_ecolDiff_1_w_hyb_0.8_S_AM100.png"), fig)
+end
+
+function find_extinct_alleles(path)
+    @load path genotypes
+
+    extinct = []
+    for i in 1:20
+        for j in 0:1
+            n = count(x -> x[1, i] == j || x[2, i] == j, genotypes)
+            if n == 0
+                push!(extinct, i)
+            end
+        end
+    end
+    return extinct
 end

@@ -22,7 +22,9 @@ end
     )
 
 Find the index of the closest male within an area covering multiple zones from a list of 
-eligible males. Return both the male index and its zone index. Return -1 for both values if 
+eligible males. 
+
+Return both the male index and its zone index. Return -1 for both values if 
 no eligible male is found.
 
 # Arguments
@@ -108,7 +110,9 @@ end
     )
 
 Compare the male's mating trait with the female mating trait to determine the match strength 
-along a Gaussian acceptance curve. The acceptance curve is bounded between 0 and 1.
+along a Gaussian acceptance curve. 
+
+The acceptance curve is bounded between 0 and 1.
 
 # Arguments
 - `female_genotype::Matrix`: the genotype of the focal female
@@ -138,9 +142,10 @@ end
         father_genotype::Matrix
     )
 
-Generate the offspring genotype from the parent genotypes. For each locus (column), first 
-row for allele from mother, second row for allele from father. The number of loci in each 
-genotype must be equal.
+Generate the offspring genotype from the parent genotypes. 
+
+For each locus (column), first row for allele from mother, second row for allele from 
+father. The number of loci in each genotype must be equal.
     
 # Example
 ```jldoctest

@@ -49,7 +49,9 @@ struct Location
         Location(starting_location::Location, sigma_disp::Real)
 
     Generate an offspring's location based on the mother's location and the dispersal 
-    distance. The offspring's location is based on a normal distribution with the dispersal 
+    distance. 
+    
+    The offspring's location is based on a normal distribution with the dispersal 
     distance being the standard deviation and the center being the given location.
 
     # Arguments
@@ -243,7 +245,9 @@ struct PopulationData
     """
         calc_zone_population(K_total::Integer, ecolDiff::Real)
 
-    Compute the initial number of individuals in each zone. When ecolDiff=0 this will just 
+    Compute the initial number of individuals in each zone. 
+    
+    When ecolDiff=0 this will just 
     be the carrying capacity (K_total) divided by the number of zones. But when there is an 
     ecological difference between the two species the effective carrying capacity is reduced 
     since not all of the available resources will be used.
@@ -454,7 +458,9 @@ end
     max_radius_squared(x::Real, y::Real, t::Real, max_dist::Real)
 
 Compute the distance from a point along an angle to the limit of the range 
-(defined by x∈[0,1), y∈[0,1)). The distance gets cut off at max_dist. Used in calculating 
+(defined by x∈[0,1), y∈[0,1)). 
+
+The distance gets cut off at max_dist. Used in calculating 
 the ideal densities.
 
 # Arguments

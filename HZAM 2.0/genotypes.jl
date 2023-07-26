@@ -16,7 +16,7 @@ outcome, pd = HZAM.run_one_HZAM_sim(0.8, 100, 1, 1.1; # these values are
 
 
 =#
-filepath = "genotypes_ecolDiff1_w_hyb0.8_S_AM100.jld2"
+filepath = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/genotypes_ecolDiff1_w_hyb0.8_S_AM100.jld2"
 #=
 HZAM.save_genotypes(pd, filepath)
 
@@ -24,4 +24,10 @@ HZAM.calc_linkage_diseq_all(filepath, "Linkage disequilibrium ecolDiff1_w_hyb0.8
 
 HZAM.check_male_mating_trait(filepath)
 =#
-HZAM.check_competition_trait(filepath)
+#=HZAM.check_competition_trait(filepath)
+HZAM.check_neutral_trait(filepath)
+HZAM.check_male_mating_trait(filepath)
+HZAM.check_female_mating_trait(filepath)
+HZAM.check_hybrid_survival(filepath)=#
+
+println(HZAM.find_extinct_alleles(filepath))
