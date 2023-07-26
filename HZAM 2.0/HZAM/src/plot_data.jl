@@ -67,12 +67,6 @@ function update_population_plot(hybrid_indices_all, hybrid_indices_functional, m
     if generation > 20
         push!(hybrid_zone_widths, sum(hybrid_zone_widths) / 10)
     end
-    if generation == 200
-        println("#########################################")
-        println(sum(hybrid_zone_widths) / length(hybrid_zone_widths))
-        println("########################################")
-    end
-
 
     println("generation: ", generation, "; individuals: ", length(locations))
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)

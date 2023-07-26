@@ -7,8 +7,6 @@ using Statistics: mean  # needed for "mean" function
 using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
-using FileIO
-using Tables
 
 # stores the parameters for each simulation
 struct SimulationParameters

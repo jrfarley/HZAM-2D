@@ -11,7 +11,7 @@ using QuadGK
 
     sigma_comp = 0.01
 
-    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
+    ideal_densities = Population.calc_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
 
     max_density = 1000 * quadgk(x -> exp(-(x - 0.5)^2 / (2 * sigma_comp^2)), 0.47, 0.53)[1]
 
@@ -38,7 +38,7 @@ end
 
     sigma_comp = 0.01
 
-    ideal_densities = Population.get_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
+    ideal_densities = Population.calc_ideal_densities(K_total, sigma_comp, locations_F, 0.03) .- Ref(1)
 
     max_density = K_total * quadgk(t->quadgk(r->r*exp(-(r^2)/(2*sigma_comp^2)), 0, 0.03)[1], 0, 2*pi)[1]
 
@@ -52,26 +52,26 @@ end
 
     @test ideal_densities[5] ≈ max_density / 2
 
-    @test Population.get_ideal_densities(K_total, sigma_comp, [Location(0f0, 0f0)], 0.03)[1] - 1 ≈ max_density / 4
+    @test Population.calc_ideal_densities(K_total, sigma_comp, [Location(0f0, 0f0)], 0.03)[1] - 1 ≈ max_density / 4
 end
 
-@testset "calculate_ind_useResource_no_ecolDiff" begin
+@testset "calc_ind_useResource_no_ecolDiff" begin
     ecolDiff = 0.0
     competition_traits_F = [0, 1]
 
-    ind_useResourceA_F = Population.calculate_ind_useResourceA(competition_traits_F, ecolDiff)
-    ind_useResourceB_F = Population.calculate_ind_useResourceB(competition_traits_F, ecolDiff)
+    ind_useResourceA_F = Population.calc_ind_useResourceA(competition_traits_F, ecolDiff)
+    ind_useResourceB_F = Population.calc_ind_useResourceB(competition_traits_F, ecolDiff)
 
     @test ind_useResourceA_F == [0.5, 0.5]
     @test ind_useResourceB_F == [0.5, 0.5]
 end
 
-@testset "calculate_ind_useResource_with_ecolDiff" begin
+@testset "calc_ind_useResource_with_ecolDiff" begin
     ecolDiff = 1.0
     competition_traits_F = [0, 1]
 
-    ind_useResourceA_F = Population.calculate_ind_useResourceA(competition_traits_F, ecolDiff)
-    ind_useResourceB_F = Population.calculate_ind_useResourceB(competition_traits_F, ecolDiff)
+    ind_useResourceA_F = Population.calc_ind_useResourceA(competition_traits_F, ecolDiff)
+    ind_useResourceB_F = Population.calc_ind_useResourceB(competition_traits_F, ecolDiff)
 
 
     @test ind_useResourceA_F == [1, 0]
@@ -86,10 +86,10 @@ end
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    deme = Population.Deme([fill(1, 2, 3), fill(1, 2, 3)], [], [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)], [], [1], [], [1], 0)
-    empty_deme = Population.Deme([], [], [], [], [1], [], [1:1], 0)
+    zone = Population.Zone([fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)], Matrix{Int8}[], [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)], Location[], [Int8(1)], Int8[], [1], 0)
+    empty_zone = Population.Zone(Matrix{Int8}[], Matrix{Int8}[], Location[], Location[], [Int8(1)], Int8[], [1:1], 0)
 
-    growth_rates_F = Population.calculate_growth_rates([empty_deme empty_deme empty_deme; empty_deme deme empty_deme; empty_deme empty_deme empty_deme],
+    growth_rates_F = Population.calc_growth_rates([empty_zone empty_zone empty_zone; empty_zone zone empty_zone; empty_zone empty_zone empty_zone],
         CartesianIndex(2, 2),
         K_total,
         sigma_comp,

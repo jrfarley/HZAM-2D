@@ -7,7 +7,6 @@ include("data_analysis.jl") # functions for analyzing data (calculating width/le
 include("population.jl") # data types and functions for initializing population with genotypes, locations, growth rates, etc.
 include("mating.jl") # functions for finding a mate and determining match strength
 include("plot_data.jl")
-include("data_analysis.jl")
 
 using .Population
 using .DataAnalysis

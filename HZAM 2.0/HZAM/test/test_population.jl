@@ -1,5 +1,5 @@
 @testset "initialize_population_1" begin
-    n = Population.NUM_DEMES
+    n = Population.NUM_ZONES
     K_total = 2 * (n^2)
     ecolDiff = 0
     total_loci = 3
@@ -54,13 +54,12 @@ end
 
 @testset "disperse_individual" begin
     locations = Location[]
-    geographic_limits = [Location(0.0f0, 0.0f0), Location(1.0f0, 1.0f0)]
     sigma_disp = 0.01
 
     num_fail = 0
 
     for i in 1:1000
-        new_location = Location(Location(0.5f0, 0.5f0), sigma_disp, geographic_limits)
+        new_location = Location(Location(0.5f0, 0.5f0), sigma_disp)
         push!(locations, new_location)
         if new_location.x < 0.5 - 2 * sigma_disp || new_location.x > 0.5 + 2 * sigma_disp || new_location.y < 0.5 - 2 * sigma_disp || new_location.y > 0.5 + 2 * sigma_disp
             num_fail += 1
@@ -78,13 +77,13 @@ end
 
 end
 
-@testset "mean" begin
+@testset "genotype_mean" begin
     genotypes = [[1 0 1; 0 1 0], [0 0 1; 1 0 0], [1 1 1; 1 1 1]]
 
-    @test Population.mean(genotypes[1], collect(1:2)) == 0.5
+    @test Population.genotype_mean(genotypes[1], collect(1:2)) == 0.5
 
-    @test Population.mean(genotypes[2], [2]) == 0
-    @test Population.mean(genotypes[3], collect(1:3)) == 1
+    @test Population.genotype_mean(genotypes[2], [2]) == 0
+    @test Population.genotype_mean(genotypes[3], collect(1:3)) == 1
 end
 
 @testset "assign_zone" begin

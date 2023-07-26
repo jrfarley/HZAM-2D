@@ -322,7 +322,6 @@ struct PopulationData
         new(zones, growth_rates_F)
     end
 
-    # creates new PopulationData with the genotypes, locations, and mitochondria from the offspring
     """
         PopulationData(
             genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
@@ -599,11 +598,16 @@ function calc_growth_rates(
 
     locations_F = population[zone_index].locations_F
 
-    # determine which zones are needed to calculate growth rates
-    # zones that are further than 0.03 units away from all females in the current zone are 
-    # not used in the growth rate calculations.
+    #= 
+    Determine which zones are needed to calculate growth rates. Zones that are further than 
+    0.03 units away from all females in the current zone are not used in the growth rate 
+    calculations.
+    =#
     lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
-    upper_right = min(zone_index + CartesianIndex(1, 1), CartesianIndex(NUM_ZONES, NUM_ZONES))
+    upper_right = min(
+        zone_index + CartesianIndex(1, 1),
+        CartesianIndex(NUM_ZONES, NUM_ZONES)
+    )
     neighbourhood = population[lower_left:upper_right]
 
 
@@ -718,7 +722,10 @@ Compute the survival fitness of an individual according to heterozygosity.
 - `genotype:Matrix`: the individual's genotype.
 - `w_hyb::Real`: the simulation's hybrid fitness value.
 """
-function calc_survival_fitness_hetdisadvantage(genotype::Matrix, w_hyb::Real)::Vector{Float32}
+function calc_survival_fitness_hetdisadvantage(
+    genotype::Matrix,
+    w_hyb::Real
+)::Vector{Float32}
     num_loci = size(genotype, 2)
     s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
     num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
@@ -728,7 +735,12 @@ function calc_survival_fitness_hetdisadvantage(genotype::Matrix, w_hyb::Real)::V
 end
 
 """
-    calc_survival_fitness_epistasis(genotype::Matrix, hybrid_survival_loci, w_hyb::Real, beta::Real=1)
+    calc_survival_fitness_epistasis(
+        genotype::Matrix, 
+        hybrid_survival_loci, 
+        w_hyb::Real, 
+        beta::Real=1
+    )
 
 Compute the survival fitness of an individual according to epistasis, with the beta 
 parameter set to one as a default.
@@ -740,7 +752,11 @@ the survival fitness.
 - `w_hyb::Real`: the simulation's hybrid fitness value.
 - `beta::Real`
 """
-function calc_survival_fitness_epistasis(genotype::Matrix, hybrid_survival_loci, w_hyb::Real, beta::Real=1)::Float32
+function calc_survival_fitness_epistasis(genotype::Matrix,
+    hybrid_survival_loci,
+    w_hyb::Real,
+    beta::Real=1
+)::Float32
     survival_HI = genotype_mean(genotype, hybrid_survival_loci)
     epistasis_fitnesses = 1 - (1 - w_hyb) * (4 * survival_HI * (1 - survival_HI))^beta
     return epistasis_fitnesses
