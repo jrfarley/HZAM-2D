@@ -1,59 +1,163 @@
+"Functions involved in mate selection and generating the offspring genotype."
 module Mating
-using ..Population
-export choose_closest_male, calc_match_strength, generate_offspring_genotype,a
+using ..Population: Location, Zone, genotype_mean, get_squared_distances
+export choose_closest_male, calc_match_strength, generate_offspring_genotype
 
-# calculates the distance between two points
-function distance(location1, location2)
+"""
+    distance(location1::Location, location2::Location)
+
+Compute the distance between `location1` and `location2`.
+"""
+function distance(location1::Location, location2::Location)
     return sqrt((location1.x - location2.x)^2 + (location1.y - location2.y)^2)
 end
 
-# finds the closest male and updates list of eligible males
-function choose_closest_male(zones::Matrix{Zone}, zone_indices::Vector{CartesianIndex{2}}, elig_M::Dict{CartesianIndex,Vector{Int64}}, location_mother::Location, neighbourhood_size::Float32)
+"""
+    choose_closest_male(
+        zones::Matrix{Zone}, 
+        zone_indices::Vector{CartesianIndex{2}}, 
+        elig_M::Dict{CartesianIndex,Vector{Int64}}, 
+        location_mother::Location, 
+        neighbourhood_size::Float32
+    )
 
+Find the index of the closest male within an area covering multiple zones from a list of 
+eligible males. Return both the male index and its zone index. Return -1 for both values if 
+no eligible male is found.
+
+# Arguments
+- `zones::Matrix{Zone}`: the matrix storing the population data for each zone.
+- `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the 
+closest male.
+- `elig_M::Dict{CartesianIndex,Vector{Int64}}`: the indices of all the eligible males in 
+each zone.
+- `location_mother::Location`: the location from which the males' distances are computed.
+- `neighbourhood_size::Float32`: the distance cutoff for the search.
+"""
+function choose_closest_male(
+    zones::Matrix{Zone},
+    zone_indices::Vector{CartesianIndex{2}},
+    elig_M::Dict{CartesianIndex,Vector{Int64}},
+    location_mother::Location,
+    neighbourhood_size::Float32
+)
     shortest_distance = neighbourhood_size # males further than this distance are ignored
     output_male = -1
     output_zone = -1
     for zone_index in zone_indices # loop through the zones that are nearby
-        if length(elig_M[zone_index]) == 0 # checks if there are any remaining males that have not been passed over already
+
+        # check if there are any remaining males that have not been passed over already
+        if length(elig_M[zone_index]) == 0
             continue
         end
 
-        male_index = choose_closest_male_from_zone(elig_M[zone_index], zones[zone_index].locations_M, location_mother) # finds the closest male in that zone to the female
-        male_distance = distance(zones[zone_index].locations_M[male_index], location_mother) # calculates distance from the mother's location to the closest male
-        if male_distance < shortest_distance # checks if the distance is smaller than the previous closest distance
+        # find the closest male in that zone to the female
+        male_index = choose_closest_male_from_zone(
+            elig_M[zone_index],
+            zones[zone_index].locations_M,
+            location_mother
+        )
+
+        # calculate distance from the mother's location to the closest male
+        male_distance = distance(zones[zone_index].locations_M[male_index], location_mother)
+
+        # check if the distance is smaller than the previous closest distance
+        if male_distance < shortest_distance
             output_male = male_index
             output_zone = zone_index
             shortest_distance = male_distance
         end
-        # keeps track of the index and remaining eligible males if the male is within the cutoff distance
     end
 
     return output_male, output_zone
 end
 
-# Finds the closest male given a list of eligible males
-function choose_closest_male_from_zone(elig_M::Vector{Int64}, locations_M::Vector{Location}, location_mother::Location)
-    return elig_M[argmin(Population.get_squared_distances(locations_M[elig_M], location_mother))] # this gets the index of a closest male, and removes that male from the list in elig_M
+"""
+    choose_closest_male_from_zone(
+        elig_M::Vector{Int64}, 
+        locations_M::Vector{Location}, 
+        location_mother::Location
+    )
+
+Find the index of the closest male within a single zone from a list of eligible males.
+
+# Arguments
+- `elig_M::Vector{Int64}`: the indices of all the eligible males.
+- `locations_M::Vector{Location}`: the locations of all the males in the zone.
+- `location_mother::Location`: the location from which the males' distances are computed.
+"""
+function choose_closest_male_from_zone(
+    elig_M::Vector{Int64},
+    locations_M::Vector{Location},
+    location_mother::Location)
+    return elig_M[argmin(
+        get_squared_distances(
+            locations_M[elig_M],
+            location_mother
+        )
+    )]
 end
 
-# compare male trait with female's trait (preference), and determine
-# whether she accepts; note that match_strength is determined by a
-# Gaussian, with a maximum of 1 and minimum of zero
-function calc_match_strength(female_genotype, male_genotype, pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    mating_trait_male = mean(male_genotype, male_mating_trait_loci)
-    mating_trait_female = mean(female_genotype, female_mating_trait_loci)
+"""
+    calc_match_strength(
+        female_genotype::Matrix, 
+        male_genotype::Matrix, 
+        pref_SD::Float64, 
+        female_mating_trait_loci, 
+        male_mating_trait_loci
+    )
+
+Compare the male's mating trait with the female mating trait to determine the match strength 
+along a Gaussian acceptance curve. The acceptance curve is bounded between 0 and 1.
+
+# Arguments
+- `female_genotype::Matrix`: the genotype of the focal female
+- `male_genotype::Matrix`: the genotype of the focal male
+- `pref_SD::Float64`: width of the Gaussian acceptance curve
+- `female_mating_trait_loci`: the loci contributing to the female's mate preference
+- `male_mating_trait_loci`: the loci contributing to the male's trait
+"""
+function calc_match_strength(
+    female_genotype::Matrix,
+    male_genotype::Matrix,
+    pref_SD::Float64,
+    female_mating_trait_loci,
+    male_mating_trait_loci
+)
+    # calculate the mean value of the male and female mating traits
+    mating_trait_male = genotype_mean(male_genotype, male_mating_trait_loci)
+    mating_trait_female = genotype_mean(female_genotype, female_mating_trait_loci)
 
     mating_trait_dif = mating_trait_male - mating_trait_female
     return exp((-(mating_trait_dif^2)) / (2 * (pref_SD^2)))
 end
 
-# generates the genotype for an offspring based on its parents' genotypes
-function generate_offspring_genotype(mother_genotype, father_genotype)
+"""
+    generate_offspring_genotype(
+        mother_genotype::Matrix, 
+        father_genotype::Matrix
+    )
+
+Generate the offspring genotype from the parent genotypes. For each locus (column), first 
+row for allele from mother, second row for allele from father. The number of loci in each 
+genotype must be equal.
+    
+```jldoctest
+julia> generate_offspring_genotype([0 0 0; 0 0 0], [1 1 1; 1 1 1])
+2×3 Matrix:
+ 0  0  0
+ 1  1  1
+```
+"""
+function generate_offspring_genotype(
+    mother_genotype::Matrix, 
+    father_genotype::Matrix
+    )
     total_loci = size(mother_genotype, 2)
-    # generate genotypes; for each locus (column), first row for allele from mother, second row for allele from father
-    kid_genotype = Array{Int8,2}(undef, 2, total_loci)
+    kid_genotype = Matrix(undef, 2, total_loci)
     for locus in 1:total_loci
-        kid_genotype[1, locus] = mother_genotype[rand([1 2]), locus]  # for this locus, pick a random allele from the mother
+        # pick a random allele from the mother
+        kid_genotype[1, locus] = mother_genotype[rand([1 2]), locus]  
         kid_genotype[2, locus] = father_genotype[rand([1 2]), locus]  # and from the father
     end
 

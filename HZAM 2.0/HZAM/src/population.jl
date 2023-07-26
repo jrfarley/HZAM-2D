@@ -8,7 +8,7 @@ export PopulationData, Location, Zone
 export calc_traits_additive
 export assign_zone
 export NUM_ZONES
-export mean
+export genotype_mean
 export get_survival_fitness_epistasis, get_survival_fitness_hetdisadvantage
 
 NUM_ZONES = 10
@@ -347,7 +347,7 @@ end
 
 
 # calculates the mean value of the genotype across the list of loci given
-function mean(genotype, loci)
+function genotype_mean(genotype::Matrix, loci)
     return sum(genotype[:, loci]) / (2 * length(loci))
 end
 
@@ -358,12 +358,12 @@ function calc_traits_additive(genotypes, loci)::Vector{Float32} #=::Array{Int8,3
     N = length(genotypes)
     #traits = Vector{Float32}(undef, N) # Float32 should be enough precision; memory saving compared to Float64
 
-    traits = map(x -> mean(genotypes[x], loci), 1:N)
+    traits = map(x -> genotype_mean(genotypes[x], loci), 1:N)
     return traits
 end
 
 # This function calculates survival fitness of each individual according to heterozygosity.
-function get_survival_fitness_hetdisadvantage(genotype::Array{Int8,2}, w_hyb::Real)::Vector{Float32}
+function get_survival_fitness_hetdisadvantage(genotype::Matrix, w_hyb::Real)::Vector{Float32}
     num_loci = size(genotype, 2)
     s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
     num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
@@ -374,8 +374,8 @@ end
 
 # This function calculates survival fitness of each individual according to epistasis,
 # with the beta parameter set to one as a default.
-function get_survival_fitness_epistasis(genotype::Array{Int8,2}, hybrid_survival_loci, w_hyb::Real, beta=1::Real)::Float32
-    survival_HI = mean(genotype, hybrid_survival_loci)
+function get_survival_fitness_epistasis(genotype::Matrix, hybrid_survival_loci, w_hyb::Real, beta=1::Real)::Float32
+    survival_HI = genotype_mean(genotype, hybrid_survival_loci)
     epistasis_fitnesses = 1 - (1 - w_hyb) * (4 * survival_HI * (1 - survival_HI))^beta
     return epistasis_fitnesses
 end
