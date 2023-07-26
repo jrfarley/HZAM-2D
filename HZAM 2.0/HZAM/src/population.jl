@@ -186,7 +186,7 @@ struct Zone
     - `locations_M::Vector{Location}`: the male locations.
     - `mitochondria_F::Vector{Int8}`: the female mitochondria.
     - `mitochondria_M::Vector{Int8}`: the male mitochondria.
-    - `competition_trait_loci`: list of the loci specifying the ecological trait (used in 
+    - `competition_trait_loci`: the loci specifying the ecological trait (used in 
     fitness related to resource use).
     - `ecolDiff::Real`: the ecological difference between the two species.
     """
