@@ -15,7 +15,7 @@ end
     choose_closest_male(
         zones::Matrix{Zone}, 
         zone_indices::Vector{CartesianIndex{2}}, 
-        elig_M::Dict{CartesianIndex,Vector{Int64}}, 
+        elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}, 
         location_mother::Location, 
         neighbourhood_size::Float32
     )
@@ -30,7 +30,7 @@ no eligible male is found.
 - `zones::Matrix{Zone}`: the matrix storing the population data for each zone.
 - `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the 
 closest male.
-- `elig_M::Dict{CartesianIndex,Vector{Int64}}`: the indices of all the eligible males in 
+- `elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}`: the indices of all the eligible males in 
 each zone.
 - `location_mother::Location`: the location from which the males' distances are computed.
 - `neighbourhood_size::Float32`: the distance cutoff for the search.
@@ -38,7 +38,7 @@ each zone.
 function choose_closest_male(
     zones::Matrix{Zone},
     zone_indices::Vector{CartesianIndex{2}},
-    elig_M::Dict{CartesianIndex,Vector{Int64}},
+    elig_M::Dict{CartesianIndex,<:Vector{<:Integer}},
     location_mother::Location,
     neighbourhood_size::Float32
 )
@@ -75,7 +75,7 @@ end
 
 """
     choose_closest_male_from_zone(
-        elig_M::Vector{Int64}, 
+        elig_M::Vector{<:Integer}, 
         locations_M::Vector{Location}, 
         location_mother::Location
     )
@@ -83,12 +83,12 @@ end
 Find the index of the closest male within a single zone from a list of eligible males.
 
 # Arguments
-- `elig_M::Vector{Int64}`: the indices of all the eligible males.
+- `elig_M::Vector{<:Integer}`: the indices of all the eligible males.
 - `locations_M::Vector{Location}`: the locations of all the males in the zone.
 - `location_mother::Location`: the location from which the males' distances are computed.
 """
 function choose_closest_male_from_zone(
-    elig_M::Vector{Int64},
+    elig_M::Vector{<:Integer},
     locations_M::Vector{Location},
     location_mother::Location)
     return elig_M[argmin(
@@ -101,8 +101,8 @@ end
 
 """
     calc_match_strength(
-        female_genotype::Matrix, 
-        male_genotype::Matrix, 
+        female_genotype::Matrix{<:Integer}, 
+        male_genotype::Matrix{<:Integer}, 
         pref_SD::Float64, 
         female_mating_trait_loci, 
         male_mating_trait_loci
@@ -114,15 +114,15 @@ along a Gaussian acceptance curve.
 The acceptance curve is bounded between 0 and 1.
 
 # Arguments
-- `female_genotype::Matrix`: the genotype of the focal female
-- `male_genotype::Matrix`: the genotype of the focal male
+- `female_genotype::Matrix{<:Integer}`: the genotype of the focal female
+- `male_genotype::Matrix{<:Integer}`: the genotype of the focal male
 - `pref_SD::Float64`: width of the Gaussian acceptance curve
 - `female_mating_trait_loci`: the loci contributing to the female's mate preference
 - `male_mating_trait_loci`: the loci contributing to the male's trait
 """
 function calc_match_strength(
-    female_genotype::Matrix,
-    male_genotype::Matrix,
+    female_genotype::Matrix{<:Integer},
+    male_genotype::Matrix{<:Integer},
     pref_SD::Float64,
     female_mating_trait_loci,
     male_mating_trait_loci
@@ -137,9 +137,9 @@ end
 
 """
     generate_offspring_genotype(
-        mother_genotype::Matrix, 
-        father_genotype::Matrix
-    )
+        mother_genotype::Matrix{<:Integer}, 
+        father_genotype::Matrix{<:Integer}
+    )::Matrix{<:Integer}
 
 Generate the offspring genotype from the parent genotypes. 
 
@@ -155,14 +155,14 @@ julia> generate_offspring_genotype([0 0 0; 0 0 0], [1 1 1; 1 1 1])
 ```
 """
 function generate_offspring_genotype(
-    mother_genotype::Matrix, 
-    father_genotype::Matrix
-    )
+    mother_genotype::Matrix{<:Integer},
+    father_genotype::Matrix{<:Integer}
+)::Matrix{<:Integer}
     total_loci = size(mother_genotype, 2)
-    kid_genotype = Matrix(undef, 2, total_loci)
+    kid_genotype = Matrix{Integer}(undef, 2, total_loci)
     for locus in 1:total_loci
         # pick a random allele from the mother
-        kid_genotype[1, locus] = mother_genotype[rand([1 2]), locus]  
+        kid_genotype[1, locus] = mother_genotype[rand([1 2]), locus]
         kid_genotype[2, locus] = father_genotype[rand([1 2]), locus]  # and from the father
     end
 

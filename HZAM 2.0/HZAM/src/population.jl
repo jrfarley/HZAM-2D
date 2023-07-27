@@ -1,8 +1,8 @@
 "Functions and datatypes for managing population data (locations, genotypes, 
 and growth rates)"
 module Population
-import QuadGK.quadgk
 import ..DataAnalysis.calc_traits_additive
+import QuadGK.quadgk
 
 export PopulationData, Location, Zone
 
@@ -330,7 +330,7 @@ struct PopulationData
             mitochondria_sons::Matrix{Vector{Int8}},
             locations_daughters::Matrix{Vector{Location}},
             locations_sons::Matrix{Vector{Location}},
-            competition_trait_loci,
+            competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
             K_total::Integer,
             sigma_comp::Real,
             intrinsic_R::Real,
@@ -347,8 +347,8 @@ struct PopulationData
     - `mitochondria_sons::Matrix{Vector{Int8}}`: the male mitochondria.
     - `locations_daughters::Matrix{Vector{Location}}`: the female locations.
     - `locations_sons::Matrix{Vector{Location}}`: the male locations.
-    - `competition_trait_loci`: list of the loci specifying the ecological trait (used in 
-    fitness related to resource use).
+    - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: list of the 
+    loci specifying the ecological trait (used in fitness related to resource use).
     - `K_total::Integer`: the carrying capacity of the environment
     - `sigma_comp::Real`: the standard deviation for the normal curve used in calculating 
     local density.
@@ -362,7 +362,7 @@ struct PopulationData
         mitochondria_sons::Matrix{Vector{Int8}},
         locations_daughters::Matrix{Vector{Location}},
         locations_sons::Matrix{Vector{Location}},
-        competition_trait_loci,
+        competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         K_total::Integer,
         sigma_comp::Real,
         intrinsic_R::Real,
@@ -688,7 +688,7 @@ function calc_growth_rates(
 end
 
 """
-    genotype_mean(genotype::Matrix, loci)
+    genotype_mean(genotype::Matrix{<:Integer}, loci::Union{UnitRange{<:Integer},Vector{<:Integer}})
 
 Compute the mean value of the genotype across the list of loci given.
 
@@ -698,21 +698,24 @@ julia> genotype_mean([0 1 0; 0 1 0], [1,3])
 0.0
 ```
 """
-function genotype_mean(genotype::Matrix, loci)
+function genotype_mean(
+    genotype::Matrix{<:Integer},
+    loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+)
     return sum(genotype[:, loci]) / (2 * length(loci))
 end
 
 """
-    calc_survival_fitness_hetdisadvantage(genotype::Matrix, w_hyb::Real)
+    calc_survival_fitness_hetdisadvantage(genotype::Matrix{<:Integer}, w_hyb::Real)
 
 Compute the survival fitness of an individual according to heterozygosity.
 
 # Arguments
-- `genotype:Matrix`: the individual's genotype.
+- `genotype:Matrix{<:Integer}`: the individual's genotype.
 - `w_hyb::Real`: the simulation's hybrid fitness value.
 """
 function calc_survival_fitness_hetdisadvantage(
-    genotype::Matrix,
+    genotype::Matrix{<:Integer},
     w_hyb::Real
 )::Vector{Float32}
     num_loci = size(genotype, 2)
@@ -725,8 +728,8 @@ end
 
 """
     calc_survival_fitness_epistasis(
-        genotype::Matrix, 
-        hybrid_survival_loci, 
+        genotype::Matrix{<:Integer}, 
+        hybrid_survival_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}, 
         w_hyb::Real, 
         beta::Real=1
     )
@@ -735,14 +738,14 @@ Compute the survival fitness of an individual according to epistasis, with the b
 parameter set to one as a default.
 
 # Arguments
-- `genotype:Matrix`: the individual's genotype.
-- `hybrid_survival_loci`: the loci responsible for heterozygote disadvantage in computing 
-the survival fitness.
+- `genotype:Matrix{<:Integer}`: the individual's genotype.
+- `hybrid_survival_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci 
+responsible for heterozygote disadvantage in computing the survival fitness.
 - `w_hyb::Real`: the simulation's hybrid fitness value.
 - `beta::Real`
 """
-function calc_survival_fitness_epistasis(genotype::Matrix,
-    hybrid_survival_loci,
+function calc_survival_fitness_epistasis(genotype::Matrix{<:Integer},
+    hybrid_survival_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
     w_hyb::Real,
     beta::Real=1
 )::Float32

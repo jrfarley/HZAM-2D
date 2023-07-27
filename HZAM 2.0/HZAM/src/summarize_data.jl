@@ -343,38 +343,26 @@ end
 
 # calculates the linkage disequilibrium between loci using Pearson coefficients
 # and returns a table of values representing the average correlation between two traits
-function calc_linkage_diseq_all(path, plot_title)
+function plot_trait_correlations_all(path, loci, plot_title)
 
     @load path genotypes
 
+    trait_correlations= DataAnalysis.calc_all_trait_correlations(genotypes, loci)
 
-    num_loci = size(genotypes[1], 2)
+    xs = [t[1] for t in trait_correlations]
+    ys = [t[2] for t in trait_correlations]
+    output = [t[3] for t in trait_correlations]
 
-    rows = (1:num_loci)
-    cols = (1:num_loci)'
+    xs = map(x->findall(z->z==x, keys(loci))[1], xs)
+    ys=map(y->findall(z->z==y, keys(loci))[1], ys)
 
-    calc_linkage_diseq(genotypes, 5, 6)
-
-    linkage_diseq = calc_linkage_diseq.(Ref(genotypes), rows, cols)
-
-    traits = ["f mating", "m mating", "competition", "hybrid survival", "neutral"]
-
-    loci = [1:4, 5:8, 9:12, 13:16, 17:20]
-
-    function average_linkage_diseq(l1, l2)
-        return l1, l2, mean(linkage_diseq[loci[l1], loci[l2]])
-    end
-
-    avg_linkage_diseq = [average_linkage_diseq.((1:5), (1:5)')...]
-
-    xs = [a[1] for a in avg_linkage_diseq]
-    ys = [a[2] for a in avg_linkage_diseq]
-    output = [a[3] for a in avg_linkage_diseq]
+    ticks = (1:length(loci))
+    labels = [string.(keys(loci))...]
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # this sets the standard font size
     fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    ax = Axis(fig[1, 1], xlabel="trait", ylabel="trait", title=plot_title, xticklabelsize=45, yticklabelsize=45, xticks=(1:5, traits), yticks=(1:5, traits), xticklabelrotation=pi / 2, titlegap=30) # creates the axes and labels
+    ax = Axis(fig[1, 1], xlabel="trait", ylabel="trait", title=plot_title, xticklabelsize=45, yticklabelsize=45, xticks=(ticks, labels), yticks=(ticks, labels), xticklabelrotation=pi / 2, titlegap=30) # creates the axes and labels
 
 
     points = scatter!(ax, xs, ys, color=output, markersize=50) # adds the location of every individual to the plot
@@ -382,7 +370,7 @@ function calc_linkage_diseq_all(path, plot_title)
     Colorbar(fig[1, 4], points, label="Pearson coefficient", height=Relative(1.0))
 
     display(fig)
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/gene_linkages")
+    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/trait_correlations_ecolDiff1")
     filepath = string(dir, "/", plot_title, ".png")
 
     save(filepath, fig)

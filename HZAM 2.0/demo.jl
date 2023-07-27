@@ -7,9 +7,9 @@ K = 20000
 println(K) 
 
 
-outcome, pd = HZAM.run_one_HZAM_sim(0.3, 10, 1, 1.1; # these values are 
+outcome, pd, loci = HZAM.run_one_HZAM_sim(0.3, 10, 1, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=K, max_generations=20,
+    K_total=K, max_generations=2,
     sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=1,
     total_loci=20,
     female_mating_trait_loci=1:4,

@@ -8,11 +8,12 @@ include("population.jl") # data types and functions for initializing population 
 include("mating.jl") # functions for finding a mate and determining match strength
 include("plot_data.jl")
 
-using .Population
-import .Population.NUM_ZONES
 import .DataAnalysis
 import .Mating
-using .Plot_Data
+import .Population.NUM_ZONES
+
+using .PlotData
+using .Population
 
 include("simulation.jl") # main function for running a simulation
 include("summarize_data.jl")

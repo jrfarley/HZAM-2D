@@ -47,7 +47,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     sigma_comp=0.01, do_plot=true, plot_int=10)
 
     # to keep track of the key measures while the simulation is running
-    output_data = OutputData[]
+    output_data = DataAnalysis.OutputData[]
 
     overall_loci_range = collect(1:total_loci)
 
@@ -389,7 +389,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             ]
             push!(
                 output_data,
-                calc_output_data(
+                DataAnalysis.calc_output_data(
                     locations,
                     sigma_disp,
                     genotypes,
@@ -401,6 +401,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         end
     end # of loop through generations
 
-    return average_output_data(output_data), pd
+    return DataAnalysis.average_output_data(output_data), pd, loci
 end # of module
 

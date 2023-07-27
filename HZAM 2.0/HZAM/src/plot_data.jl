@@ -1,5 +1,5 @@
 "Functions for plotting data while the simulation is running."
-module Plot_Data
+module PlotData
 
 export create_new_plot, update_population_plot
 
