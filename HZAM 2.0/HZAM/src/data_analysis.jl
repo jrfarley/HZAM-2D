@@ -55,7 +55,10 @@ end
 Calculate the average movement of the hybrid zone each generation.
 """
 function calc_variance(positions::Vector{<:Real})
-    zone_movements = map(i -> abs(positions[i] - positions[max(1, i - 1)]), eachindex(positions))
+    zone_movements = map(
+        i -> abs(positions[i] - positions[max(1, i - 1)]),
+        eachindex(positions)
+    )
     return mean(zone_movements)
 end
 
@@ -143,8 +146,11 @@ length of the shortest path traversing the entire range passing through each mid
 """
 function calc_length(sigmoid_curves::Vector{<:Vector{<:Real}})
     total_length = 0.1
-    mid_points = map(x -> spaced_locations[argmin(abs.(sigmoid_curves[x] .- mean(sigmoid_curves[x])))], collect(1:10)) # gets the x coordinates of each sigmoid curve where the curve passes through 0.5 (the middle of the hybrid zone)
-    # add up the distance between each midpoint
+    # get the x coordinates of each sigmoid curve where the curve passes through 0.5
+    mid_points = map(
+        x -> spaced_locations[argmin(abs.(sigmoid_curves[x] .- mean(sigmoid_curves[x])))],
+        collect(1:10))
+    # add up the distances between each midpoint
     for i in 2:10
         total_length += sqrt(0.1^2 + (mid_points[i] - mid_points[i-1])^2)
     end
@@ -173,8 +179,15 @@ function calc_all_gene_flow(
     hybrid_indices_functional::Vector{<:Real},
     loci::NamedTuple
 )
-    species_A_genotypes = genotypes[filter(x -> hybrid_indices_functional[x] < 0.25, eachindex(hybrid_indices_functional))]
-    species_B_genotypes = genotypes[filter(x -> hybrid_indices_functional[x] > 0.75, eachindex(hybrid_indices_functional))]
+    species_A_genotypes = genotypes[filter(
+        x -> hybrid_indices_functional[x] < 0.25,
+        eachindex(hybrid_indices_functional)
+    )]
+
+    species_B_genotypes = genotypes[filter(
+        x -> hybrid_indices_functional[x] > 0.75,
+        eachindex(hybrid_indices_functional)
+    )]
 
     function calc_gene_flow(loci_range)
         species_A_indices = calc_traits_additive(species_A_genotypes, loci_range)
@@ -373,10 +386,20 @@ function calc_bimodality_overall(
     hybrid_indices::Vector{<:Real},
     sigma_disp::Real
 )
-    sorted_locations_x = [locations_x[sorted_indices[i]] for i in eachindex(sorted_indices)]
-    sorted_hybrid_indices = [hybrid_indices[sorted_indices[i]] for i in eachindex(sorted_indices)]
+    sorted_locations_x = [
+        locations_x[sorted_indices[i]] for i in eachindex(sorted_indices)
+    ]
+    sorted_hybrid_indices =
+        [hybrid_indices[sorted_indices[i]] for i in eachindex(sorted_indices)
+        ]
 
-    bimodality_per_range = calc_bimodality_in_range.(sigmoid_curves, sorted_locations_x, sorted_hybrid_indices, Ref(sigma_disp))
+    bimodality_per_range = calc_bimodality_in_range.(
+        sigmoid_curves,
+        sorted_locations_x,
+        sorted_hybrid_indices,
+        Ref(sigma_disp)
+    )
+
     return mean(bimodality_per_range)
 end
 
@@ -430,7 +453,10 @@ average correlation between loci of each trait.
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
 - `loci::NamedTuple`: the name and loci range of each trait of interest.
 """
-function calc_average_linkage_diseq(genotypes::Vector{<:Matrix{<:Integer}}, loci::NamedTuple)
+function calc_average_linkage_diseq(
+    genotypes::Vector{<:Matrix{<:Integer}},
+    loci::NamedTuple
+)
     num_loci = length(loci.overall)
 
     rows = (1:num_loci)
@@ -486,7 +512,10 @@ Compute the correlation between each trait.
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
 - `loci::NamedTuple`: the name and loci range of each trait of interest.
 """
-function calc_all_trait_correlations(genotypes::Vector{<:Matrix{<:Integer}}, loci::NamedTuple)
+function calc_all_trait_correlations(
+    genotypes::Vector{<:Matrix{<:Integer}},
+    loci::NamedTuple
+)
     num_traits = length(loci)
     output = []
 
@@ -631,10 +660,10 @@ function average_gene_data(gene_data::Vector{<:NamedTuple})
     function average_trait_gene_data(trait)
         mean([gd[trait] for gd in gene_data])
     end
-    
+
     traits = keys(gene_data[1])
 
-    return (; zip(traits, map(average_trait_gene_data, traits))...) 
+    return (; zip(traits, map(average_trait_gene_data, traits))...)
 end
 
 """
