@@ -31,7 +31,7 @@ end
     zone_populations = map(l -> l.x < 0.5 ? 1 : 1, zone_locations) # assigns 0 to each zone occupied by population A and 1 to each zone occupied by population B (dividing line down the middle at the beginning)
 
     # initializes the genotypes, locations, and mitochondria for each zone
-    zones = Population.Zone.(Ref(1000),
+    zones = Zone.(Ref(1000),
         Ref(10),
         zone_locations,
         Ref(0.1f0),
@@ -46,7 +46,7 @@ end
         elig_M[i] = 1:length(zones[i].locations_M)
     end
 
-    closest_male, zone_index = choose_closest_male(zones, [CartesianIndex(5, 5)], elig_M, location_mother, 0.1f0)
+    closest_male, zone_index = Mating.choose_closest_male(zones, [CartesianIndex(5, 5)], elig_M, location_mother, 0.1f0)
 
     @test zones[zone_index].locations_M[closest_male] == location_mother
     @test zone_index == CartesianIndex(5, 5)
@@ -61,7 +61,7 @@ end
 
     for i in 1:10
         # initializes the genotypes, locations, and mitochondria for each zone
-        zones = Population.Zone.(Ref(10),
+        zones = Zone.(Ref(10),
             Ref(10),
             zone_locations,
             Ref(0.1f0),
@@ -79,7 +79,7 @@ end
         mitochondria_F = zones[i, i].mitochondria_F
         mitochondria_M = vcat(zones[i, i].mitochondria_M, Int8(1))
 
-        zones[i, i] = Population.Zone(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M, collect(1:2), 0)
+        zones[i, i] = Zone(genotypes_F, genotypes_M, locations_F, locations_M, mitochondria_F, mitochondria_M, collect(1:2), 0)
 
         elig_M = Dict{CartesianIndex,Vector{Int64}}()
 
@@ -88,7 +88,7 @@ end
         end
         neighbourhood = filter(e -> length(elig_M[e]) > 0, CartesianIndex(1, 1):CartesianIndex(10, 10))
 
-        closest_male, zone_index = choose_closest_male(zones, neighbourhood, elig_M, location_mother, 1.0f0)
+        closest_male, zone_index = Mating.choose_closest_male(zones, neighbourhood, elig_M, location_mother, 1.0f0)
 
         @test zones[zone_index].locations_M[closest_male] == location_mother
         @test zone_index == CartesianIndex(i, i)
@@ -100,8 +100,8 @@ end
 @testset "generate_offspring_genotype" begin
     genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
 
-    @test generate_offspring_genotype(genotypes[1], genotypes[2]) == [0 0 0; 1 1 1]
-    @test generate_offspring_genotype(genotypes[1], genotypes[1]) == [0 0 0; 0 0 0]
+    @test Mating.generate_offspring_genotype(genotypes[1], genotypes[2]) == [0 0 0; 1 1 1]
+    @test Mating.generate_offspring_genotype(genotypes[1], genotypes[1]) == [0 0 0; 0 0 0]
 end
 
 
@@ -112,9 +112,9 @@ end
 
     genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
 
-    match_strength1 = calc_match_strength(genotypes[1], genotypes[1], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    match_strength2 = calc_match_strength(genotypes[2], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
-    match_strength3 = calc_match_strength(genotypes[1], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+    match_strength1 = Mating.calc_match_strength(genotypes[1], genotypes[1], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+    match_strength2 = Mating.calc_match_strength(genotypes[2], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
+    match_strength3 = Mating.calc_match_strength(genotypes[1], genotypes[2], pref_SD, female_mating_trait_loci, male_mating_trait_loci)
 
     @test match_strength1 == match_strength2
     @test match_strength1 > match_strength3

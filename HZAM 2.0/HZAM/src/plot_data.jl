@@ -6,7 +6,6 @@ export create_new_plot, update_population_plot
 # for plotting:
 #using Plots
 #gr()  # use GR backend for graphs
-using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 #using Plots.PlotMeasures  # needed for plot margin adjustment
@@ -85,31 +84,55 @@ function update_population_plot(
     locations::Vector,
     generation::Integer
 )
-    locations_x = [l.x for l in locations] # x coordinates of all individuals in the simulation
-    locations_y = [l.y for l in locations] # y coordinates of all individuals in the simulation
+    locations_x = [l.x for l in locations] # x coordinates of all individuals
+    locations_y = [l.y for l in locations] # y coordinates of all individuals
 
-    sorted_indices = sort_y(locations_y) # sorts the indices of the y coordinates
+    sorted_indices = sort_y(locations_y) # sort the indices of the y coordinates
 
-    delete!(ax, points) # removes the old points from the plot
-    [delete!(ax, sigmoid_line) for sigmoid_line in sigmoid_lines] # removes the sigmoid curves from the plot
+    delete!(ax, points) # remove the old points from the plot
+    # remove the sigmoid curves from the plot
+    [delete!(ax, sigmoid_line) for sigmoid_line in sigmoid_lines]
     global sigmoid_lines = []
 
-    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional, markersize=10) # adds the location of every individual to the plot
+    # add the location of every individual to the plot
+    global points = scatter!(
+        ax,
+        locations_x,
+        locations_y,
+        color=hybrid_indices_functional,
+        markersize=10
+    )
 
 
-    sigmoid_curves = [calc_sigmoid_curve(locations_x[sorted_indices[i]], hybrid_indices_functional[sorted_indices[i]]) for i in eachindex(sorted_indices)]
+    sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
 
     hybrid_zone_widths = [calc_width(sigmoid_curves[i]) for i in eachindex(sigmoid_curves)]
 
-    [push!(sigmoid_lines, lines!(ax, spaced_locations, scale_curve(sigmoid_curves[i], i), color=colors[i], linewidth=20)) for i in eachindex(sigmoid_curves)]# adds the curve to the plot
+    # add the curves to the plot
+    [push!(sigmoid_lines, lines!(
+        ax,
+        spaced_locations,
+        scale_curve(sigmoid_curves[i], i),
+        color=colors[i], linewidth=20
+    )) for i in eachindex(sigmoid_curves)]
 
     ax.title = string("HZAM simulation, generation = ", generation)
 
     println("generation: ", generation, "; individuals: ", length(locations))
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
     println("hybrid zone length: ", calc_length(sigmoid_curves))
-    println("bimodality: ", calc_bimodality_overall(sigmoid_curves, sorted_indices, locations_x, hybrid_indices_functional, 0.05))
-    println("overlap: ", calc_overlap_overall(locations_x, hybrid_indices_functional, sorted_indices))
+    println("bimodality: ", calc_bimodality_overall(
+        sigmoid_curves,
+        sorted_indices,
+        locations_x,
+        hybrid_indices_functional,
+        0.05
+    ))
+    println("overlap: ", calc_overlap_overall(
+        locations_x,
+        hybrid_indices_functional,
+        sorted_indices
+    ))
     println("")
 end
 

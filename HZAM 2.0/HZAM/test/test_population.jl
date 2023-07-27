@@ -32,8 +32,8 @@
     [@test length(d.locations_M) == 1 for d in pd.population]
     [@test length(d.genotypes_F) == 1 for d in pd.population]
     [@test length(d.genotypes_M) == 1 for d in pd.population]
-    [@test assign_zone(pd.population[i].locations_F[1])==i for i in eachindex(IndexCartesian(), pd.population)]
-    [@test assign_zone(pd.population[i].locations_M[1])==i for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].locations_F[1])==i for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].locations_M[1])==i for i in eachindex(IndexCartesian(), pd.population)]
     [@test pd.population[i].mitochondria_F[1]==0 && i[1]<=5 ||pd.population[i].mitochondria_F[1]==1 && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
     [@test pd.population[i].mitochondria_M[1]==0 && i[1]<=5 ||pd.population[i].mitochondria_M[1]==1 && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
     [@test pd.population[i].genotypes_F[1]==[0 0 0; 0 0 0] && i[1]<=5 ||pd.population[i].genotypes_F[1]==[1 1 1; 1 1 1] && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
@@ -45,11 +45,11 @@ end
 @testset "calc_traits_additive" begin
     genotypes = [[0 0 0; 0 0 0], [1 1 1; 1 1 1]]
 
-    @test calc_traits_additive(genotypes, 1:3) == [0, 1]
+    @test DataAnalysis.calc_traits_additive(genotypes, 1:3) == [0, 1]
 
     genotypes = [[1 0 0; 0 0 0], [0 1 0; 1 0 0], [1 1 1; 1 1 1]]
 
-    @test calc_traits_additive(genotypes, 1:2) == [0.25, 0.5, 1]
+    @test DataAnalysis.calc_traits_additive(genotypes, 1:2) == [0.25, 0.5, 1]
 end
 
 @testset "disperse_individual" begin
@@ -89,7 +89,7 @@ end
 @testset "assign_zone" begin
     locations = [Location(0.01f0, 0f0), Location(0.32f0, 0.75f0), Location(0.5f0, 0.5f0)]
 
-    zones = assign_zone.(locations)
+    zones = Population.assign_zone.(locations)
 
     @test zones == [CartesianIndex(1,1), CartesianIndex(4,8), CartesianIndex(6,6)]
 end

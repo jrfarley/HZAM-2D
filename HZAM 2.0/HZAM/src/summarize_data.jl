@@ -1,9 +1,7 @@
-using CategoricalArrays
 using Colors, ColorSchemes
 import ColorSchemes.plasma
-#using Plots.PlotMeasures  # needed for plot margin adjustment
 using GLMakie
-using Statistics: mean  # needed for "mean" function
+using Statistics: mean 
 using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV

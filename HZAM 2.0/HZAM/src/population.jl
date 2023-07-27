@@ -1,14 +1,10 @@
 "Functions and datatypes for managing population data (locations, genotypes, 
 and growth rates)"
 module Population
-using QuadGK
+import QuadGK.quadgk
+import ..DataAnalysis.calc_traits_additive
 
 export PopulationData, Location, Zone
-export calc_traits_additive
-export assign_zone
-export NUM_ZONES
-export genotype_mean
-export calc_survival_fitness_epistasis, calc_survival_fitness_hetdisadvantage
 
 "The width of the (square) grid of zones that divides the population into more manageable 
 chunks. Default is 10x10."
@@ -704,19 +700,6 @@ julia> genotype_mean([0 1 0; 0 1 0], [1,3])
 """
 function genotype_mean(genotype::Matrix, loci)
     return sum(genotype[:, loci]) / (2 * length(loci))
-end
-
-"""
-    calc_traits_additive(genotypes::Vector, loci)::Vector{Float32}
-
-Compute the mean values of the genotypes passed to it at the given loci. Used to determine 
-trait values in an additive way.
-"""
-function calc_traits_additive(genotypes::Vector, loci)::Vector{Float32}
-    N = length(genotypes)
-
-    traits = map(x -> genotype_mean(genotypes[x], loci), 1:N)
-    return traits
 end
 
 """

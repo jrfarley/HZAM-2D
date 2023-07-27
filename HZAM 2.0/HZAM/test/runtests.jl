@@ -1,7 +1,8 @@
-using Test, HZAM
-using .Population
-using .Mating
-
+using Test
+import HZAM.Population as Population
+using HZAM.Population
+import HZAM.Mating as Mating
+import HZAM.DataAnalysis as DataAnalysis
 
 test_files = [
     "test_find_mate.jl",

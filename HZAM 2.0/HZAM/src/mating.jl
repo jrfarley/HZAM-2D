@@ -1,7 +1,6 @@
 "Functions involved in mate selection and generating the offspring genotype."
 module Mating
-using ..Population: Location, Zone, genotype_mean, calc_squared_distances
-export choose_closest_male, calc_match_strength, generate_offspring_genotype
+using ..Population
 
 """
     distance(location1::Location, location2::Location)
@@ -93,7 +92,7 @@ function choose_closest_male_from_zone(
     locations_M::Vector{Location},
     location_mother::Location)
     return elig_M[argmin(
-        calc_squared_distances(
+        Population.calc_squared_distances(
             locations_M[elig_M],
             location_mother
         )
@@ -129,10 +128,10 @@ function calc_match_strength(
     male_mating_trait_loci
 )
     # calculate the mean value of the male and female mating traits
-    mating_trait_male = genotype_mean(male_genotype, male_mating_trait_loci)
-    mating_trait_female = genotype_mean(female_genotype, female_mating_trait_loci)
+    mating_trait_M = Population.genotype_mean(male_genotype, male_mating_trait_loci)
+    mating_trait_F = Population.genotype_mean(female_genotype, female_mating_trait_loci)
 
-    mating_trait_dif = mating_trait_male - mating_trait_female
+    mating_trait_dif = mating_trait_M - mating_trait_F
     return exp((-(mating_trait_dif^2)) / (2 * (pref_SD^2)))
 end
 

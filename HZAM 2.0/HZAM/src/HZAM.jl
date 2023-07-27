@@ -9,13 +9,10 @@ include("mating.jl") # functions for finding a mate and determining match streng
 include("plot_data.jl")
 
 using .Population
-using .DataAnalysis
-using .Mating
+import .Population.NUM_ZONES
+import .DataAnalysis
+import .Mating
 using .Plot_Data
-
-export DataAnalysis, Population, Mating, demo # export modules for testing
-
-global demo = 10
 
 include("simulation.jl") # main function for running a simulation
 include("summarize_data.jl")

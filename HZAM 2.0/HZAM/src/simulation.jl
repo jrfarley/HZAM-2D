@@ -49,6 +49,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     # to keep track of the key measures while the simulation is running
     output_data = OutputData[]
 
+    overall_loci_range = collect(1:total_loci)
+
     # list of loci specifying the phenotype
     functional_loci_range = union(
         female_mating_trait_loci,
@@ -57,12 +59,34 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         hybrid_survival_loci
     )
 
+    # list of loci that do not affect the phenotype
+    neutral_loci_range = setdiff(overall_loci_range, functional_loci_range)
+
+    # put all the loci together in an easy to access data format
+    loci = @NamedTuple{
+        overall,
+        functional,
+        neutral,
+        female_mating_trait,
+        male_mating_trait,
+        competition_trait,
+        hybrid_survival
+    }((
+        overall_loci_range,
+        functional_loci_range,
+        neutral_loci_range,
+        female_mating_trait_loci,
+        male_mating_trait_loci,
+        competition_trait_loci,
+        hybrid_survival_loci
+    ))
+
     # get the chosen survival fitness function
     if survival_fitness_method == "epistasis"
-        calc_survival_fitness = calc_survival_fitness_epistasis
+        calc_survival_fitness = Population.calc_survival_fitness_epistasis
         short_survFitnessMethod = "Ep"
     elseif survival_fitness_method == "hetdisadvantage"
-        calc_survival_fitness = calc_survival_fitness_hetdisadvantage
+        calc_survival_fitness = Population.calc_survival_fitness_hetdisadvantage
         short_survFitnessMethod = "Het"
     else
         println("ERROR--no survival fitness method chosen--should be either epistasis or 
@@ -103,7 +127,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         ]
 
         create_new_plot(
-            calc_traits_additive(genotypes, functional_loci_range),
+            DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
             locations
         )
     end
@@ -165,7 +189,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     towards the bottom left.
                     =#
                     lower_left = max(
-                        assign_zone(Location(
+                        Population.assign_zone(Location(
                             zone.locations_F[mother].x -
                             neighbourhood_size,
                             zone.locations_F[mother].y -
@@ -179,7 +203,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     towards the top right.
                     =#
                     upper_right = min(
-                        assign_zone(Location(
+                        Population.assign_zone(Location(
                             zone.locations_F[mother].x +
                             neighbourhood_size,
                             zone.locations_F[mother].y +
@@ -205,7 +229,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     # determine male mate of female
                     while mate == false
                         # present female with closest male, and remove him from list:
-                        focal_male, male_zone = choose_closest_male(
+                        focal_male, male_zone = Mating.choose_closest_male(
                             pd.population,
                             neighbourhood,
                             elig_M,
@@ -221,7 +245,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                             determined by a Gaussian, with a maximum of 1 and minimum of 
                             zero.
                             =#
-                            match_strength = calc_match_strength(
+                            match_strength = Mating.calc_match_strength(
                                 zone.genotypes_F[mother],
                                 pd.population[male_zone].genotypes_M[focal_male],
                                 pref_SD,
@@ -275,7 +299,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     # if there are offspring, generate their genotypes and sexes
                     if offspring >= 1
                         for kid in 1:offspring
-                            kid_genotype = generate_offspring_genotype(
+                            kid_genotype = Mating.generate_offspring_genotype(
                                 zone.genotypes_F[mother],
                                 pd.population[father_zone].genotypes_M[father]
                             )
@@ -294,7 +318,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                                 )
 
                                 # determine which zone the offspring dispersed into
-                                kid_zone = assign_zone(new_location)
+                                kid_zone = Population.assign_zone(new_location)
 
                                 # update variables for tracking offspring data
                                 if rand() > 0.5 # kid is daughter
@@ -318,7 +342,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         end # of loop through the zones
 
         # assign surviving offspring to new adult population
-        pd = PopulationData(genotypes_daughters_all,
+        pd = PopulationData(
+            genotypes_daughters_all,
             genotypes_sons_all,
             mitochondria_daughters_all,
             mitochondria_sons_all,
@@ -328,7 +353,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             K_total,
             sigma_comp,
             intrinsic_R,
-            ecolDiff)
+            ecolDiff
+        )
 
         # update the plot of locations and hybrid indices
         if (do_plot && (generation % plot_int == 0))
@@ -342,14 +368,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             ]
 
             update_population_plot(
-                calc_traits_additive(genotypes, functional_loci_range),
+                DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
                 locations,
                 generation
             )
         end
 
         if generation > max_generations - 20
-            neutral_loci = setdiff(collect(1:total_loci), functional_loci_range)
             genotypes = [
                 vcat([d.genotypes_F for d in pd.population]...)
                 vcat([d.genotypes_M for d in pd.population]...)
@@ -362,50 +387,15 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 vcat([d.mitochondria_F for d in pd.population]...)
                 vcat([d.mitochondria_M for d in pd.population]...)
             ]
-
-            hybrid_indices_functional = calc_traits_additive(
-                genotypes,
-                functional_loci_range
-            )
-
-            gene_flows = calc_all_gene_flow(
-                genotypes,
-                hybrid_indices_functional,
-                female_mating_trait_loci,
-                male_mating_trait_loci,
-                competition_trait_loci,
-                hybrid_survival_loci,
-                neutral_loci
-            )
-            cline_widths, cline_positions = calc_all_cline_widths(
-                genotypes,
-                locations,
-                female_mating_trait_loci,
-                male_mating_trait_loci,
-                competition_trait_loci,
-                hybrid_survival_loci,
-                total_loci
-            )
-            average_linkage_diseq = calc_average_linkage_diseq(
-                genotypes,
-                female_mating_trait_loci,
-                male_mating_trait_loci,
-                competition_trait_loci,
-                hybrid_survival_loci,
-                neutral_loci
-            )
             push!(
                 output_data,
                 calc_output_data(
-                    hybrid_indices_functional,
                     locations,
                     sigma_disp,
-                    gene_flows,
                     genotypes,
-                    cline_widths,
-                    cline_positions,
                     mitochondria,
-                    average_linkage_diseq
+                    loci,
+                    generation==max_generations
                 )
             )
         end
