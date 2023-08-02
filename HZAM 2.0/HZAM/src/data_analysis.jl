@@ -7,6 +7,8 @@ export calc_sigmoid_curves, calc_length, calc_width, calc_bimodality_overall,
 using LsqFit: curve_fit
 using Statistics: mean
 
+import HypothesisTests.EqualVarianceTTest
+
 "Parameters for fitting sigmoid curves to the clines."
 global initial_par = [0.0, 1.0]
 
@@ -33,6 +35,123 @@ struct OutputData
     mitochondria_position::Real
     "The correlation between each trait measured using the Pearson coefficient."
     trait_correlations::Union{AbstractArray{Tuple},Missing}
+    "The average number of offspring per phenotype each generation"
+    fitness_per_phenotype::Union{Missing,Vector{Dict{<:Real,<:Real}}}
+    """
+    OutputData(
+        locations::Vector,
+        sigma_disp::Real,
+        genotypes::Vector{<:Matrix{<:Integer}},
+        mitochondria::Vector{<:Integer},
+        loci::NamedTuple,
+        last_generation::Bool
+    )
+
+Compute the key statistics used to determine the outcome of the simulation.
+
+# Arguments
+- `locations::Vector`: the location of every individual.
+- `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
+- `mitochondria::Vector{<:Integer}`: the mitochondria type of every individual.
+- `loci::NamedTuple`: the name and loci range of each trait of interest.
+- `last_generation::Bool`: true if it is the end of the simulation, otherwise false.
+"""
+    function OutputData(
+        locations::Vector,
+        sigma_disp::Real,
+        genotypes::Vector{<:Matrix{<:Integer}},
+        mitochondria::Vector{<:Integer},
+        loci::NamedTuple,
+        last_generation::Bool
+    )
+        trait_correlations = missing
+        locations_x = [l.x for l in locations]
+        locations_y = [l.y for l in locations]
+
+        sorted_indices = sort_y(locations_y)
+
+        hybrid_indices_functional = calc_traits_additive(
+            genotypes,
+            loci.functional
+        )
+
+        gene_flows = calc_all_gene_flow(
+            genotypes,
+            hybrid_indices_functional,
+            loci
+        )
+
+        cline_widths, cline_positions = calc_all_cline_widths_and_positions(
+            genotypes,
+            locations,
+            loci
+        )
+
+        if last_generation
+            trait_correlations = calc_all_trait_correlations(
+                genotypes,
+                loci
+            )
+        end
+
+        sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
+
+        bimodality = calc_bimodality_overall(
+            sigmoid_curves,
+            sorted_indices,
+            locations_x,
+            hybrid_indices_functional,
+            sigma_disp
+        )
+
+        overlap = calc_overlap_overall(locations_x, hybrid_indices_functional, sorted_indices)
+
+        mitochondria_position = calc_position(calc_sigmoid_curves(locations, mitochondria))
+
+        new(
+            bimodality,
+            gene_flows,
+            overlap,
+            missing,
+            cline_widths,
+            cline_positions,
+            mitochondria_position,
+            trait_correlations,
+            missing)
+    end
+
+    """
+        OutputData(output_data::Vector{OutputData})
+
+    Summarize the simulation data from a list of the key statistics measured over a timeframe. 
+    """
+    function OutputData(output_data::Vector{OutputData}, fitnesses)
+        last_output = last(output_data)
+        bimodality = mean([o.bimodality for o in output_data])
+        gene_flows = average_gene_data([o.gene_flows for o in output_data])
+        overlap = mean([o.overlap for o in output_data])
+        positions = [o.cline_positions.functional for o in output_data]
+
+        variance = calc_variance(positions)
+        cline_widths = average_gene_data([o.cline_widths for o in output_data])
+        cline_positions = average_gene_data([o.cline_positions for o in output_data])
+        mitochondria_position = mean([o.mitochondria_position for o in output_data])
+
+        trait_correlations = last_output.trait_correlations
+
+        new(
+            bimodality,
+            gene_flows,
+            overlap,
+            variance,
+            cline_widths,
+            cline_positions,
+            mitochondria_position,
+            trait_correlations,
+            fitnesses
+        )
+    end
 end
 
 """
@@ -529,89 +648,6 @@ function calc_all_trait_correlations(
 end
 
 """
-    calc_output_data(
-        locations::Vector,
-        sigma_disp::Real,
-        genotypes::Vector{<:Matrix{<:Integer}},
-        mitochondria::Vector{<:Integer},
-        loci::NamedTuple,
-        last_generation::Bool
-    )
-
-Compute the key statistics used to determine the outcome of the simulation.
-
-# Arguments
-- `locations::Vector`: the location of every individual.
-- `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
-- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
-- `mitochondria::Vector{<:Integer}`: the mitochondria type of every individual.
-- `loci::NamedTuple`: the name and loci range of each trait of interest.
-- `last_generation::Bool`: true if it is the end of the simulation, otherwise false.
-"""
-function calc_output_data(
-    locations::Vector,
-    sigma_disp::Real,
-    genotypes::Vector{<:Matrix{<:Integer}},
-    mitochondria::Vector{<:Integer},
-    loci::NamedTuple,
-    last_generation::Bool
-)
-    trait_correlations = missing
-    locations_x = [l.x for l in locations]
-    locations_y = [l.y for l in locations]
-
-    sorted_indices = sort_y(locations_y)
-
-    hybrid_indices_functional = calc_traits_additive(
-        genotypes,
-        loci.functional
-    )
-
-    gene_flows = calc_all_gene_flow(
-        genotypes,
-        hybrid_indices_functional,
-        loci
-    )
-
-    cline_widths, cline_positions = calc_all_cline_widths_and_positions(
-        genotypes,
-        locations,
-        loci
-    )
-
-    if last_generation
-        trait_correlations = calc_all_trait_correlations( #=calc_average_linkage_diseq=#
-            genotypes,
-            loci
-        )
-    end
-
-    sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
-
-    bimodality = calc_bimodality_overall(
-        sigmoid_curves,
-        sorted_indices,
-        locations_x,
-        hybrid_indices_functional,
-        sigma_disp
-    )
-
-    overlap = calc_overlap_overall(locations_x, hybrid_indices_functional, sorted_indices)
-
-    mitochondria_position = calc_position(calc_sigmoid_curves(locations, mitochondria))
-
-    return OutputData(
-        bimodality,
-        gene_flows,
-        overlap,
-        missing,
-        cline_widths,
-        cline_positions,
-        mitochondria_position,
-        trait_correlations)
-end
-
-"""
     sort_y(y_locations::Vector{<:Real})
 
 Sort the y coordinate indices into 10 vectors [0, 0.1), [0.1, 0.2), etc.
@@ -667,37 +703,6 @@ function average_gene_data(gene_data::Vector{<:NamedTuple})
 end
 
 """
-    average_output_data(output_data::Vector{OutputData})
-
-Summarize the simulation data from a list of the key statistics measured over a timeframe. 
-"""
-function average_output_data(output_data::Vector{OutputData})
-    last_output = last(output_data)
-    bimodality = mean([o.bimodality for o in output_data])
-    gene_flows = average_gene_data([o.gene_flows for o in output_data])
-    overlap = mean([o.overlap for o in output_data])
-    positions = [o.cline_positions.functional for o in output_data]
-
-    variance = calc_variance(positions)
-    cline_widths = average_gene_data([o.cline_widths for o in output_data])
-    cline_positions = average_gene_data([o.cline_positions for o in output_data])
-    mitochondria_position = mean([o.mitochondria_position for o in output_data])
-
-    trait_correlations = last_output.trait_correlations
-
-    return OutputData(
-        bimodality,
-        gene_flows,
-        overlap,
-        variance,
-        cline_widths,
-        cline_positions,
-        mitochondria_position,
-        trait_correlations
-    )
-end
-
-"""
     calc_traits_additive(genotypes::Vector, loci)::Vector{Float32}
 
 Compute the mean values of the genotypes passed to it at the given loci. Used to determine 
@@ -716,5 +721,56 @@ function calc_traits_additive(
 
     traits = map(x -> mean(genotypes[x], loci), 1:N)
     return traits
+end
+
+"""
+    calc_fitness_per_phenotype(
+        offspring_per_parent::Vector{<:Integer},
+        genotypes::Vector{<:Matrix{<:Integer}},
+        loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+    )
+
+Compute the average number of offspring for individuals of each phenotype for a given 
+loci range.
+
+# Arguments
+- `offspring_per_parent::Vector{<:Integer}`: a list of the number of offspring for each 
+parent
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes for each parent (order matching 
+offspring_per_parent)
+- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}`: the loci range governing the trait 
+of interest.
+"""
+function calc_fitness_per_phenotype(
+    offspring_per_parent::Vector{<:Integer},
+    genotypes::Vector{<:Matrix{<:Integer}},
+    loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+)
+    hybrid_indices = calc_traits_additive(genotypes, loci)
+    n = 2 * length(loci)
+    different_hybrid_indices = (0:n) .* (1 / n)
+
+    total_offspring_per_phenotype = Dict{Real,Integer}()
+
+    function count_phenotype(i)
+        count(x -> x == i, hybrid_indices)
+    end
+
+    function calc_average(i)
+        return total_offspring_per_phenotype[i] / count_phenotype(i)
+    end
+
+    for i in different_hybrid_indices
+        total_offspring_per_phenotype[i] = 0
+    end
+
+    for i in eachindex(offspring_per_parent)
+        total_offspring_per_phenotype[hybrid_indices[i]] += offspring_per_parent[i]
+    end
+
+    average_offspring_per_phenotype = calc_average.(different_hybrid_indices)
+
+    return Dict(different_hybrid_indices .=> average_offspring_per_phenotype)
+
 end
 end

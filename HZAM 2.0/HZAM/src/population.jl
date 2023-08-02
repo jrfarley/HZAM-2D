@@ -47,8 +47,8 @@ struct Location
     Generate an offspring's location based on the mother's location and the dispersal 
     distance. 
     
-    The offspring's location is based on a normal distribution with the dispersal 
-    distance being the standard deviation and the center being the given location.
+    The offspring's location is based on a normal distribution centered on a 
+    given location.
 
     # Arguments
     - `starting_location::Location`: the center of the normal distribution.
@@ -58,7 +58,7 @@ struct Location
         x = -1
         y = -1
         # Keep generating new locations until there's one that's within the range.
-        while ~(0 < x < 0.999 && 0 < y < 0.999) # Check if the location is within the range.
+        while ~(0 <= x < 1 && 0 <= y < 1) # Check if the location is within the range.
             dist = sigma_disp * randn()
             dir = rand() * 2 * pi
             x = starting_location.x + dist * cos(dir)
@@ -80,9 +80,9 @@ struct Zone
     locations_F::Vector{Location}
     "The male locations."
     locations_M::Vector{Location}
-    "The female mitochondria (a single locus genotype)."
+    "The female mitochondrion (a single locus genotype)."
     mitochondria_F::Vector{Int8}
-    "The male mitochondria."
+    "The male mitochondrion."
     mitochondria_M::Vector{Int8}
 
     "Each female's contribution to the use of resource A."
@@ -129,10 +129,15 @@ struct Zone
 
         zone_range = [
             location,
-            Location(min(location.x + size, 0.999f0), min(location.y + size, 0.999f0))
+            Location(min(location.x + size, 1.0f0), min(location.y + size, 1.0f0))
         ] # the geographic limits of the zone
 
-        genotypes = fill(fill(species, 2, total_loci), N_half)
+        genotype = fill(species, 2, total_loci)
+        for i in 1:-1
+            genotype[1, i] = 1 - species
+        end
+
+        genotypes = fill(genotype, N_half)
 
         locations = [[Location(zone_range) for i in 1:N_half] for i in 1:2]
 
@@ -171,7 +176,7 @@ struct Zone
             locations_M::Vector{Location},
             mitochondria_F::Vector{Int8},
             mitochondria_M::Vector{Int8},
-            competition_trait_loci,
+            competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
             ecolDiff
         )
 
@@ -184,8 +189,8 @@ struct Zone
     - `locations_M::Vector{Location}`: the male locations.
     - `mitochondria_F::Vector{Int8}`: the female mitochondria.
     - `mitochondria_M::Vector{Int8}`: the male mitochondria.
-    - `competition_trait_loci`: the loci specifying the ecological trait (used in 
-    fitness related to resource use).
+    - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci 
+    specifying the ecological trait (used in fitness related to resource use).
     - `ecolDiff::Real`: the ecological difference between the two species.
     """
     function Zone(
@@ -195,7 +200,7 @@ struct Zone
         locations_M::Vector{Location},
         mitochondria_F::Vector{Int8},
         mitochondria_M::Vector{Int8},
-        competition_trait_loci,
+        competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         ecolDiff::Real
     )
         # calculate new competition traits
@@ -410,7 +415,10 @@ Determine which zone a location falls in.
 function assign_zone(location::Location)
     zone_x = convert(Integer, trunc(NUM_ZONES * location.x) + 1) # x index of the zone
     zone_y = convert(Integer, trunc(NUM_ZONES * location.y) + 1) # y index of the zone
-    return CartesianIndex(zone_x, zone_y)
+    return CartesianIndex(
+        min(zone_x, NUM_ZONES),
+        min(zone_y, NUM_ZONES)
+    )
 end
 
 """
@@ -569,6 +577,77 @@ function calc_squared_distances(location_list::Vector{Location}, focal_location:
 end
 
 """
+    get_surrounding_zones(zone_index::CartesianIndex)
+
+Return a list of the indices of the neighbouring zones and the given zone index.
+"""
+function get_surrounding_zones(zone_index::CartesianIndex)
+    lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
+    upper_right = min(
+        zone_index + CartesianIndex(1, 1),
+        CartesianIndex(NUM_ZONES, NUM_ZONES)
+    )
+    return lower_left:upper_right
+end
+
+"""
+    calc_real_densities(
+        neighbourhood::Matrix{Zone},
+        locations_F::Vector{Location},
+        max_dist::Real
+    )
+
+Compute the population density at each female's location for both resources.
+
+# Arguments
+- `neighbourhood::Matrix{Zone}`: the zone indices for all the zones close enough to affect 
+the density calculation.
+- `locations_F::Vector{Location}`: the locations of every female in the focal zone.
+- `max_dist::Real`: the distance cutoff for the density calculation.
+"""
+function calc_real_densities(
+    neighbourhood::Matrix{Zone},
+    locations_F::Vector{Location},
+    max_dist::Real,
+    sigma_comp
+)
+    # collect the individual contributions to the use of both resources.
+    ind_useResourceA_all = vcat(
+        [[z.ind_useResourceA_F; z.ind_useResourceA_M] for z in neighbourhood]...
+    )
+    ind_useResourceB_all = vcat(
+        [[z.ind_useResourceB_F; z.ind_useResourceB_M] for z in neighbourhood]...
+    )
+    locations_all = vcat([[z.locations_F; z.locations_M] for z in neighbourhood]...)
+
+    """
+    Calculate the resource use density for both resources at the given location.
+    """
+    function calc_useResource_densities(focal_location)
+        squared_distances = calc_squared_distances(locations_all, focal_location)
+        useResource_densities = [0.0, 0.0]
+        for i in eachindex(squared_distances)
+            if squared_distances[i] <= max_dist^2
+                useResource_densities[1] += ind_useResourceA_all[i] *
+                                            exp(-squared_distances[i] /
+                                                (2 * (sigma_comp^2)))
+                useResource_densities[2] += ind_useResourceB_all[i] *
+                                            exp(-squared_distances[i] /
+                                                (2 * (sigma_comp^2)))
+            end
+        end
+        return useResource_densities
+    end
+
+    # calculate the densities for both resources at the location of each female
+    real_densities = calc_useResource_densities.(locations_F)
+
+    # split the densities up by resource
+    return [d[1] for d in real_densities], [d[2] for d in real_densities]
+
+end
+
+"""
     calc_growth_rates(
         population::Matrix{Zone},
         zone_index::CartesianIndex,
@@ -599,35 +678,16 @@ function calc_growth_rates(
     max_dist = 3 * sigma_comp
 
     locations_F = population[zone_index].locations_F
-
-    #= 
-    Determine which zones are needed to calculate growth rates. Zones that are further than 
-    0.03 units away from all females in the current zone are not used in the growth rate 
-    calculations.
-    =#
-    lower_left = max(zone_index - CartesianIndex(1, 1), CartesianIndex(1, 1))
-    upper_right = min(
-        zone_index + CartesianIndex(1, 1),
-        CartesianIndex(NUM_ZONES, NUM_ZONES)
-    )
-    neighbourhood = population[lower_left:upper_right]
+    neighbourhood = population[get_surrounding_zones(zone_index)]
 
 
-    # calculate the individual contributions to the use of both resources.
-    ind_useResourceA_all = vcat(
-        [[z.ind_useResourceA_F; z.ind_useResourceA_M] for z in neighbourhood]...
-    )
-    ind_useResourceB_all = vcat(
-        [[z.ind_useResourceB_F; z.ind_useResourceB_M] for z in neighbourhood]...
-    )
-    locations_all = vcat([[z.locations_F; z.locations_M] for z in neighbourhood]...)
     locations_F = population[zone_index].locations_F
 
     #= 
     Set up the expected local densities, based on a geographically even distribution of 
     individuals at the carrying capacity.
     =#
-    ideal_densities_at_locations_F = calc_ideal_densities(
+    ideal_densities = calc_ideal_densities(
         K_total,
         sigma_comp,
         locations_F,
@@ -635,49 +695,25 @@ function calc_growth_rates(
     )
 
     # assume both resources have same constant density across range
-    ideal_densities_at_locations_F_resourceA = ideal_densities_at_locations_F ./ 2
-    ideal_densities_at_locations_F_resourceB = ideal_densities_at_locations_F_resourceA
+    ideal_densities_resourceA = ideal_densities ./ 2
+    ideal_densities_resourceB = ideal_densities_resourceA
+
+    real_densities_resourceA, real_densities_resourceB = calc_real_densities(neighbourhood, locations_F, max_dist, sigma_comp)
 
     """
-    Calculate the resource use density for both resources at the given location.
+    Calculate the local growth rates according to discrete time logistic growth equation.
     """
-    function calc_useResource_densities(focal_location)
-        squared_distances = calc_squared_distances(locations_all, focal_location)
-        useResource_densities = [0.0, 0.0]
-        for i in eachindex(squared_distances)
-            if squared_distances[i] <= max_dist^2
-                useResource_densities[1] += ind_useResourceA_all[i] *
-                                            exp(-squared_distances[i] /
-                                                (2 * (sigma_comp^2)))
-                useResource_densities[2] += ind_useResourceB_all[i] *
-                                            exp(-squared_distances[i] /
-                                                (2 * (sigma_comp^2)))
-            end
-        end
-        return useResource_densities
+    function logistic_growth_equation(ideal_densities, real_densities)
+        return intrinsic_R .*
+               ideal_densities ./ (ideal_densities .+ (real_densities .* (intrinsic_R - 1)))
     end
-
-    # calculate the densities for both resources at the location of each female
-    real_densities = calc_useResource_densities.(locations_F)
-
-    # split the densities up by resource
-    real_densities_at_locations_F_resourceA = [d[1] for d in real_densities]
-    real_densities_at_locations_F_resourceB = [d[2] for d in real_densities]
 
     #= 
     Calculate the local growth rates due to each resource according to discrete time 
     logistic growth equation.
     =#
-    local_growth_rates_resourceA = intrinsic_R .*
-                                   ideal_densities_at_locations_F_resourceA ./
-                                   (ideal_densities_at_locations_F_resourceA .+
-                                    ((real_densities_at_locations_F_resourceA) .*
-                                     (intrinsic_R - 1)))
-    local_growth_rates_resourceB = intrinsic_R .*
-                                   ideal_densities_at_locations_F_resourceB ./
-                                   (ideal_densities_at_locations_F_resourceB .+
-                                    ((real_densities_at_locations_F_resourceB) .*
-                                     (intrinsic_R - 1)))
+    local_growth_rates_resourceA = logistic_growth_equation(ideal_densities_resourceA, real_densities_resourceA)
+    local_growth_rates_resourceB = logistic_growth_equation(ideal_densities_resourceB, real_densities_resourceB)
 
     growth_rateA = population[zone_index].ind_useResourceA_F .* local_growth_rates_resourceA
     growth_rateB = population[zone_index].ind_useResourceB_F .* local_growth_rates_resourceB

@@ -1,7 +1,7 @@
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 using GLMakie
-using Statistics: mean 
+using Statistics: mean
 using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
@@ -317,6 +317,22 @@ function save_genotypes(pd, filepath)
     @save filepath genotypes
 end
 
+function t_test(genotypes)
+    function calc_heterozygosity(locus)
+        count(x -> x == [0; 1] || x == [1; 0], [g[:, locus] for g in genotypes]) / length(genotypes)
+    end
+
+    heterozygosities = map(calc_heterozygosity, (1:20))
+
+    neutral_heterozygosities = heterozygosities[17:20]
+
+    loci = [1:4, 5:8, 9:12, 13:16]
+
+    for range in loci
+        println(EqualVarianceTTest(heterozygosities[range], neutral_heterozygosities))
+    end
+end
+
 # calculates the Pearson coefficient between two loci
 function calc_linkage_diseq(genotypes, l1, l2)
     if l2 != l1
@@ -340,6 +356,28 @@ function calc_linkage_diseq(genotypes, l1, l2)
     end
 end
 
+function calc_chi_squared(genotypes, locus)
+    genotypes = [g[:, locus] for g in genotypes]
+    alleles = vcat([g[1] for g in genotypes], [g[2] for g in genotypes])
+
+    N = length(genotypes)
+    p_A = count(x -> x == 0, alleles) / (2 * N)
+    p_B = 1 - p_A
+    n_AB = count(x -> x == [0; 1] || x == [1; 0], genotypes)
+    n_AA = count(x -> x == [0; 0], genotypes)
+    n_BB = count(x -> x == [1; 1], genotypes)
+
+
+    return (((n_AA - N * p_A^2)^2) / (N * p_A^2)) +
+           (((n_AB - 2 * N * p_A * p_B)^2) / (2 * N * p_A * p_B)) +
+           (((n_BB - N * p_B^2)^2) / (N * p_B^2))
+end
+
+function load_genotypes(path)
+    @load path genotypes
+
+    return genotypes
+end
 
 # calculates the linkage disequilibrium between loci using Pearson coefficients
 # and returns a table of values representing the average correlation between two traits
@@ -347,14 +385,14 @@ function plot_trait_correlations_all(path, loci, plot_title)
 
     @load path genotypes
 
-    trait_correlations= DataAnalysis.calc_all_trait_correlations(genotypes, loci)
+    trait_correlations = DataAnalysis.calc_all_trait_correlations(genotypes, loci)
 
     xs = [t[1] for t in trait_correlations]
     ys = [t[2] for t in trait_correlations]
     output = [t[3] for t in trait_correlations]
 
-    xs = map(x->findall(z->z==x, keys(loci))[1], xs)
-    ys=map(y->findall(z->z==y, keys(loci))[1], ys)
+    xs = map(x -> findall(z -> z == x, keys(loci))[1], xs)
+    ys = map(y -> findall(z -> z == y, keys(loci))[1], ys)
 
     ticks = (1:length(loci))
     labels = [string.(keys(loci))...]
@@ -468,11 +506,10 @@ function check_hybrid_survival(path)
     save(string("HZAM_Sym_Julia_results_GitIgnore/gene_linkages/hybrid_survival_ecolDiff_1_w_hyb_0.8_S_AM100.png"), fig)
 end
 
-function find_extinct_alleles(path)
-    @load path genotypes
+function find_extinct_alleles(genotypes)
 
     extinct = []
-    for i in 1:20
+    for i in 1:size(genotypes[1], 2)
         for j in 0:1
             n = count(x -> x[1, i] == j || x[2, i] == j, genotypes)
             if n == 0
@@ -481,4 +518,235 @@ function find_extinct_alleles(path)
         end
     end
     return extinct
+end
+
+
+global ax, points, fig
+
+function create_gene_plot(
+    genotypes,
+    loci,
+    generation
+)
+    global ax = Vector(undef, 6)
+    global points = Vector(undef, 6)
+
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # set the standard font size
+    global fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    # create the axis and labels
+    global ax[2] = Axis(
+        fig[1, 1],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Female mating trait",
+        limits=(-0.05, 1.05, 0, 6000),
+        yticks=(0:1000:6000))
+    global ax[3] = Axis(
+        fig[1, 2],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Male mating trait",
+        limits=(-0.05, 1.05, 0, 12000),
+        yticks=(0:3000:12000, ["0", "3000", "6000", "9000", "12000"])
+    )
+    global ax[4] = Axis(
+        fig[1, 3],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Competition trait",
+        limits=(-0.05, 1.05, 0, 5000),
+        yticks=(0:1000:5000)
+    )
+    global ax[5] = Axis(
+        fig[2, 1],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Hybrid survival trait",
+        limits=(-0.05, 1.05, 0, 12000),
+        yticks=(0:3000:12000, ["0", "3000", "6000", "9000", "12000"])
+    )
+    global ax[1] = Axis(
+        fig[2, 2],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Neutral trait",
+        limits=(-0.05, 1.05, 0, 5000),
+        yticks=(0:1000:5000)
+    )
+
+    global ax[6] = Axis(
+        fig[2, 3],
+        xlabel="trait value",
+        ylabel="# individuals",
+        title="Expected neutral",
+        limits=(-0.05, 1.05, 0, 5000),
+        yticks=(0:1000:5000)
+    )
+
+    function get_hybrid_indices(range, genotypes)
+        hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, range)
+        return hybrid_indices
+    end
+
+    function get_points(range, genotypes)
+        hybrid_indices = get_hybrid_indices(range, genotypes)
+        return map(i -> count(x -> x == i, hybrid_indices), (0:0.125:1))
+    end
+
+    function get_expected(i)
+        n = length(genotypes)
+        return (n * binomial(8, Int(8 * i))) / 2^8
+    end
+
+    hybrid_survival_indices = get_hybrid_indices(loci.hybrid_survival, genotypes)
+
+    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
+    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
+
+    species_A_output = get_points.(values(loci), Ref(genotypes[species_A_indices]))
+    species_B_output = get_points.(values(loci), Ref(genotypes[species_B_indices]))
+    other_output = get_points.(values(loci), Ref(genotypes[other_indices]))
+
+    for i in 3:7
+        xs = [(0:0.125:1); (0:0.125:1); (0:0.125:1)]
+        stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
+        ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
+
+        global points[i-2] = barplot!(
+            ax[i-2],
+            xs,
+            ys,
+            color=stk,
+            stack=stk,
+            colorrange=(1.1, 2.9),
+            highclip=:orange,
+            lowclip=:blue)
+    end
+    global points[6] = barplot!(ax[6], (0:0.125:1), get_expected.((0:0.125:1)), color=:blue)
+
+    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+    save(string(dir, "/", generation, ".png"), fig)
+    display(fig)
+end
+
+function update_gene_plot(
+    genotypes,
+    loci,
+    generation
+)
+
+    [delete!(ax[i], points[i]) for i in 1:6] # remove the old points from the plot
+
+
+    function get_hybrid_indices(range, genotypes)
+        hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, range)
+        return hybrid_indices
+    end
+
+    function get_points(range, genotypes)
+        hybrid_indices = get_hybrid_indices(range, genotypes)
+        return map(i -> count(x -> x == i, hybrid_indices), (0:0.125:1))
+    end
+
+    function get_expected(i)
+        n = length(genotypes)
+        return (n * binomial(8, Int(8 * i))) / 2^8
+    end
+
+    hybrid_survival_indices = get_hybrid_indices(loci.hybrid_survival, genotypes)
+
+
+    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
+    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
+
+    species_A_output = get_points.(values(loci), Ref(genotypes[species_A_indices]))
+    species_B_output = get_points.(values(loci), Ref(genotypes[species_B_indices]))
+    other_output = get_points.(values(loci), Ref(genotypes[other_indices]))
+
+    for i in 3:7
+        xs = [(0:0.125:1); (0:0.125:1); (0:0.125:1)]
+        stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
+        ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
+
+        global points[i-2] = barplot!(
+            ax[i-2],
+            xs,
+            ys,
+            color=stk,
+            stack=stk,
+            colorrange=(1.1, 2.9),
+            highclip=:orange,
+            lowclip=:blue)
+    end
+    global points[6] = barplot!(ax[6], (0:0.125:1), get_expected.((0:0.125:1)), color=:blue)
+    println(generation)
+
+    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+    save(string(dir, "/", generation, ".png"), fig)
+end
+
+function chi_squared_traits(genotypes, loci)
+    n = length(genotypes)
+
+    function get_hybrid_indices(range)
+        hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, range)
+        return sort(hybrid_indices)
+    end
+
+    neutral_hybrid_indices = get_hybrid_indices(loci.neutral)
+
+    function get_q(range)
+        haplotypes1 = [g[1, range] for g in genotypes]
+        haplotypes2 = [g[2, range] for g in genotypes]
+        (sum(map(h -> count(x -> x == 1, h), haplotypes1)) + sum(map(h -> count(x -> x == 1, h), haplotypes2))) / (n * 8)
+    end
+
+    function calc_probability(trait_index, q)
+        return (q^trait_index) * ((1 - q)^(8 - trait_index)) * binomial(8, Int(trait_index))
+        binomial(8, Int(8 * trait_index)) / (2^8)
+    end
+
+    function count_indv(i, hybrid_indices)
+        count(x -> x == i, hybrid_indices)
+    end
+
+    function calc_expected(i, q)
+        # return n * calc_probability(8*i, q)
+        return count(x -> x == i, neutral_hybrid_indices)
+    end
+
+    function calc_phenotype(i, q, indices)
+        m = calc_expected(i, q)
+        x = count_indv(i, indices)
+        ((x - m)^2) / m
+    end
+
+    function check_trait(trait)
+        q = get_q(loci[trait])
+        indices = get_hybrid_indices(loci[trait])
+        intermediate = map(x -> calc_phenotype(x, q, indices), collect(0:0.125:1))
+        output = 0
+        return sum(intermediate)
+    end
+    println(keys(loci)[3:7])
+    println(map(check_trait, keys(loci)[3:7]))
+end
+
+function plot_fitnesses(fitnesses)
+    @save "fitness.jld2" fitnesses
+    num_phenotypes = length(fitnesses[1])
+    xs = vcat([fill(gen, num_phenotypes) for gen in eachindex(fitnesses)]...)
+    ys = vcat([collect(keys(f)) for f in fitnesses]...)
+    zs = vcat([collect(values(f)) for f in fitnesses]...)
+
+    println(typeof(fitnesses))
+    println(typeof(xs))
+    println(typeof(ys))
+    println(typeof(zs))
+
+    display(heatmap(xs, ys, zs, colormap=:grayC, colorrange=(0.5,2)))
+    readline()
 end

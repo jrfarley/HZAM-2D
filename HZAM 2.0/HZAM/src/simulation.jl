@@ -1,5 +1,5 @@
 using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
-
+using Test
 
 # This is the function to run a single HZAM simulation
 """
@@ -18,9 +18,9 @@ Run a single HZAM simulation.
 - `S_AM::Real`: the strength of assortative mating.
 - `ecolDiff::Real`: the ecological difference between the two species.
 - `intrinsic_R::Real`: the intrinsic growth rate.
-- `K_total::Int=20000`: the carrying capacity of the environment.
-- `max_generations::Int=1000`: the number of generations that the simulation will run for.
-- `total_loci::Int=6`: the total number of loci in the genome.
+- `K_total::Integer=20000`: the carrying capacity of the environment.
+- `max_generations::Integer=1000`: the number of generations that the simulation will run for.
+- `total_loci::Integer=6`: the total number of loci in the genome.
 - `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
 - `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
 - `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in 
@@ -40,14 +40,15 @@ every individual while the simulation is running if this is true.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::Real;
     # the semicolon makes the following optional keyword arguments  
-    K_total::Int=20000, max_generations::Int=1000,
-    total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
+    K_total::Integer=20000, max_generations::Integer=1000,
+    total_loci::Integer=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3,
     survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.05,
     sigma_comp=0.01, do_plot=true, plot_int=10)
 
     # to keep track of the key measures while the simulation is running
     output_data = DataAnalysis.OutputData[]
+    fitnesses = Vector{Dict}(undef, max_generations)
 
     overall_loci_range = collect(1:total_loci)
 
@@ -93,18 +94,20 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         hetdisadvantage")
     end
 
-    # convert S_AM to pref_ratio (for use in math below)
+    
+    # width of female acceptance curve for male trait
+    pref_SD = 1
+
+    # convert S_AM to pref_SD (for use in math below)
     if S_AM == 1
-        S_AM_for_math = 1 + 10^(-15)
+        pref_SD = Inf
     elseif S_AM == Inf
-        S_AM_for_math = 10^(15)
+        pref_SD = 10^(-15)
     else
-        S_AM_for_math = S_AM
+        pref_SD = sqrt(-1 / (2 * log(1 / S_AM)))
     end
 
-    # width of female acceptance curve for male trait
-    pref_SD = sqrt(-1 / (2 * log(1 / S_AM_for_math)))
-
+    
     #=
     Generate the starting genotypes/locations and calculate the growth rates based on 
     individual resource use for all individuals in the simulation.
@@ -114,6 +117,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         total_loci,
         intrinsic_R,
         sigma_comp)
+
 
     if do_plot
         # display plot of individual locations and genotypes
@@ -126,10 +130,12 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             vcat([d.locations_M for d in pd.population]...)
         ]
 
-        create_new_plot(
+        #=create_new_plot(
             DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
             locations
-        )
+        )=#
+
+        create_gene_plot(genotypes, loci, 0)
     end
 
 
@@ -143,6 +149,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         locations_sons_all = Matrix{Vector{Location}}(undef, NUM_ZONES, NUM_ZONES)
         mitochondria_daughters_all = Matrix{Vector{Int8}}(undef, NUM_ZONES, NUM_ZONES)
         mitochondria_sons_all = Matrix{Vector{Int8}}(undef, NUM_ZONES, NUM_ZONES)
+        offspring_per_parent_F = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
+        offspring_per_parent_M = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
 
         # fill all the matrices with empty vectors
         for i in eachindex(genotypes_daughters_all)
@@ -152,6 +160,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             locations_sons_all[i] = Location[]
             mitochondria_daughters_all[i] = Int8[]
             mitochondria_sons_all[i] = Int8[]
+            offspring_per_parent_F[i] = zeros(length(pd.population[i].locations_F))
+            offspring_per_parent_M[i] = zeros(length(pd.population[i].locations_M))
         end
 
         for zone_index in eachindex(IndexCartesian(), pd.population)
@@ -311,6 +321,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                             )
 
                             if survival_fitness > rand()
+                                offspring_per_parent_F[zone_index][mother] += 1
+                                offspring_per_parent_M[father_zone][father] += 1
+
                                 # generate offspring location
                                 new_location = Location(
                                     zone.locations_F[mother],
@@ -341,6 +354,46 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             end # of loop through mothers
         end # of loop through the zones
 
+        genotypes = [
+            vcat([d.genotypes_F for d in pd.population]...)
+            vcat([d.genotypes_M for d in pd.population]...)
+        ]
+        offspring_per_parent = [
+            vcat([offspring_per_parent_F...]...)
+            vcat([offspring_per_parent_M...]...)
+        ]
+
+
+        fitnesses[generation] = DataAnalysis.calc_fitness_per_phenotype(
+            offspring_per_parent,
+            genotypes,
+            loci.male_mating_trait
+        )        
+
+
+        if generation > max_generations - 20
+            locations = [
+                vcat([d.locations_F for d in pd.population]...)
+                vcat([d.locations_M for d in pd.population]...)
+            ]
+            mitochondria = [
+                vcat([d.mitochondria_F for d in pd.population]...)
+                vcat([d.mitochondria_M for d in pd.population]...)
+            ]
+
+            push!(
+                output_data,
+                DataAnalysis.OutputData(
+                    locations,
+                    sigma_disp,
+                    genotypes,
+                    mitochondria,
+                    loci,
+                    generation == max_generations
+                )
+            )
+        end
+
         # assign surviving offspring to new adult population
         pd = PopulationData(
             genotypes_daughters_all,
@@ -367,40 +420,16 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 vcat([d.locations_M for d in pd.population]...)
             ]
 
-            update_population_plot(
+            #=update_population_plot(
                 DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
                 locations,
                 generation
-            )
-        end
+            )=#
 
-        if generation > max_generations - 20
-            genotypes = [
-                vcat([d.genotypes_F for d in pd.population]...)
-                vcat([d.genotypes_M for d in pd.population]...)
-            ]
-            locations = [
-                vcat([d.locations_F for d in pd.population]...)
-                vcat([d.locations_M for d in pd.population]...)
-            ]
-            mitochondria = [
-                vcat([d.mitochondria_F for d in pd.population]...)
-                vcat([d.mitochondria_M for d in pd.population]...)
-            ]
-            push!(
-                output_data,
-                DataAnalysis.calc_output_data(
-                    locations,
-                    sigma_disp,
-                    genotypes,
-                    mitochondria,
-                    loci,
-                    generation==max_generations
-                )
-            )
+            update_gene_plot(genotypes, loci, generation)
         end
     end # of loop through generations
 
-    return DataAnalysis.average_output_data(output_data), pd, loci
+    return DataAnalysis.OutputData(output_data, fitnesses), pd, loci
 end # of module
 
