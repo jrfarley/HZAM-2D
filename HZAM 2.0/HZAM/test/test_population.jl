@@ -12,19 +12,19 @@
         intrinsic_R,
         sigma_comp)
 
-        genotypes_F = vcat([d.genotypes_F for d in pd.population]...)
-        genotypes_M = vcat([d.genotypes_M for d in pd.population]...)
-        locations_F = vcat([d.locations_F for d in pd.population]...)
-        locations_M = vcat([d.locations_M for d in pd.population]...)
-            
-    
+    genotypes_F = vcat([d.genotypes_F for d in pd.population]...)
+    genotypes_M = vcat([d.genotypes_M for d in pd.population]...)
+    locations_F = vcat([d.locations_F for d in pd.population]...)
+    locations_M = vcat([d.locations_M for d in pd.population]...)
 
-    @test count(i->i==[0 0 0; 0 0 0], genotypes_F) == n^2 / 2
-    @test count(i->i==[0 0 0; 0 0 0], genotypes_M) == n^2 / 2
-    @test count(i->i==[1 1 1; 1 1 1], genotypes_F) == n ^2 / 2
-    @test count(i->i==[1 1 1; 1 1 1], genotypes_M) == n^2 /2 
+
+
+    @test count(i -> i == [0 0 0; 0 0 0], genotypes_F) == n^2 / 2
+    @test count(i -> i == [0 0 0; 0 0 0], genotypes_M) == n^2 / 2
+    @test count(i -> i == [1 1 1; 1 1 1], genotypes_F) == n^2 / 2
+    @test count(i -> i == [1 1 1; 1 1 1], genotypes_M) == n^2 / 2
     @test length(genotypes_F) == n^2
-    @test length(genotypes_M) == n^2 
+    @test length(genotypes_M) == n^2
     @test length(locations_F) == n^2
     @test length(locations_M) == n^2
 
@@ -32,14 +32,12 @@
     [@test length(d.locations_M) == 1 for d in pd.population]
     [@test length(d.genotypes_F) == 1 for d in pd.population]
     [@test length(d.genotypes_M) == 1 for d in pd.population]
-    [@test Population.assign_zone(pd.population[i].locations_F[1])==i for i in eachindex(IndexCartesian(), pd.population)]
-    [@test Population.assign_zone(pd.population[i].locations_M[1])==i for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].mitochondria_F[1]==0 && i[1]<=5 ||pd.population[i].mitochondria_F[1]==1 && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].mitochondria_M[1]==0 && i[1]<=5 ||pd.population[i].mitochondria_M[1]==1 && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].genotypes_F[1]==[0 0 0; 0 0 0] && i[1]<=5 ||pd.population[i].genotypes_F[1]==[1 1 1; 1 1 1] && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].genotypes_M[1]==[0 0 0; 0 0 0] && i[1]<=5 ||pd.population[i].genotypes_M[1]==[1 1 1; 1 1 1] && i[1]>5 for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].locations_F[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].locations_M[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
+    [@test pd.population[i].genotypes_F[1] == [0 0 0; 0 0 0] && i[1] <= 5 || pd.population[i].genotypes_F[1] == [1 1 1; 1 1 1] && i[1] > 5 for i in eachindex(IndexCartesian(), pd.population)]
+    [@test pd.population[i].genotypes_M[1] == [0 0 0; 0 0 0] && i[1] <= 5 || pd.population[i].genotypes_M[1] == [1 1 1; 1 1 1] && i[1] > 5 for i in eachindex(IndexCartesian(), pd.population)]
 
-    [@test length(pd.growth_rates_F[i])==1 for i in eachindex(IndexCartesian(), pd.population)]
+    [@test length(pd.growth_rates_F[i]) == 1 for i in eachindex(IndexCartesian(), pd.population)]
 end
 
 @testset "calc_traits_additive" begin
@@ -87,9 +85,38 @@ end
 end
 
 @testset "assign_zone" begin
-    locations = [Location(0.01f0, 0f0), Location(0.32f0, 0.75f0), Location(0.5f0, 0.5f0)]
+    locations = [Location(0.01f0, 0.0f0), Location(0.32f0, 0.75f0), Location(0.5f0, 0.5f0)]
 
     zones = Population.assign_zone.(locations)
 
-    @test zones == [CartesianIndex(1,1), CartesianIndex(4,8), CartesianIndex(6,6)]
+    @test zones == [CartesianIndex(1, 1), CartesianIndex(4, 8), CartesianIndex(6, 6)]
+end
+
+@testset "calc_survival_fitness_hetdisadvantage" begin
+    genotypes = [[1 0 1; 0 1 0], [0 0 1; 0 0 1], [1 1 1; 1 1 1], [1 0 0; 0 1 0]]
+
+    fitnesses = Population.calc_survival_fitness_hetdisadvantage.(genotypes, Ref(1))
+    @test fitnesses == [1, 1, 1, 1]
+
+    fitnesses = Population.calc_survival_fitness_hetdisadvantage.(genotypes, Ref(0))
+    @test fitnesses == [0, 1, 1, 0]
+
+    fitnesses = Population.calc_survival_fitness_hetdisadvantage.(genotypes, Ref(0.9))
+    expected = [0.9, 1, 1, 0.932169]
+    [@test abs(fitnesses[i] - expected[i]) < 0.001 for i in eachindex(expected)]
+end
+
+@testset "calc_survival_fitness_epistasis" begin
+    genotypes = [[1 0 1; 0 1 0], [0 0 1; 0 0 1], [1 1 1; 1 1 1], [1 0 0; 0 1 0]]
+
+    loci = 1:3
+    fitnesses = Population.calc_survival_fitness_epistasis.(genotypes, Ref(loci), Ref(1))
+    @test fitnesses == [1, 1, 1, 1]
+
+    fitnesses = Population.calc_survival_fitness_epistasis.(genotypes, Ref(loci), Ref(0))
+    @test fitnesses ≈ [0, 1/9, 1, 1/9]
+
+    fitnesses = Population.calc_survival_fitness_epistasis.(genotypes, Ref(loci), Ref(0.9))
+    expected = [0.9, 41/45, 1, 41/45]
+    [@test abs(fitnesses[i] - expected[i]) < 0.001 for i in eachindex(expected)]
 end

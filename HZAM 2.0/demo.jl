@@ -1,23 +1,44 @@
 include("HZAM/src/HZAM.jl")
 
 import .HZAM
+using JLD2 # needed for saving / loading data in Julia format
 
-K = 10000
+K = 40000
 
 println(K) 
+#=
+fitnesses, pd, loci, tracking_data = HZAM.run_one_HZAM_sim(0.92, 300, 1, 1.1; # these values are 
+    # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
+    K_total=K, max_generations=400,
+    sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=10,
+    total_loci=8,
+    female_mating_trait_loci=1:4,
+    male_mating_trait_loci=1:4,
+    competition_trait_loci=1:4,
+    hybrid_survival_loci=1:4,
+    per_reject_cost=0.0,
+    gene_plot=false,
+    save_plot=false)
 
+@save "mates_per_phenotype.JLD2" fitnesses
+HZAM.plot_fitnesses(fitnesses)
 
-outcome, pd, loci = HZAM.run_one_HZAM_sim(0.7, 100, 0, 1.1; # these values are 
+#@save "tracking6.JLD2" tracking_data
+
+=#
+
+phenotypes = HZAM.run_one_HZAM_sim(0.8, 400, 0, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
     K_total=K, max_generations=2000,
-    sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=10,
-    total_loci=20,
+    sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=50,
+    total_loci=16,
     female_mating_trait_loci=1:4,
     male_mating_trait_loci=5:8,
-    competition_trait_loci=9:12,
-    hybrid_survival_loci=5:8,
-    per_reject_cost=0.0)
+    competition_trait_loci=1:4,
+    hybrid_survival_loci=9:12,
+    per_reject_cost=0.0,
+    gene_plot=true,
+    save_plot=true
+    )
 
-HZAM.plot_fitnesses(outcome.fitness_per_phenotype)
-
-#ClineWidths(0.256065f0, 0.25054f0, 0.279335f0, 0.27077502f0, 0.269615f0, 0.19386499f0, 0.28293502f0)
+    @save "phenotypes2.JLD2" phenotypes

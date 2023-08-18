@@ -48,7 +48,7 @@ end
     # assign the population number to each zone
     zone_populations = map(l -> l.x < 0.5 ? 1 : 1, zone_locations)
 
-    # initialize the genotypes, locations, and mitochondria for each zone
+    # initialize the genotypes and locations and for each zone
     zones = Zone.(Ref(1000),
         Ref(10),
         zone_locations,
@@ -85,7 +85,7 @@ end
     zone_populations = map(l -> l.x < 0.5 ? 1 : 1, zone_locations)
 
     for i in 1:10
-        # initializes the genotypes, locations, and mitochondria for each zone
+        # initializes the genotypes and locations for each zone
         zones = Zone.(Ref(10),
             Ref(10),
             zone_locations,
@@ -101,16 +101,12 @@ end
         genotypes_M = zones[i, i].genotypes_M
         push!(genotypes_M, genotypes_M[1])
         locations_F = zones[i, i].locations_F
-        mitochondria_F = zones[i, i].mitochondria_F
-        mitochondria_M = vcat(zones[i, i].mitochondria_M, Int8(1))
 
         zones[i, i] = Zone(
             genotypes_F,
             genotypes_M,
             locations_F,
             locations_M,
-            mitochondria_F,
-            mitochondria_M,
             collect(1:2),
             0
         )
@@ -135,6 +131,21 @@ end
         @test zones[zone_index].locations_M[closest_male] == location_mother
         @test zone_index == CartesianIndex(i, i)
     end
+end
+
+@testset "choose_closest_male_empty_zone" begin
+    zone = Zone(0, 0, Location(0.0f0, 0.0f0), 0.1f0, 0, 0)
+    zones = [zone zone; zone zone]
+    elig_M = Dict{CartesianIndex,Vector{Int64}}()
+    elig_M[CartesianIndex(1, 1)] = []
+
+    closest_male = Mating.choose_closest_male(
+        zones,
+        [CartesianIndex(1, 1)],
+        elig_M,
+        Location(0.5f0, 0.6f0),
+        0.5f0
+    )
 end
 
 
@@ -253,14 +264,14 @@ end
             male_mating_trait_loci
         )
 
-        match_strength33 =
-            Mating.calc_match_strength(
-                genotypes[3],
-                genotypes[3],
-                pref_SD,
-                female_mating_trait_loci,
-                male_mating_trait_loci
-            )
+    match_strength33 =
+        Mating.calc_match_strength(
+            genotypes[3],
+            genotypes[3],
+            pref_SD,
+            female_mating_trait_loci,
+            male_mating_trait_loci
+        )
 
     @test match_strength11 == 1
     @test match_strength33 == 1
@@ -313,14 +324,14 @@ end
             male_mating_trait_loci
         )
 
-        match_strength33 =
-            Mating.calc_match_strength(
-                genotypes[3],
-                genotypes[3],
-                pref_SD,
-                female_mating_trait_loci,
-                male_mating_trait_loci
-            )
+    match_strength33 =
+        Mating.calc_match_strength(
+            genotypes[3],
+            genotypes[3],
+            pref_SD,
+            female_mating_trait_loci,
+            male_mating_trait_loci
+        )
 
     @test match_strength11 == 1
     @test match_strength33 == 1

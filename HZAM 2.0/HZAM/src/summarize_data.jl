@@ -348,6 +348,8 @@ function calc_linkage_diseq(genotypes, l1, l2)
         pearson_coefficient = (D^2) / (p_A * (1 - p_A) * p_B * (1 - p_B))
 
         if isnan(pearson_coefficient)
+            println(string("loci 1: ", l1, " loci 2: ", l2))
+            println((p_A * (1 - p_A) * p_B * (1 - p_B)))
             pearson_coefficient = 1
         end
         return pearson_coefficient
@@ -381,9 +383,7 @@ end
 
 # calculates the linkage disequilibrium between loci using Pearson coefficients
 # and returns a table of values representing the average correlation between two traits
-function plot_trait_correlations_all(path, loci, plot_title)
-
-    @load path genotypes
+function plot_trait_correlations_all(genotypes, loci, plot_title)
 
     trait_correlations = DataAnalysis.calc_all_trait_correlations(genotypes, loci)
 
@@ -526,7 +526,8 @@ global ax, points, fig
 function create_gene_plot(
     genotypes,
     loci,
-    generation
+    generation,
+    save_plot
 )
     global ax = Vector(undef, 6)
     global points = Vector(undef, 6)
@@ -590,8 +591,10 @@ function create_gene_plot(
     end
 
     function get_points(range, genotypes)
+        num_loci = length(range)
+        indices_range = (0:(1/(2*num_loci)):1)
         hybrid_indices = get_hybrid_indices(range, genotypes)
-        return map(i -> count(x -> x == i, hybrid_indices), (0:0.125:1))
+        return map(i -> count(x -> x == i, hybrid_indices), indices_range)
     end
 
     function get_expected(i)
@@ -610,7 +613,9 @@ function create_gene_plot(
     other_output = get_points.(values(loci), Ref(genotypes[other_indices]))
 
     for i in 3:7
-        xs = [(0:0.125:1); (0:0.125:1); (0:0.125:1)]
+        num_loci = length(values(loci)[i])
+        range = (0:(1/(2*num_loci)):1)
+        xs = [range; range; range]
         stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
         ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
 
@@ -626,15 +631,18 @@ function create_gene_plot(
     end
     global points[6] = barplot!(ax[6], (0:0.125:1), get_expected.((0:0.125:1)), color=:blue)
 
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-    save(string(dir, "/", generation, ".png"), fig)
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", generation, ".png"), fig)
+    end
     display(fig)
 end
 
 function update_gene_plot(
     genotypes,
     loci,
-    generation
+    generation,
+    save_plot
 )
 
     [delete!(ax[i], points[i]) for i in 1:6] # remove the old points from the plot
@@ -646,8 +654,10 @@ function update_gene_plot(
     end
 
     function get_points(range, genotypes)
+        num_loci = length(range)
+        indices_range = (0:(1/(2*num_loci)):1)
         hybrid_indices = get_hybrid_indices(range, genotypes)
-        return map(i -> count(x -> x == i, hybrid_indices), (0:0.125:1))
+        return map(i -> count(x -> x == i, hybrid_indices), indices_range)
     end
 
     function get_expected(i)
@@ -667,7 +677,9 @@ function update_gene_plot(
     other_output = get_points.(values(loci), Ref(genotypes[other_indices]))
 
     for i in 3:7
-        xs = [(0:0.125:1); (0:0.125:1); (0:0.125:1)]
+        num_loci = length(values(loci)[i])
+        range = (0:(1/(2*num_loci)):1)
+        xs = [range; range; range]
         stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
         ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
 
@@ -682,10 +694,12 @@ function update_gene_plot(
             lowclip=:blue)
     end
     global points[6] = barplot!(ax[6], (0:0.125:1), get_expected.((0:0.125:1)), color=:blue)
-    println(generation)
+    println(string("generation: ", generation))
 
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-    save(string(dir, "/", generation, ".png"), fig)
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", generation, ".png"), fig)
+    end
 end
 
 function chi_squared_traits(genotypes, loci)
@@ -737,16 +751,207 @@ end
 
 function plot_fitnesses(fitnesses)
     @save "fitness.jld2" fitnesses
+    generations = collect(eachindex(fitnesses))
+    num_generations = length(generations)
+    phenotypes = collect(keys(fitnesses[1]))
     num_phenotypes = length(fitnesses[1])
     xs = vcat([fill(gen, num_phenotypes) for gen in eachindex(fitnesses)]...)
     ys = vcat([collect(keys(f)) for f in fitnesses]...)
     zs = vcat([collect(values(f)) for f in fitnesses]...)
 
-    println(typeof(fitnesses))
-    println(typeof(xs))
-    println(typeof(ys))
-    println(typeof(zs))
 
-    display(heatmap(xs, ys, zs, colormap=:grayC, colorrange=(0.5,2)))
+    function maximum_fitness()
+        return map(
+            f -> reduce((x, y) -> f[x] ≥ f[y] ? x : y, keys(f)),
+            fitnesses
+        )
+    end
+
+    function ratio()
+        return map(
+            f -> f[0.5f0] / f[0.0f0],
+            fitnesses
+        )
+    end
+
+    function average_fitness(phenotype)
+        average_fitnesses = []
+        for i in 1:10:length(fitnesses)
+            fitness_values = []
+            for j in i:min(i + 9, length(fitnesses))
+                push!(fitness_values, fitnesses[j][phenotype])
+            end
+            push!(average_fitnesses, mean(fitness_values))
+        end
+        return average_fitnesses
+    end
+
+    #=
+    xs = vcat([(1:10:num_generations) for phenotype in phenotypes]...)
+    ys = vcat([fill(phenotype, Int(trunc(num_generations/10))) for phenotype in phenotypes]...)
+    zs = vcat(map(average_fitness, phenotypes)...)
+    zs = Float32.(zs)
+    =#
+    #=
+    xs = generations
+    ys = ratio()
+    =#
+
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    ax = Axis(fig[1, 1], xlabel="generation", ylabel="phenotype")
+    scatter!(ax, xs, ys)
+    display(fig)
+    display(heatmap(xs, ys, zs, colormap=:grayC))
     readline()
+end
+
+function plot_tracking_data(filepath)
+    @load filepath tracking_data
+    overlaps = [t.overlap for t in tracking_data]
+    hybridnesses = [t.hybridness for t in tracking_data]
+    widths = [t.width for t in tracking_data]
+    populations = [t.population for t in tracking_data]
+
+    xs = collect(eachindex(tracking_data))
+    ax = Vector(undef, 4)
+    points = Vector(undef, 4)
+
+    fontsize_theme = Theme(fontsize=40)
+    set_theme!(fontsize_theme)  # set the standard font size
+    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    # create the axis and labels
+    ax[1] = Axis(
+        fig[1, 1],
+        ylabel="# individuals",
+        yticklabelsize=30.0f0
+    )
+    ax[2] = Axis(
+        fig[2, 1],
+        ylabel="cline width",
+        limits=((nothing, nothing), (-0.05, 1.05))
+    )
+    ax[3] = Axis(
+        fig[3, 1],
+        ylabel="hybridness",
+        yticklabelsize=30.0f0
+    )
+    ax[4] = Axis(
+        fig[4, 1],
+        ylabel="overlap",
+        xlabel="generation",
+        limits=((nothing, nothing), (-0.05, 1.05))
+    )
+    points[1] = scatter!(ax[1], xs, populations)
+    points[2] = scatter!(ax[2], xs, widths)
+    points[3] = scatter!(ax[3], xs, hybridnesses)
+    points[4] = scatter!(ax[4], xs, overlaps)
+
+    yspace = 1.5 * maximum(tight_yticklabel_spacing!, [ax[1], ax[2]])
+
+    ax[1].yticklabelspace = yspace
+    ax[2].yticklabelspace = yspace
+    ax[3].yticklabelspace = yspace
+    ax[4].yticklabelspace = yspace
+
+    display(fig)
+    readline()
+
+    save("hz_formation_ecolDiff1_S_AM_350_w_hyb_0.87.png", fig)
+end
+
+function summarize_gene_correlations(dir)
+    names = ["magic_preference", "magic_cue", "search_cost", "no_magic"]
+    correlations = Matrix(undef, 4, 3)
+
+    magic_loci = [[1, 5], [3, 5], [5, 6], [5, 6]]
+    fmt_loci = [[2], 1:2, 1:2, 1:2]
+    mmt_loci = [3:4, [4], 3:4, 3:4]
+    neutral_loci = [6:9, 6:9, 7:10, 7:10]
+
+    for i in 1:4
+        filename = string(dir, "/", names[i], ".jld2")
+        @load filename sim_params outcome_array
+        correlations[i, 1] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], fmt_loci[i]), outcome_array)...)
+        correlations[i, 2] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], mmt_loci[i]), outcome_array)...)
+
+        correlations[i, 3] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], neutral_loci[i]), outcome_array)...)
+
+    end
+
+    w_hyb_set = string.([0.95, 0.9, 0.7, 0.5])
+    S_AM_set = string.([1, 10, 100, 1000])
+    xticks = [4, 3, 2, 1]
+    yticks = [1, 2, 3, 4]
+
+    xs = vcat(fill(xticks, 4)...)
+    ys = vcat([fill(s, 4) for s in yticks]...)
+
+    ax = Matrix(undef, 4, 4)
+    hm = Matrix(undef, 4, 4)
+
+
+    fontsize_theme = Theme(fontsize=25)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0, 1), colormap=:curl)
+
+    println(correlations)
+
+    for j in 1:4
+        for i in 1:3
+            ax[j, i] = Axis(fig[j, i], xlabel="w_hyb", ylabel="S_AM", xticks=(xticks, w_hyb_set), yticks=(yticks, S_AM_set), xticklabelsize=20, yticklabelsize=20, xlabelsize=15, ylabelsize=15)
+            hm[j, i] = heatmap!(ax[j, i], xs, ys, correlations[j, i], colorrange=(-1, 1))
+            println(correlations[j, i][16])
+        end
+        println("")
+    end
+
+    xlabel1 = Label(fig[0, 1], "Female mating trait", tellwidth=false)
+    xlabel2 = Label(fig[0, 2], "Male mating trait", tellwidth=false)
+    xlabel3 = Label(fig[0, 3], "Neutral trait", tellwidth=false)
+
+    ylabel1 = Label(fig[1, 0], "Magic preference", rotation=pi / 2, tellheight=false)
+    ylabel2 = Label(fig[2, 0], "Magic cue", rotation=pi / 2, tellheight=false)
+    ylabel3 = Label(fig[3, 0], "Search cost", rotation=pi / 2, tellheight=false)
+    ylabel4 = Label(fig[4, 0], "No pleiotropy", rotation=pi / 2, tellheight=false)
+    Colorbar(fig[:, 4], hm[1, 1], label="Pearson coefficient", ticklabelsize=15)
+    display(fig)
+    readline()
+    save("trial1.png", fig)
+end
+
+function plot_phenotypes(phenotypes)
+    ylabels = ["Mating preference", "Mating cue", "Hybrid survival trait"]
+    function calc_proportion(dict)
+        return_dict = Dict(collect(keys(dict)).=>Float32.(collect(values(dict))))
+        counts = collect(values(dict))
+        sum_counts = sum(counts)
+        map!(x->x/sum_counts, values(return_dict))
+        return return_dict
+    end
+    function plot_phenotypes_at_loci(loci, ax)
+        proportions = [calc_proportion(p[loci]) for p in phenotypes]
+        generations = collect(eachindex(proportions))
+        num_phenotypes = length(proportions[1])
+        xs = vcat([fill(gen, num_phenotypes) for gen in generations]...)
+        ys = vcat([collect(keys(p)) for p in proportions]...)
+        zs = vcat([collect(values(p)) for p in proportions]...)
+        return heatmap!(ax, xs, ys, zs)
+    end
+    
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colormap=:grayC)
+    ax = Vector(undef, 3)
+    hm = Vector(undef, 3)
+
+    for i in 1:3
+        ax[i] = Axis(fig[i,1], xlabel="generation", ylabel=ylabels[i])
+    end
+
+    hm[1] = plot_phenotypes_at_loci(:female_mating_trait, ax[1])
+    hm[2] = plot_phenotypes_at_loci(:male_mating_trait, ax[2])
+    hm[3] = plot_phenotypes_at_loci(:hybrid_survival, ax[3])
+    display(fig)
+    readline()
+    
+    save("phenotypes2.png", fig)
 end

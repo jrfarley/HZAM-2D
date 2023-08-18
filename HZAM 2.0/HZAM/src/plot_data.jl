@@ -18,6 +18,8 @@ GLMakie.activate!(inline=false) # set up the plot to display in its own window
 global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25),
     (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25),
     (:black, 0.25)]
+"The figure showing locations and hybrid indices"
+global fig
 "Axes on which the locations are plotted"
 global ax
 "Points showing the location and hybrid index of every individual"
@@ -35,14 +37,15 @@ Initialize the plot of locations and hybrid indices.
 """
 function create_new_plot(
     hybrid_indices_functional::Vector,
-    locations::Vector
+    locations::Vector,
+    save_plot
 )
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # set the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
+    global fig = Figure(resolution=(1800, 1200), figure_padding=60)
     # create the axis and labels
     global ax = Axis(
         fig[1, 1],
@@ -60,6 +63,10 @@ function create_new_plot(
     # add the location of every individual to the plot
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional)
 
+    if save_plot
+    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+    save(string(dir, "/", 1, ".png"), fig)
+    end
     display(fig)
 end
 
@@ -82,7 +89,8 @@ every individual.
 function update_population_plot(
     hybrid_indices_functional::Vector,
     locations::Vector,
-    generation::Integer
+    generation::Integer,
+    save_plot
 )
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
@@ -134,6 +142,11 @@ function update_population_plot(
         sorted_indices
     ))
     println("")
+
+    if save_plot
+    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+    save(string(dir, "/", generation, ".png"), fig)
+    end
 end
 
 """

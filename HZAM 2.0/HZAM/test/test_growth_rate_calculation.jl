@@ -108,10 +108,28 @@ end
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    zone = Population.Zone([fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)], Matrix{Int8}[], [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)], Location[], [Int8(1)], Int8[], [1], 0)
-    empty_zone = Population.Zone(Matrix{Int8}[], Matrix{Int8}[], Location[], Location[], [Int8(1)], Int8[], 1:1, 0)
+    zone = Population.Zone(
+        [fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)],
+        Matrix{Int8}[],
+        [Location(0.5f0, 0.5f0),
+            Location(0.0f0, 0.0f0)],
+        Location[],
+        [1],
+        0
+    )
+    empty_zone = Population.Zone(
+        Matrix{Int8}[],
+        Matrix{Int8}[],
+        Location[],
+        Location[],
+        1:1,
+        0
+    )
 
-    growth_rates_F = Population.calc_growth_rates([empty_zone empty_zone empty_zone; empty_zone zone empty_zone; empty_zone empty_zone empty_zone],
+    growth_rates_F = Population.calc_growth_rates(
+        [empty_zone empty_zone empty_zone; 
+        empty_zone zone empty_zone; 
+        empty_zone empty_zone empty_zone],
         CartesianIndex(2, 2),
         K_total,
         sigma_comp,
@@ -129,13 +147,35 @@ end
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    zone = Population.Zone([fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)], Matrix{Int8}[], [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)], Location[], [Int8(1)], Int8[], [1], 0)
-    empty_zone = Population.Zone(Matrix{Int8}[], Matrix{Int8}[], Location[], Location[], [Int8(1)], Int8[], 1:1, 0)
+    zone = Population.Zone(
+        [fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)],
+        Matrix{Int8}[],
+        [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)],
+        Location[], [Int8(1)],
+        0
+    )
+    empty_zone = Population.Zone(
+        Matrix{Int8}[],
+        Matrix{Int8}[],
+        Location[],
+        Location[],
+        1:1,
+        0
+    )
 
-    neighbourhood = [empty_zone empty_zone empty_zone; empty_zone zone empty_zone; empty_zone empty_zone empty_zone]
+    neighbourhood = [
+        empty_zone empty_zone empty_zone
+        empty_zone zone empty_zone
+        empty_zone empty_zone empty_zone
+    ]
     locations_F = [Location(1.0f0, 0.0f0), Location(0.5f0, 0.5f0), Location(0.49f0, 0.5f0)]
 
-    densities_A, densities_B = Population.calc_real_densities(neighbourhood, locations_F, 0.03, 0.01)
+    densities_A, densities_B = Population.calc_real_densities(
+        neighbourhood,
+        locations_F,
+        0.03,
+        0.01
+    )
 
     @test densities_A[1] == 0
     @test densities_B[1] == 0
@@ -147,18 +187,37 @@ end
 
 @testset "calc_real_densities_ecolDiff1" begin
     K_total = Integer(trunc(1000 / sqrt(2 * pi * 0.01^2)))
-    ecolDiff = 0.0
+    ecolDiff = 1
     competition_trait_loci = 1:1
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    zone = Population.Zone([fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)], Matrix{Int8}[], [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)], Location[], [Int8(1)], Int8[], [1], 0)
-    empty_zone = Population.Zone(Matrix{Int8}[], Matrix{Int8}[], Location[], Location[], [Int8(1)], Int8[], 1:1, 0)
+    zone = Population.Zone(
+        [fill(Int8(1), 2, 3), fill(Int8(1), 2, 3)],
+        Matrix{Int8}[],
+        [Location(0.5f0, 0.5f0), Location(0.0f0, 0.0f0)],
+        Location[],
+        [1],
+        1
+    )
+    empty_zone = Population.Zone(
+        Matrix{Int8}[],
+        Matrix{Int8}[],
+        Location[],
+        Location[],
+        1:1,
+        1
+    )
 
-    neighbourhood = [empty_zone empty_zone empty_zone; empty_zone zone empty_zone; empty_zone empty_zone empty_zone]
+    neighbourhood = [
+        empty_zone empty_zone empty_zone
+        empty_zone zone empty_zone
+        empty_zone empty_zone empty_zone
+    ]
     locations_F = [Location(1.0f0, 0.0f0), Location(0.5f0, 0.5f0), Location(0.49f0, 0.5f0)]
 
-    densities_A, densities_B = Population.calc_real_densities(neighbourhood, locations_F, 0.03, 0.01)
+    densities_A, densities_B =
+        Population.calc_real_densities(neighbourhood, locations_F, 0.03, 0.01)
 
     @test densities_A[1] == 0
     @test densities_B[1] == 0
@@ -166,4 +225,24 @@ end
     @test densities_B[2] == 1
     @test densities_A[3] == 0
     @test abs(densities_B[3] - exp(-1 / 2)) < 0.00001
+end
+
+@testset "max_radius_squared" begin
+    locations = Location.(
+        [0.98f0, 0.98f0, 0.01f0, 0.01f0, 0.5f0, 0.5f0, 0.5f0, 0.5f0, 0.5f0, 0.01f0, 0.02f0,
+            0.98f0, 0.99f0],
+        [0.5f0, 0.5f0, 0.5f0, 0.5f0, 0.5f0, 0.98f0, 0.98f0, 0.01f0, 0.01f0, 0.01f0, 0.021f0,
+            0.99f0, 0.98f0]
+    )
+
+    angles = [0, 3 * pi / 2, 2 * pi / 3, pi / 4, 2, pi / 2, 0, 5 * pi / 4, pi + 0.01,
+        3 * pi / 4, 3 * pi / 4, pi / 2, pi / 2]
+
+    max_radii_squared = Population.max_radius_squared.(locations, angles, Ref(0.03))
+
+    expected = [0.02^2, 0.03^2, 0.02^2, 0.03^2, 0.03^2, 0.02^2, 0.03^2, 0.0002, 0.03^2,
+        0.0002, 0.0008, 0.0001, 0.0004]
+    for i in eachindex(max_radii_squared)
+        @test abs(max_radii_squared[i] - expected[i]) < 0.0000001
+    end
 end

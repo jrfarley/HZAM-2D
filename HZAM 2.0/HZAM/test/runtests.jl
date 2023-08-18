@@ -5,6 +5,7 @@ import HZAM.Mating as Mating
 import HZAM.DataAnalysis as DataAnalysis
 
 test_files = [
+    "test_data_analysis.jl",
     "test_find_mate.jl",
     "test_growth_rate_calculation.jl",
     "test_population.jl"

@@ -68,7 +68,7 @@ struct Location
     end
 end
 
-"The population data (genotypes, mitochondria, locations, and resource use) for a subset of 
+"The population data (genotypes, locations, and resource use) for a subset of 
 the total population."
 struct Zone
     "The female genotypes. rows are alleles (row 1 from mother, row 2 from father) and 
@@ -80,11 +80,6 @@ struct Zone
     locations_F::Vector{Location}
     "The male locations."
     locations_M::Vector{Location}
-    "The female mitochondrion (a single locus genotype)."
-    mitochondria_F::Vector{Int8}
-    "The male mitochondrion."
-    mitochondria_M::Vector{Int8}
-
     "Each female's contribution to the use of resource A."
     ind_useResourceA_F::Vector{Float64}
     "Each male's contribution to the use of resource A."
@@ -104,7 +99,7 @@ struct Zone
             ecolDiff::Real
         )
 
-    Set up the initial locations, genotypes, mitochondria, and resource use of every 
+    Set up the initial locations, genotypes, and resource use of every 
     individual in the zone.
 
     # Arguments
@@ -133,34 +128,28 @@ struct Zone
         ] # the geographic limits of the zone
 
         genotype = fill(species, 2, total_loci)
-        for i in 1:-1
+        #=
+        for i in 3:6
             genotype[1, i] = 1 - species
         end
+        =#
 
         genotypes = fill(genotype, N_half)
 
         locations = [[Location(zone_range) for i in 1:N_half] for i in 1:2]
 
-        mitochondria = fill(species, N_half)
-
-
         #=
         Calculate individual contributions to resource use, according to linear gradient 
         between use of species 0 and species 1.
-
-        At the beginning the mitochondria value can be used as a stand in for the 
-        competition trait.
         =#
-        ind_useResourceA = calc_ind_useResourceA(mitochondria, ecolDiff)
-        ind_useResourceB = calc_ind_useResourceB(mitochondria, ecolDiff)
+        ind_useResourceA = calc_ind_useResourceA(fill(species, N_half), ecolDiff)
+        ind_useResourceB = calc_ind_useResourceB(fill(species, N_half), ecolDiff)
 
         new(
             genotypes,
             genotypes,
             locations[1],
             locations[1],
-            mitochondria,
-            mitochondria,
             ind_useResourceA,
             ind_useResourceA,
             ind_useResourceB,
@@ -174,21 +163,17 @@ struct Zone
             genotypes_M::Vector{Matrix{Int8}},
             locations_F::Vector{Location},
             locations_M::Vector{Location},
-            mitochondria_F::Vector{Int8},
-            mitochondria_M::Vector{Int8},
             competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
             ecolDiff
         )
 
-    Create a new Zone using the genotypes, locations, and mitochondria of the offspring.
+    Create a new Zone using the genotypes and locations of the offspring.
 
     # Arguments
     - `genotypes_F::Vector{Matrix{Int8}}`: the female genotypes.
     - `genotypes_M::Vector{Matrix{Int8}}`: the male genotypes.
     - `locations_F::Vector{Location}`: the female locations.
     - `locations_M::Vector{Location}`: the male locations.
-    - `mitochondria_F::Vector{Int8}`: the female mitochondria.
-    - `mitochondria_M::Vector{Int8}`: the male mitochondria.
     - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci 
     specifying the ecological trait (used in fitness related to resource use).
     - `ecolDiff::Real`: the ecological difference between the two species.
@@ -198,8 +183,6 @@ struct Zone
         genotypes_M::Vector{Matrix{Int8}},
         locations_F::Vector{Location},
         locations_M::Vector{Location},
-        mitochondria_F::Vector{Int8},
-        mitochondria_M::Vector{Int8},
         competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         ecolDiff::Real
     )
@@ -211,18 +194,18 @@ struct Zone
         calculate individual contributions to resource use, according to linear gradient 
         between use of species 0 and species 1
         =#
+
         ind_useResourceA_F = calc_ind_useResourceA(competition_traits_F, ecolDiff)
         ind_useResourceA_M = calc_ind_useResourceA(competition_traits_M, ecolDiff)
         ind_useResourceB_F = calc_ind_useResourceB(competition_traits_F, ecolDiff)
         ind_useResourceB_M = calc_ind_useResourceB(competition_traits_M, ecolDiff)
+
 
         new(
             genotypes_F,
             genotypes_M,
             locations_F,
             locations_M,
-            mitochondria_F,
-            mitochondria_M,
             ind_useResourceA_F,
             ind_useResourceA_M,
             ind_useResourceB_F,
@@ -232,11 +215,11 @@ struct Zone
 end
 
 
-"The population data (genotypes, locations, mitochondria, resource use, and growth rates) 
+"The population data (genotypes, locations, resource use, and growth rates) 
 for all individuals in the simulation. The data is subdivided by 'zone' into a matrix for 
 calculation efficiency."
 struct PopulationData
-    "All of the zones (containing the genotypes, locations, mitochondria, and resource use) 
+    "All of the zones (containing the genotypes, locations, and resource use) 
     in the simulation."
     population::Matrix{Zone}
 
@@ -259,7 +242,6 @@ struct PopulationData
         floor(Int, effective_K / (NUM_ZONES^2))
     end
 
-    # initializes the genotypes, locations, mitochondria, and growth rates of the simulation
     """
         PopulationData(
             K_total::Integer,
@@ -302,7 +284,7 @@ struct PopulationData
         =#
         zone_species = map(l -> l.x < 0.5 ? 0 : 1, zone_locations)
 
-        # initialize the genotypes, locations, and mitochondria for each zone
+        # initialize the genotypes and locations for each zone
         zones = Zone.(
             Ref(num_individuals_per_zone),
             Ref(total_loci),
@@ -331,8 +313,6 @@ struct PopulationData
         PopulationData(
             genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
             genotypes_sons::Matrix{Vector{Matrix{Int8}}},
-            mitochondria_daughters::Matrix{Vector{Int8}},
-            mitochondria_sons::Matrix{Vector{Int8}},
             locations_daughters::Matrix{Vector{Location}},
             locations_sons::Matrix{Vector{Location}},
             competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
@@ -342,14 +322,12 @@ struct PopulationData
             ecolDiff::Real
         )
 
-    Create a new PopulationData using the genotypes, locations, and mitochondria of the 
+    Create a new PopulationData using the genotypes and locations of the 
     offspring.
 
     # Arguments
     - `genotypes_daughters::Matrix{Vector{Matrix{Int8}}}`: the female genotypes.
     - `genotypes_sons::Matrix{Vector{Matrix{Int8}}}`: the male genotypes.
-    - `mitochondria_daughters::Matrix{Vector{Int8}}`: the female mitochondria.
-    - `mitochondria_sons::Matrix{Vector{Int8}}`: the male mitochondria.
     - `locations_daughters::Matrix{Vector{Location}}`: the female locations.
     - `locations_sons::Matrix{Vector{Location}}`: the male locations.
     - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: list of the 
@@ -363,8 +341,6 @@ struct PopulationData
     function PopulationData(
         genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
         genotypes_sons::Matrix{Vector{Matrix{Int8}}},
-        mitochondria_daughters::Matrix{Vector{Int8}},
-        mitochondria_sons::Matrix{Vector{Int8}},
         locations_daughters::Matrix{Vector{Location}},
         locations_sons::Matrix{Vector{Location}},
         competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
@@ -375,8 +351,8 @@ struct PopulationData
     )
 
         #= 
-        Set up empty matrices for storing the zone data (genotypes, locations, and 
-        mitochondria for every individual in the zone) and the female growth rates.
+        Set up empty matrices for storing the zone data (genotypes and locations for every 
+        individual in the zone) and the female growth rates.
         =#
         zones = Matrix{Zone}(undef, NUM_ZONES, NUM_ZONES)
         growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_ZONES, NUM_ZONES)
@@ -387,8 +363,6 @@ struct PopulationData
                 genotypes_sons[zone_index],
                 locations_daughters[zone_index],
                 locations_sons[zone_index],
-                mitochondria_daughters[zone_index],
-                mitochondria_sons[zone_index],
                 competition_trait_loci,
                 ecolDiff)
         end
@@ -432,7 +406,9 @@ between the resource use of species 0 and species 1.
 - `ecolDiff::Real`: the ecological difference between the species. 
 """
 function calc_ind_useResourceA(competition_traits::Vector, ecolDiff::Real)
-    competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
+    competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1
+
+    #return competAbility .+ (1 .- round.(competition_traits)) 
 
     ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
 
@@ -453,6 +429,7 @@ between the resource use of species 0 and species 1.
 function calc_ind_useResourceB(competition_traits::Vector, ecolDiff::Real)
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
 
+    #return competAbility .+ round.(competition_traits)
     ind_useResourceB = competAbility .+ (competition_traits .* ecolDiff)
 
     return ind_useResourceB
@@ -479,7 +456,7 @@ function max_radius_squared(location::Location, t::Real, max_dist::Real)
     if y > (1 - max_dist) && t < pi
         y_dist = (1 - y) / sin(t)
     elseif y < max_dist && t > pi
-        y_dist = y / sin(t)
+        y_dist = -y / sin(t)
     else
         y_dist = max_dist
     end
@@ -492,7 +469,7 @@ function max_radius_squared(location::Location, t::Real, max_dist::Real)
         x_dist = max_dist
     end
 
-    return (min(x_dist, y_dist))^2
+    return (min(x_dist, y_dist, max_dist))^2
 end
 
 """
@@ -753,7 +730,7 @@ Compute the survival fitness of an individual according to heterozygosity.
 function calc_survival_fitness_hetdisadvantage(
     genotype::Matrix{<:Integer},
     w_hyb::Real
-)::Vector{Float32}
+)::Float32
     num_loci = size(genotype, 2)
     s_per_locus = 1 - w_hyb^(1 / num_loci)  # loss in fitness due to each heterozygous locus 
     num_hetloci = sum(genotype[1, :] .≠ genotype[2, :])
