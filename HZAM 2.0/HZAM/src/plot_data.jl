@@ -1,7 +1,7 @@
 "Functions for plotting data while the simulation is running."
 module PlotData
 
-export create_new_plot, update_population_plot
+export create_new_plot, update_population_plot, create_gene_plot, update_gene_plot
 
 # for plotting:
 #using Plots
@@ -64,8 +64,8 @@ function create_new_plot(
     global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional)
 
     if save_plot
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-    save(string(dir, "/", 1, ".png"), fig)
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", 1, ".png"), fig)
     end
     display(fig)
 end
@@ -144,8 +144,8 @@ function update_population_plot(
     println("")
 
     if save_plot
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-    save(string(dir, "/", generation, ".png"), fig)
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", generation, ".png"), fig)
     end
 end
 
@@ -161,5 +161,191 @@ Scale the curve output to display on the plot over the corresponding y-axis rang
 """
 function scale_curve(curve, index::Integer)
     (curve .* 0.1) .+ Ref((index - 1) * 0.1)
+end
+
+"""
+    function count_genotypes(
+        range::Union{UnitRange{<:Integer},Vector{<:Integer}},
+        genotypes::Vector{<:Matrix{<:Integer}}
+    )
+
+Count the number of individuals with each genotype for a given loci range.
+"""
+function count_genotypes(
+    range::Union{UnitRange{<:Integer},Vector{<:Integer}},
+    genotypes::Vector{<:Matrix{<:Integer}}
+)
+    num_loci = length(range)
+    indices_range = (0:(1/(2*num_loci)):1)
+    hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, range)
+    return map(i -> count(x -> x == i, hybrid_indices), indices_range)
+end
+
+"""
+    get_expected(x::Real, n::Integer)
+
+Compute the expected number of individuals with a given trait hybrid index if the trait is 
+controlled by 4 loci. 
+
+# Arguments
+- `x::Real`: the hybrid index for the trait of interest.
+- `n::Integer`: the total population size.
+"""
+function get_expected(x::Real, n::Integer)
+    return (n * binomial(8, Int(8 * x))) / 2^8
+end
+
+"""
+    create_gene_plot(
+        genotypes::Vector{<:Matrix{<:Integer}},
+        loci::NamedTuple,
+        generation::Integer,
+        save_plot::Bool
+    )
+
+Initialize the plot of the phenotype frequencies for each loci range.
+
+# Arguments
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual.
+- `loci::NamedTuple`: the loci range for each trait.
+- `generation::Integer`: the generation # the simulation is on.
+- `save_plot::Bool`: true if the plot is to be saved to a file.
+"""
+function create_gene_plot(
+    genotypes::Vector{<:Matrix{<:Integer}},
+    loci::NamedTuple,
+    save_plot::Bool
+)
+    plot_titles = ["Neutral trait", "Female mating trait", "Male mating trait",
+        "Competition trait", "Hybrid survival trait", "Expected neutral distribution"]
+    global ax = Vector(undef, 6)
+    global points = Vector(undef, 6)
+
+    fontsize_theme = Theme(fontsize=60)
+    set_theme!(fontsize_theme)  # set the standard font size
+    global fig = Figure(resolution=(1800, 1200), figure_padding=60)
+
+    # initialize the axis for each subplot
+    for i in 1:6
+        global ax[i] = Axis(
+            fig[Int(ceil(i / 3)), (i-1)%3+1],
+            xlabel="trait value",
+            ylabel="# individuals",
+            title=plot_titles[i],
+            yticklabelsize=20,
+            xticklabelsize=20
+        )
+    end
+
+    hybrid_survival_indices = DataAnalysis.calc_traits_additive(genotypes, loci.hybrid_survival)
+
+    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
+    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
+
+    species_A_output = count_genotypes.(values(loci), Ref(genotypes[species_A_indices]))
+    species_B_output = count_genotypes.(values(loci), Ref(genotypes[species_B_indices]))
+    other_output = count_genotypes.(values(loci), Ref(genotypes[other_indices]))
+    println(points)
+    println(ax)
+
+    for i in 3:7
+        num_loci = length(values(loci)[i])
+        range = (0:(1/(2*num_loci)):1)
+        xs = [range; range; range]
+        stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
+        ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
+
+        global points[i-2] = barplot!(
+            ax[i-2],
+            xs,
+            ys,
+            color=stk,
+            stack=stk,
+            colorrange=(1.1, 2.9),
+            highclip=:orange,
+            lowclip=:blue)
+    end
+
+    global points[6] = barplot!(
+        ax[6],
+        (0:0.125:1),
+        get_expected.((0:0.125:1), Ref(length(genotypes))),
+        color=:blue
+    )
+    println("generation 1")
+    display(fig)
+
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", 1, ".png"), fig)
+    end
+end
+
+"""
+    create_gene_plot(
+        genotypes::Vector{<:Matrix{<:Integer}},
+        loci::NamedTuple,
+        generation::Integer,
+        save_plot::Bool
+    )
+
+Update the plot of the phenotype frequencies for each loci range.
+
+# Arguments
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual.
+- `loci::NamedTuple`: the loci range for each trait.
+- `generation::Integer`: the generation # the simulation is on.
+- `save_plot::Bool`: true if the plot is to be saved to a file.
+"""
+function update_gene_plot(
+    genotypes,
+    loci,
+    generation,
+    save_plot
+)
+
+    [delete!(ax[i], points[i]) for i in 1:6] # remove the old points from the plot
+
+    hybrid_survival_indices = DataAnalysis.calc_traits_additive(genotypes, loci.hybrid_survival)
+
+    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
+    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
+
+    species_A_output = count_genotypes.(values(loci), Ref(genotypes[species_A_indices]))
+    species_B_output = count_genotypes.(values(loci), Ref(genotypes[species_B_indices]))
+    other_output = count_genotypes.(values(loci), Ref(genotypes[other_indices]))
+
+    for i in 3:7
+        num_loci = length(values(loci)[i])
+        range = (0:(1/(2*num_loci)):1)
+        xs = [range; range; range]
+        stk = [fill(1, length(species_A_output[i])); fill(3, length(species_B_output[i])); fill(2, length(other_output[i]))]
+        ys = [species_A_output[i]; species_B_output[i]; other_output[i]]
+
+        global points[i-2] = barplot!(
+            ax[i-2],
+            xs,
+            ys,
+            color=stk,
+            stack=stk,
+            colorrange=(1.1, 2.9),
+            highclip=:orange,
+            lowclip=:blue)
+    end
+
+    global points[6] = barplot!(
+        ax[6],
+        (0:0.125:1),
+        get_expected.((0:0.125:1), Ref(length(genotypes))),
+        color=:blue
+    )
+    println(string("generation: ", generation))
+
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", generation, ".png"), fig)
+    end
 end
 end # end of Plot_Data module

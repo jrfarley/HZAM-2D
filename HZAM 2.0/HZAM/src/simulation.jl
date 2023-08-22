@@ -151,7 +151,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         ]
 
         if gene_plot
-            create_gene_plot(genotypes, loci, 0, save_plot)
+            create_gene_plot(genotypes, loci, save_plot)
         else
             create_new_plot(
                 DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),

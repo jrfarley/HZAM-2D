@@ -183,6 +183,12 @@ end
     @test abs(1 - DataAnalysis.calc_trait_correlation(genotypes, 1:3, 1:3)) < 0.0001
     @test abs(0.4472 - DataAnalysis.calc_trait_correlation(genotypes, [1], [3])) < 0.0001
     @test abs(0.8407 - DataAnalysis.calc_trait_correlation(genotypes, 1:2, 2:3)) < 0.0001
+
+    genotypes = [[1 0 1; 0 1 1], [0 1 1; 1 0 1], [0 0 1; 1 1 1]]
+
+    correlation = DataAnalysis.calc_trait_correlation(genotypes, [1, 2, 3], [3])
+
+    @test correlation == 0
 end
 
 @testset "calc_linkage_diseq" begin
@@ -482,4 +488,18 @@ end
     @test c2[0.5f0] == 100
     @test c2[0.75f0] == 0
     @test c2[1.0f0] == 0
+end
+
+@testset "find_fixed_alleles" begin
+    genotypes = [[1 1 1; 1 1 1], [1 1 1; 1 1 1], [1 0 0; 1 0 0], [1 0 1; 1 1 0]]
+
+    @test DataAnalysis.find_fixed_alleles(genotypes) == [1]
+
+    genotypes = fill([1 1 1; 1 1 1], 50)
+
+    @test DataAnalysis.find_fixed_alleles(genotypes) == [1, 2, 3]
+
+    genotypes = [[1 1; 1 1], [0 0; 0 0]]
+
+    @test DataAnalysis.find_fixed_alleles(genotypes) == []
 end

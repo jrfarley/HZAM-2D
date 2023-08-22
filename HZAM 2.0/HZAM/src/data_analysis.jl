@@ -641,13 +641,7 @@ function calc_trait_correlation(
     correlation = covariance / deviation
 
     if isnan(correlation)
-        if correlation < 0
-            return -1
-        elseif correlation == 0
-            return 0
-        else
-            return 0
-        end
+        return 0
     end
 
     return correlation
@@ -825,5 +819,21 @@ function count_phenotypes_at_loci(
     end
 
     return Dict(different_hybrid_indices .=> count_phenotype.(different_hybrid_indices))
+end
+
+"""
+    find_fixed_alleles(genotypes::Vector{<:Matrix{<:Integer}})
+
+Determine at which loci the population has lost its genetic diversity.
+"""
+function find_fixed_alleles(genotypes::Vector{<:Matrix{<:Integer}})
+    extinct = []
+    for i in 1:size(genotypes[1], 2)
+        genotypes_at_locus = [g[:,i] for g in genotypes]
+        if all(genotypes_at_locus[1] .== genotypes_at_locus)
+            push!(extinct, i)
+        end
+    end
+    return extinct
 end
 end
