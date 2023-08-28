@@ -3,7 +3,7 @@ include("HZAM/src/HZAM.jl")
 import .HZAM
 using JLD2 # needed for saving / loading data in Julia format
 
-K = 40000
+K = 20000
 
 println(K)
 #=
@@ -27,16 +27,19 @@ HZAM.plot_fitnesses(fitnesses)
 
 =#
 
-HZAM.run_one_HZAM_sim(0.8, 400, 0, 1.1; # these values are 
+outcome = HZAM.run_one_HZAM_sim(0.4, 300, 0.4, 1.1; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=K, max_generations=2000,
-    sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=1,
+    K_total=K, max_generations=1000,
+    sigma_disp=0.05, sigma_comp=0.01, do_plot=true, plot_int=10,
     total_loci=16,
     female_mating_trait_loci=1:4,
     male_mating_trait_loci=5:8,
-    competition_trait_loci=1:4,
-    hybrid_survival_loci=1:4,
-    per_reject_cost=0.0,
-    gene_plot=true,
-    save_plot=true
+    competition_trait_loci=9:12,
+    hybrid_survival_loci=9:12,
+    per_reject_cost=0,
+    gene_plot=false,
+    save_plot=true,
+    track_phenotypes=true
 )
+
+#@save "blending.JLD2" outcome

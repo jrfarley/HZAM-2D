@@ -1,7 +1,7 @@
 "Functions for plotting data while the simulation is running."
 module PlotData
 
-export create_new_plot, update_population_plot, create_gene_plot, update_gene_plot
+export create_population_plot, update_population_plot, create_gene_plot, update_gene_plot
 
 # for plotting:
 #using Plots
@@ -28,18 +28,28 @@ global points
 global sigmoid_lines = []
 
 """
-    create_new_plot(
-        hybrid_indices_functional::Vector,
-        locations::Vector
+    create_population_plot(
+        hybrid_indices_functional::Vector{<:Real},
+        locations::Vector,
+        save_plot::Bool
     )
 
 Initialize the plot of locations and hybrid indices.
+
+# Arguments
+- `hybrid_indices_functional::Vector`: list of the hybrid index (value between 0 and 1) of 
+every individual.
+- `locations::Vector`: the location of every individual 
+(must be in the same order as the hybrid indices).
+- `generation::Integer`: the number of elapsed generations.
+- `save_plot::Bool`: true if the plot is to be saved to a PNG file.
 """
-function create_new_plot(
+function create_population_plot(
     hybrid_indices_functional::Vector,
     locations::Vector,
-    save_plot
+    save_plot::Bool
 )
+
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
@@ -71,10 +81,11 @@ function create_new_plot(
 end
 
 """
-    function update_population_plot(
+    update_population_plot(
         hybrid_indices_functional::Vector,
         locations::Vector,
-        generation::Integer
+        generation::Integer,
+        save_plot::Bool
     )
 
 Update the existing plot with new locations and hybrid indices.
@@ -82,15 +93,16 @@ Update the existing plot with new locations and hybrid indices.
 # Arguments
 - `hybrid_indices_functional::Vector`: list of the hybrid index (value between 0 and 1) of 
 every individual.
-- `locations::Vector`: the location of every individual 
-(must be in the same order as the hybrid indices).
+- `locations::Vector`: the location of every individual (must be in the same order as the 
+hybrid indices).
 - `generation::Integer`: the number of elapsed generations.
+- `save_plot::Bool`: true if the plot is to be saved to a PNG file.
 """
 function update_population_plot(
     hybrid_indices_functional::Vector,
     locations::Vector,
     generation::Integer,
-    save_plot
+    save_plot::Bool
 )
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
@@ -150,12 +162,12 @@ function update_population_plot(
 end
 
 """
-    scale_curve(curve, index::Real)
+    scale_curve(curve, index::Integer)
 
 Scale the curve output to display on the plot over the corresponding y-axis range.
 
 # Arguments
-- `curve`: the output of a function approximating the data whose range is [0,1]
+- `curve`: the output of a function approximating the data whose range is [0,1].
 - `index::Integer`: the index of the corresponding range on the y-axis. 1 refers to 
 [0, 0.1), 2 to [0.1, 0.2) and so on.
 """
@@ -199,7 +211,6 @@ end
     create_gene_plot(
         genotypes::Vector{<:Matrix{<:Integer}},
         loci::NamedTuple,
-        generation::Integer,
         save_plot::Bool
     )
 
@@ -208,7 +219,6 @@ Initialize the plot of the phenotype frequencies for each loci range.
 # Arguments
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual.
 - `loci::NamedTuple`: the loci range for each trait.
-- `generation::Integer`: the generation # the simulation is on.
 - `save_plot::Bool`: true if the plot is to be saved to a file.
 """
 function create_gene_plot(
@@ -246,8 +256,6 @@ function create_gene_plot(
     species_A_output = count_genotypes.(values(loci), Ref(genotypes[species_A_indices]))
     species_B_output = count_genotypes.(values(loci), Ref(genotypes[species_B_indices]))
     other_output = count_genotypes.(values(loci), Ref(genotypes[other_indices]))
-    println(points)
-    println(ax)
 
     for i in 3:7
         num_loci = length(values(loci)[i])
@@ -283,7 +291,7 @@ function create_gene_plot(
 end
 
 """
-    create_gene_plot(
+    update_gene_plot(
         genotypes::Vector{<:Matrix{<:Integer}},
         loci::NamedTuple,
         generation::Integer,
@@ -299,10 +307,10 @@ Update the plot of the phenotype frequencies for each loci range.
 - `save_plot::Bool`: true if the plot is to be saved to a file.
 """
 function update_gene_plot(
-    genotypes,
-    loci,
-    generation,
-    save_plot
+    genotypes::Vector{<:Matrix{<:Integer}},
+    loci::NamedTuple,
+    generation::Integer,
+    save_plot::Bool
 )
 
     [delete!(ax[i], points[i]) for i in 1:6] # remove the old points from the plot
@@ -348,4 +356,4 @@ function update_gene_plot(
         save(string(dir, "/", generation, ".png"), fig)
     end
 end
-end # end of Plot_Data module
+end # end of PlotData module

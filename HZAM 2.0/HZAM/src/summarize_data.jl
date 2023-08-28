@@ -6,69 +6,53 @@ using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
 
-# stores the parameters for each simulation
-struct SimulationParameters
-    intrinsic_R
-    ecolDiff
-    w_hyb
-    S_AM
-    K_total
-    max_generations
-    sigma_disp
-    total_loci
-    female_mating_trait_loci
-    male_mating_trait_loci
-    competition_trait_loci
-    hybrid_survival_loci
-    num_neutral_loci
-    survival_fitness_method
-    per_reject_cost
-end
+"""
+    run_one_HZAM_sim(
+        w_hyb::Real, 
+        S_AM::Real, 
+        ecolDiff::Real, 
+        intrinsic_R::Real; 
+        <keyword arguments>
+    )
 
-# runs the simulation for various combinations of hybrid fitness and assortative mating strength
-# stores the outcome of each simulation in a JLD2 file
-function run_HZAM_set(set_name::String, intrinsic_R, ecolDiff;  # the semicolon makes the following optional keyword arguments 
-    K_total::Int=1000, max_generations::Int=1000,
+Run the simulation for 64 combinations of hybrid fitness and assortative mating strength and 
+store the outcome of each simulation in a JLD2 file.
+
+# Arguments
+- `set_name::String`: the name assigned to the set of simulations.
+- `intrinsic_R::Real`: the intrinsic growth rate.
+- `ecolDiff::Real`: the ecological difference between the two species. Between 0 and 1.
+- `K_total::Integer=20000`: the carrying capacity of the environment.
+- `max_generations::Integer=1000`: the number of generations that the simulation will run for.
+- `total_loci::Integer=6`: the total number of loci in the genome.
+- `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
+- `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
+- `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in fitness related to resource use).
+- `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood.
+- `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
+- `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
+- `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
+- `track_spatial_data=false`: if true, keeps track of bimodality, gene flow, variance, cline widths, and cline positions.
+- `track_population_data=true`: if true, keeps track of population size, hybridness, overlap, and hybrid zone width.
+- `track_fitness=false`: if true, keeps track of the average number of offspring for each phenotype.
+- `track_mating_success=false`: if true, keeps track of the average number of mates per male for each phenotype.
+- `track_phenotypes=false`: if true, keeps track of the number of individuals with each phenotype.
+"""
+function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # the semicolon makes the following optional keyword arguments 
+    K_total::Int=20000, max_generations::Int=1000,
     total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3,
-    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.05)
-    # ecolDiff should be from 0 to 1 (parameter "E" in the paper)
-    # intrinsic_R is called "R" in the paper
-    # replications should be somehting like "1:10" or just "1" for 1 replicate, or something like "2:5" to add replicates after 1 is done
-    # K_total (default 1000) is the total carrying capacity, divided equally between K_alpha and K_beta
-    # max_generations (default 1000) is the number of generations each simulation will run 
-    # total_loci (default 6) is the total number of loci, regardless of their role (with indices 1:total_loci, referred to below)
-    # Need to specify indices (columns) of four types of functional loci (can be the same). At least one should begin with index 1:
-    # female_mating_trait_loci (default 1:3) is indices of the loci that determine the female mating trait
-    # male_mating_trait_loci (default 1:3) is indices of the loci that determine the male mating trait
-    # competition_trait_loci (default 1:3) is indices of the loci that determine the ecological trait (used in fitness related to resource use)
-    # hybrid_survival_loci (default 1:3) is indices of the loci that determine survival probability of offspring to adulthood (can be viewed as incompatibilities and/or fitness valley based on ecology)
-    # Specify indices (columns) of neutral loci (which have no effect on anything, just along for the ride):
-    # neutral_loci (default 4:6) is indices of neutral loci (used for neutral measure of hybrid index; not used in the HZAM-sym paper)
-    # per_reject_cost (default 0, can take values of 0 to 1) is fitness loss of female per male rejected (due to search time, etc.)
-    # starting_pop_ratio (default 1) is the starting ratio of pop A to pop B
+    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.05,
+    track_spatial_data=false, track_population_data=true, track_fitness=false,
+    track_mating_success=false, track_phenotypes=false)
 
     # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1, 0.95, 0.9, 0.7, 0.5, 0.3, 0.1, 0]#[1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] # for just one run, just put one number in this and next line
-    # the set of assortative mating strengths (S_AM) that will be run
+    w_hyb_set = [1, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]
     S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
-    total_functional_loci = union(female_mating_trait_loci, male_mating_trait_loci, competition_trait_loci, hybrid_survival_loci)
-    neutral_loci = setdiff((1:total_loci), total_functional_loci)
-    num_neutral_loci = length(neutral_loci)
-    num_functional_loci = length(total_functional_loci)
-
-    if survival_fitness_method == "epistasis"
-        short_survFitnessMethod = "Ep"
-    elseif survival_fitness_method == "hetdisadvantage"
-        short_survFitnessMethod = "Het"
-    end
 
     # set up array of strings to record outcomes
-    outcome_array = Array{OutputData,2}(undef, length(w_hyb_set), length(S_AM_set))
-
-    sim_params = Array{SimulationParameters,2}(undef, length(w_hyb_set), length(S_AM_set))
-
+    outcome_array = Array{DataAnalysis.OutputData,2}(undef, length(w_hyb_set), length(S_AM_set))
 
     dir = mkpath(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", set_name))
 
@@ -79,184 +63,143 @@ function run_HZAM_set(set_name::String, intrinsic_R, ecolDiff;  # the semicolon 
             S_AM = S_AM_set[j]
             println("ecolDiff = ", ecolDiff, "; w_hyb = ", w_hyb, "; S_AM = ", S_AM)
 
-            run_name = string("HZAM_animation_run", "_surv", short_survFitnessMethod, "_ecolDiff", ecolDiff, "_growthrate", intrinsic_R, "_K", K_total, "_FL", num_functional_loci, "_NL", num_neutral_loci, "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
-
-            # set up initial values for one simulation
-            extinction = false
-            K = K_total
-
-            #K = (1+ecolDiff) * K_total
+            run_name = string("HZAM_animation_run", "_ecolDiff", ecolDiff, "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
 
             # run one simulation by calling the function defined above:
             outcome = run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
-                K_total=Int(trunc(K)), max_generations,
+                K_total, max_generations,
                 total_loci, female_mating_trait_loci, male_mating_trait_loci,
                 competition_trait_loci, hybrid_survival_loci,
-                survival_fitness_method, per_reject_cost, sigma_disp, do_plot=false)
+                survival_fitness_method, per_reject_cost, sigma_disp, do_plot=false,
+                track_spatial_data, track_population_data, track_fitness,
+                track_mating_success, track_phenotypes)
 
-            parameters = SimulationParameters(
-                intrinsic_R,
-                ecolDiff,
-                w_hyb,
-                S_AM,
-                K_total,
-                max_generations,
-                sigma_disp,
-                total_loci,
-                female_mating_trait_loci,
-                male_mating_trait_loci,
-                competition_trait_loci,
-                hybrid_survival_loci,
-                num_neutral_loci,
-                survival_fitness_method,
-                per_reject_cost
-            )
+
 
             filename = string(dir, "/", run_name, ".jld2")
-            @save filename parameters outcome
+            @save filename outcome
 
-            println(run_name, "  outcome was: ", outcome)
+            println(run_name, "  completed.")
             outcome_array[i, j] = outcome
-            sim_params[i, j] = parameters
         end # of S_AM loop
     end # of w_hyb loop   
 
-    return outcome_array, sim_params
+    return outcome_array
 end
 
+"""
+    plot_output_field(
+        outcomes::Array{:Real},
+        sim_params::Array{<:DataAnalysis.SimParams}
+    )
 
-#### functions for summarizing and plotting results
+Create a heatmap of an output variable vs hybrid fitness and assortative mating.
 
-# creates a plot of all the outcomes in a folder with hybrid fitness on the x axis, strength of assortative mating on the y axis
-# and the colour of each point representing the output variable of interest
-function plot_output_field(outcomes, sim_params, run_name, fieldname)
-    output = [[getfield(outcome, fieldname) for outcome in outcomes]...]
+# Arguments
+- `outcomes::Array{:Real}`: the output from the simulation to be displayed.
+- `sim_params::Array{<:DataAnalysis.SimParams}`: the simulation parameters resulting in the outcomes.
+"""
+function plot_output_field(
+    outcomes::Array{:Real},
+    sim_params::Array{<:DataAnalysis.SimParams}
+)
+    output = [outcomes...]
     w_hybs = [[s.w_hyb for s in sim_params]...]
     S_AMs = [[s.S_AM for s in sim_params]...]
 
-    fieldname = String(fieldname)
+    w_hyb_set = sort(union(w_hybs))
+    S_AM_set = sort(union(S_AMs))
+    xticks = collect(1:length(w_hyb_set))
+    yticks = collect(1:length(S_AM_set))
 
-    cr = (0, 1) # color range
-    if cmp(fieldname, "variance") == 0
-        cr = (0, 0.05)
-    end
+    xs = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
+    ys = map(s -> indexin(s, S_AM_set)[1], S_AMs)
 
-    fontsize_theme = Theme(fontsize=60)
+
+    fontsize_theme = Theme(fontsize=25)
     set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=cr)
-    ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string(fieldname, "--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
 
-    xlims!(-0.1, 1.1)
-    points = scatter!(ax, w_hybs, S_AMs, color=output, markersize=50, colorrange=cr) # adds the location of every individual to the plot
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colormap=:grayC)
 
-    Colorbar(fig[1, 4], points, label="overlap", height=Relative(0.5))
+    ax = Axis(
+        fig[1, 1],
+        xlabel="w_hyb",
+        ylabel="S_AM",
+        xticks=(xticks, string.(w_hyb_set)),
+        yticks=(yticks, string.(S_AM_set)),
+        xticklabelsize=20,
+        yticklabelsize=20,
+        xlabelsize=15,
+        ylabelsize=15
+    )
+    hm = heatmap!(ax, xs, ys, output)
 
-    fig
-end
-
-# creates a plot of gene flow (for a given trait) vs hybrid fitness on the x axis and assortative mating strength on the y axis
-function plot_gene_flow(outcomes, sim_params, run_name, loci_type)
-    all_gene_flow = [map(o -> o.gene_flows, outcomes)...]
-    gene_flow_at_loci = [getfield(gf, loci_type) for gf in all_gene_flow]
-    w_hybs = [[s.w_hyb for s in sim_params]...]
-    S_AMs = [[s.S_AM for s in sim_params]...]
-
-    fontsize_theme = Theme(fontsize=60)
-    set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0, 0.3))
-    ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel="S_AM", title=string(loci_type, "--", run_name), yscale=log10, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
-
-    xlims!(-0.1, 1.1)
-
-    points = scatter!(ax, w_hybs, S_AMs, color=gene_flow_at_loci, markersize=50, colorrange=(0, 0.3)) # adds the location of every individual to the plot
-
-    Colorbar(fig[1, 4], points, label="gene flow", height=Relative(0.5))
-
-    fig
-end
-
-# creates a plot of all the outcomes in a csv file where the x axis is the strength of assortative mating
-# and the colour of the points is the hybrid fitness
-function plot_trait_vs_S_AM(filepath, name)
-    w_hybs, S_AMs, output = load_from_file_csv(filepath)
-
-    w_hyb_values = sort(union(w_hybs))
-    S_AM_values = sort(union(S_AMs))
-
-    fontsize_theme = Theme(fontsize=60)
-    set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0, 0.3))
-    ax = Axis(fig[1, 1], xlabel="S_AM", ylabel=name, title=name, xticklabelsize=45, yticklabelsize=45, titlegap=30, xscale=log10) # creates the axes and labels
-
-    ylims!(-0.04, 0.3)
-    points = []
-    xs = S_AM_values
-
-    for w_hyb in w_hyb_values
-        indices = filter(i -> w_hybs[i] == w_hyb, eachindex(output))
-        xs = S_AMs[indices]
-        ys = output[indices]
-        push!(points, scatter!(xs, ys, markersize=30))
-    end
-    Legend(fig[1, 2],
-        points,
-        string.(w_hyb_values))
-
+    Colorbar(fig[:, 2], hm, ticklabelsize=15)
     display(fig)
     readline()
+    return fig
 end
 
-# plots all of the outcomes in a csv file vs w_hyb (ignores S_AM)
-function plot_trait_vs_w_hyb(filepath, name)
-    w_hybs, S_AMs, output = load_from_file_csv(filepath)
+"""
+    load_from_folder(dir::String)
 
-    w_hyb_values = sort(union(w_hybs))
-
-    fontsize_theme = Theme(fontsize=60)
-    set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0, 0.3))
-    ax = Axis(fig[1, 1], xlabel="w_hyb", ylabel=name, title=name, xticklabelsize=45, yticklabelsize=45, titlegap=30) # creates the axes and labels
-
-    ylims!(-0.04, 0.3)
-
-    points = scatter!(w_hybs, output, markersize=30)
-    display(fig)
-    readline()
-end
-
-# loads the data from each simulation output file stored in the given folder into an array of outcomes and a matching array of
-# the simulation parameters
-function load_from_folder(OutcomesFolder)
-    simulation_outcomes = OutputData[]
-    simulation_parameters = SimulationParameters[]
-    files = readdir(OutcomesFolder)
+Load the data from each simulation output file stored in the given directory into an array 
+organized by hybrid fitness and assortative mating strength.
+"""
+function load_from_folder(dir::String)
+    files = readdir(dir)
+    w_hyb_set = [1, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]
+    S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]
+    outcome_array = Array{DataAnalysis.OutputData,2}(
+        undef, length(w_hyb_set), length(S_AM_set)
+    )
     for file in files
-        parameters = missing
-        outcome = missing
-        path = string(OutcomesFolder, "/", file)
+        path = string(dir, "/", file)
         if occursin(".jld2", path)
-            @load path parameters outcome
-            push!(simulation_outcomes, outcome)
-            push!(simulation_parameters, parameters)
+            @load path outcome
+            outcome_array[
+                indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+                indexin(outcome.sim_params.S_AM, S_AM_set)[1]
+            ] = outcome
         end
     end
-
-    simulation_parameters, simulation_outcomes
+    return outcome_array
 end
 
-# reads a csv and returns the data in a format that's easy to plot
-# (a vector of the hybrid fitnesses, a vector of the assortative mating strengths, and a vector of the output data)
-function load_from_file_csv(filepath)
+"""
+    load_from_csv(filepath::String)
+
+Read the data from a CSV file and return vectors for hybrid fitness, assortative mating 
+strength, and the output variable.
+"""
+function load_from_csv(filepath::String)
     df = DataFrame(CSV.File(filepath))
 
     return df[!, "w_hyb"], df[!, "S_AM"], df[:, 3]
 end
 
-# converts a list of outcomes to a csv file for the given trait
-function convert_to_CSV(sim_params, outcomes, output_field, output_folder)
-    output = [[getfield(outcome, output_field) for outcome in outcomes]...]
-    w_hybs = [[s.w_hyb for s in sim_params]...]
-    S_AMs = [[s.S_AM for s in sim_params]...]
+"""
+    convert_to_CSV(
+        outcome_array::Array{<:DataAnalysis.OutputData},
+        field_name::Symbol,
+        output_folder::String
+    )
+
+Convert an array of outcomes to a csv file for the given output field.
+
+# Arguments
+- `outcome_array::Array{<:DataAnalysis.OutputData}`: the array of output data from a set of simulations.
+- `field_name::Symbol`: the name of the output field of interest.
+- `output_folder::String`: the destination for the CSV.
+"""
+function convert_to_CSV(
+    outcome_array::Array{<:DataAnalysis.OutputData},
+    field_name::Symbol,
+    output_folder::String
+)
+    output = [[getfield(outcome, field_name) for outcome in outcome_array]...]
+    w_hybs = [[o.sim_params.w_hyb for o in outcome_array]...]
+    S_AMs = [[o.sim_params.S_AM for o in outcome_array]...]
 
     df = DataFrame(S_AM=S_AMs, w_hyb=w_hybs, output_field=output)
 
@@ -265,95 +208,15 @@ function convert_to_CSV(sim_params, outcomes, output_field, output_folder)
     CSV.write(string(dir, "/", String(output_field), ".csv"), df)
 end
 
-# creates csv files of the gene flow for each trait
-function convert_to_CSV_gene_flows(sim_params, outcomes, output_folder)
-    gene_flows = [[o.gene_flows for o in outcomes]...]
-    for loci_type in fieldnames(GeneFlows)
-        convert_to_CSV(sim_params, gene_flows, loci_type, output_folder)
-    end
-end
+"""
+    plot_fitnesses(fitnesses::Vector{<:Dict})
 
-# saves the genotypes to a file given the population data at the end of a simulation
-function save_genotypes(pd, filepath)
-    genotypes = [vcat([d.genotypes_F for d in pd.population]...); vcat([d.genotypes_M for d in pd.population]...)]
-    #filepath = string("genotypes.jld2")
-    @save filepath genotypes
-end
+Produce a plot of fitnesses per phenotype over time.
 
-# calculates the Pearson coefficient between two loci
-function calc_linkage_diseq(genotypes, l1, l2)
-    if l2 != l1
-        genotypes = [g[:, [l1, l2]] for g in genotypes]
-
-        haplotypes = vcat([g[1, :] for g in genotypes], [g[2, :] for g in genotypes])
-
-        p_A = count(h -> h[1] == 0, haplotypes) / length(haplotypes)
-        p_B = count(h -> h[2] == 0, haplotypes) / length(haplotypes)
-
-        p_AB = count(h -> h == [0, 0], haplotypes) / length(haplotypes)
-        D = (p_AB - (p_A * p_B))
-        pearson_coefficient = (D^2) / (p_A * (1 - p_A) * p_B * (1 - p_B))
-
-        if isnan(pearson_coefficient)
-            pearson_coefficient = 1
-        end
-        return pearson_coefficient
-    else
-        return 1
-    end
-end
-
-# Compute the chi-squared value for a given locus
-function calc_chi_squared(genotypes, locus)
-    genotypes = [g[:, locus] for g in genotypes]
-    alleles = vcat([g[1] for g in genotypes], [g[2] for g in genotypes])
-
-    N = length(genotypes)
-    p_A = count(x -> x == 0, alleles) / (2 * N)
-    p_B = 1 - p_A
-    n_AB = count(x -> x == [0; 1] || x == [1; 0], genotypes)
-    n_AA = count(x -> x == [0; 0], genotypes)
-    n_BB = count(x -> x == [1; 1], genotypes)
-
-
-    return (((n_AA - N * p_A^2)^2) / (N * p_A^2)) +
-           (((n_AB - 2 * N * p_A * p_B)^2) / (2 * N * p_A * p_B)) +
-           (((n_BB - N * p_B^2)^2) / (N * p_B^2))
-end
-
-# calculate the linkage disequilibrium between loci using Pearson coefficients
-# and returns a table of values representing the average correlation between two traits
-function plot_trait_correlations_all(genotypes, loci, plot_title)
-    trait_correlations = DataAnalysis.calc_all_trait_correlations(genotypes, loci)
-
-    xs = [t[1] for t in trait_correlations]
-    ys = [t[2] for t in trait_correlations]
-    output = [t[3] for t in trait_correlations]
-
-    xs = map(x -> findall(z -> z == x, keys(loci))[1], xs)
-    ys = map(y -> findall(z -> z == y, keys(loci))[1], ys)
-
-    ticks = (1:length(loci))
-    labels = [string.(keys(loci))...]
-
-    fontsize_theme = Theme(fontsize=60)
-    set_theme!(fontsize_theme)  # this sets the standard font size
-    fig = Figure(resolution=(1800, 1200), figure_padding=60)
-    ax = Axis(fig[1, 1], xlabel="trait", ylabel="trait", title=plot_title, xticklabelsize=45, yticklabelsize=45, xticks=(ticks, labels), yticks=(ticks, labels), xticklabelrotation=pi / 2, titlegap=30) # creates the axes and labels
-
-
-    points = scatter!(ax, xs, ys, color=output, markersize=50) # adds the location of every individual to the plot
-
-    Colorbar(fig[1, 4], points, label="Pearson coefficient", height=Relative(1.0))
-
-    display(fig)
-    dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/trait_correlations_ecolDiff1")
-    filepath = string(dir, "/", plot_title, ".png")
-
-    save(filepath, fig)
-end
-
-function plot_fitnesses(fitnesses)
+# Arguments
+- `fitnesses::Vector{<:Dict}`: number of offspring per phenotype each generation.
+"""
+function plot_fitnesses(fitnesses::Vector{<:Dict})
     @save "fitness.jld2" fitnesses
     generations = collect(eachindex(fitnesses))
     num_generations = length(generations)
@@ -363,7 +226,9 @@ function plot_fitnesses(fitnesses)
     ys = vcat([collect(keys(f)) for f in fitnesses]...)
     zs = vcat([collect(values(f)) for f in fitnesses]...)
 
-
+    """
+    Determines which phenotype has the highest fitness each generation.
+    """
     function maximum_fitness()
         return map(
             f -> reduce((x, y) -> f[x] ≥ f[y] ? x : y, keys(f)),
@@ -371,14 +236,16 @@ function plot_fitnesses(fitnesses)
         )
     end
 
+    """
+    Compute the running average of the fitnesses for a given phenotype.
+    """
     function average_fitness(phenotype)
+        n = 10
         average_fitnesses = []
-        for i in 1:10:length(fitnesses)
-            fitness_values = []
-            for j in i:min(i + 9, length(fitnesses))
-                push!(fitness_values, fitnesses[j][phenotype])
-            end
-            push!(average_fitnesses, mean(fitness_values))
+        for i in eachindex(fitnesses)
+            fitness_values =
+                [fitnesses[j][phenotype] for j in i:min(length(fitnesses), i + n - 1)]
+            push!(average_fitness, mean(fitness_values))
         end
         return average_fitnesses
     end
@@ -391,14 +258,22 @@ function plot_fitnesses(fitnesses)
     readline()
 end
 
-function plot_tracking_data(filepath)
-    @load filepath tracking_data
-    overlaps = [t.overlap for t in tracking_data]
-    hybridnesses = [t.hybridness for t in tracking_data]
-    widths = [t.width for t in tracking_data]
-    populations = [t.population for t in tracking_data]
+"""
+    plot_population_tracking_data(filepath::String)
 
-    xs = collect(eachindex(tracking_data))
+Create plots of the population size, hybrid zone width, hybrid index, and population overlap vs time.
+
+# Arguments
+- `filepath::String`:: the filepath for the file containing the outcome of the simulation.
+"""
+function plot_population_tracking_data(filepath::String)
+    @load filepath population_tracking_data
+    overlaps = [t.overlap for t in population_tracking_data]
+    hybridnesses = [t.hybridness for t in population_tracking_data]
+    widths = [t.width for t in tracking_data]
+    populations = [t.population for t in population_tracking_data]
+
+    xs = collect(eachindex(population_tracking_data))
     ax = Vector(undef, 4)
     points = Vector(undef, 4)
 
@@ -440,13 +315,36 @@ function plot_tracking_data(filepath)
     ax[4].yticklabelspace = yspace
 
     display(fig)
-    readline()
 
-    save("hz_formation_ecolDiff1_S_AM_350_w_hyb_0.87.png", fig)
+    save(string(
+        "hz_formation_ecolDiff",
+        sim_params.ecolDiff,
+        "_S_AM",
+        sim_params.S_AM,
+        "_w_hyb",
+        sim_params.w_hyb,
+        ".png",
+        fig
+    ))
+
+    readline()
 end
 
-function summarize_gene_correlations(dir)
+"""
+    summarize_gene_correlations(dir::String)
+
+Create plots of the gene correlations between different traits vs S_AM and w_hyb for 
+different combinations of the same loci controlling different traits.
+
+# Arguments
+- `dir::String`: the folder where the outcomes of all the simulations are stored.
+"""
+function summarize_gene_correlations(dir::String)
     names = ["magic_preference", "magic_cue", "search_cost", "no_magic"]
+    xlabelnames = ["Female mating trait", "Male mating trait", "Neutral trait"]
+    ylabelnames = ["Magic preference", "Magic cue", "Search cost", "No pleiotropy"]
+    xlabels = []
+    ylabels = []
     correlations = Matrix(undef, 4, 3)
 
     magic_loci = [[1, 5], [3, 5], [5, 6], [5, 6]]
@@ -492,21 +390,30 @@ function summarize_gene_correlations(dir)
         println("")
     end
 
-    xlabel1 = Label(fig[0, 1], "Female mating trait", tellwidth=false)
-    xlabel2 = Label(fig[0, 2], "Male mating trait", tellwidth=false)
-    xlabel3 = Label(fig[0, 3], "Neutral trait", tellwidth=false)
+    for i in 1:3
+        push!(xlabels, Label(fig[0, i], xlabelnames[i], tellwidth=false))
+    end
 
-    ylabel1 = Label(fig[1, 0], "Magic preference", rotation=pi / 2, tellheight=false)
-    ylabel2 = Label(fig[2, 0], "Magic cue", rotation=pi / 2, tellheight=false)
-    ylabel3 = Label(fig[3, 0], "Search cost", rotation=pi / 2, tellheight=false)
-    ylabel4 = Label(fig[4, 0], "No pleiotropy", rotation=pi / 2, tellheight=false)
+    for i in 1:4
+        push!(ylabels, Label(fig[i, 0], ylabelnames[i], rotation=pi / 2, tellheight=false))
+    end
+
     Colorbar(fig[:, 4], hm[1, 1], label="Pearson coefficient", ticklabelsize=15)
     display(fig)
+    save(string(dir, "/gene_correlations.png"), fig)
     readline()
-    save("trial1.png", fig)
 end
 
-function plot_phenotypes(phenotypes)
+"""
+    plot_phenotypes(phenotypes; filepath="phenotype_frequencies.png")
+
+Create plots of mating preference, mating cue, and hybrid survival trait phenotype 
+frequencies over time.
+
+# Arguments
+- `filepath="phenotype_frequencies.png"`: the destination filepath for the plot image.
+"""
+function plot_phenotypes(phenotypes; filepath="phenotype_frequencies.png")
     ylabels = ["Mating preference", "Mating cue", "Hybrid survival trait"]
     function calc_proportion(dict)
         return_dict = Dict(collect(keys(dict)) .=> Float32.(collect(values(dict))))
@@ -537,7 +444,6 @@ function plot_phenotypes(phenotypes)
     hm[2] = plot_phenotypes_at_loci(:male_mating_trait, ax[2])
     hm[3] = plot_phenotypes_at_loci(:hybrid_survival, ax[3])
     display(fig)
+    save(filepath, fig)
     readline()
-
-    save("phenotypes2.png", fig)
 end

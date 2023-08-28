@@ -10,50 +10,42 @@ export PopulationData, Location, Zone
 chunks. Default is 10x10."
 NUM_ZONES = 10
 
-"A location with an x coordinate and a y coordinate."
+"""
+    Location
+
+A Location stores an x coordinate and a y coordinate.
+
+# Constructors
+```julia
+- Location(x::Float32, y::Float32)
+- Location(starting_range::Vector{<:Location})
+- Location(starting_location::Location, sigma_disp::Real)
+```
+
+# Details on behaviour of different constructors
+
+The first constructor creates a new location with the given x and y coordinates.
+
+The second constructor generates a random location within the given range. Range is 
+specified by a vector containing the coordinates of the bottom left and top right corners.
+
+The third constructor generates an offspring's location based on the mother's location and 
+the standard deviation of the dispersal distance.
+"""
 struct Location
-    "The location's x coordinate."
     x::Float32
-    "The location's y coordinate."
     y::Float32
 
-    """
-        Location(x::Float32, y::Float32)
-
-    Create a new location with the given x and y coordinates.
-    """
     function Location(x::Float32, y::Float32)
         new(x, y)
     end
 
-    """
-        Location(starting_range::Vector{Location})
-
-    Create a random location within the given range.
-
-    # Arguments
-    - `starting_range::Vector{Location}`: a vector of two locations specifying the lower 
-    left and the upper right corners of the range.
-    """
-    function Location(starting_range::Vector{Location})
+    function Location(starting_range::Vector{<:Location})
         x = rand() * (starting_range[2].x - starting_range[1].x) + starting_range[1].x
         y = rand() * (starting_range[2].y - starting_range[1].y) + starting_range[1].y
         new(x, y)
     end
 
-    """
-        Location(starting_location::Location, sigma_disp::Real)
-
-    Generate an offspring's location based on the mother's location and the dispersal 
-    distance. 
-    
-    The offspring's location is based on a normal distribution centered on a 
-    given location.
-
-    # Arguments
-    - `starting_location::Location`: the center of the normal distribution.
-    - `sigma_disp::Real`: the width of the normal distribution.
-    """
     function Location(starting_location::Location, sigma_disp::Real)
         x = -1
         y = -1
@@ -68,48 +60,60 @@ struct Location
     end
 end
 
-"The population data (genotypes, locations, and resource use) for a subset of 
-the total population."
+"""
+    Zone
+
+A Zone stores the genotypes locations and resource use for the individuals contained within 
+a subset of the range.
+
+# Fields
+- `genotypes_F::Vector{Matrix{Int8}}`: the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci.
+- `genotypes_M::Vector{Matrix{Int8}}`: the male genotypes.
+- `locations_F::Vector{<:Location}`: the female locations.
+- `locations_M::Vector{<:Location}`: the male locations.
+- `ind_useResourceA_F::Vector{Float64}`: each female's contribution to the use of resource A.
+- `ind_useResourceA_M::Vector{Float64}`: each male's contribution to the use of resource A.
+- `ind_useResourceB_F::Vector{Float64}`: each female's contribution to the use of resource B.
+- `ind_useResourceB_M::Vector{Float64}`: each male's contribution to the use of resource B.
+
+# Constructors
+```julia
+- Zone(
+    starting_N::Integer,
+    total_loci::Integer,
+    location::Location,
+    size::Float32,
+    population::Real,
+    ecolDiff::Real
+)
+- Zone(
+    genotypes_F::Vector{Matrix{Int8}},
+    genotypes_M::Vector{Matrix{Int8}},
+    locations_F::Vector{<:Location},
+    locations_M::Vector{<:Location},
+    competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
+    ecolDiff
+)
+```
+
+# Details on behaviour of different constructors
+
+The first constructor sets up the initial locations, genotypes, and resource use of every 
+individual in the zone.
+
+The second constructor creates a new Zone using the genotypes and locations of the 
+offspring.
+"""
 struct Zone
-    "The female genotypes. rows are alleles (row 1 from mother, row 2 from father) and 
-    columns are loci."
     genotypes_F::Vector{Matrix{Int8}}
-    "The male genotypes."
     genotypes_M::Vector{Matrix{Int8}}
-    "The female locations."
-    locations_F::Vector{Location}
-    "The male locations."
-    locations_M::Vector{Location}
-    "Each female's contribution to the use of resource A."
+    locations_F::Vector{<:Location}
+    locations_M::Vector{<:Location}
     ind_useResourceA_F::Vector{Float64}
-    "Each male's contribution to the use of resource A."
     ind_useResourceA_M::Vector{Float64}
-    "Each female's contribution to the use of resource B."
     ind_useResourceB_F::Vector{Float64}
-    "Each male's contribution to the use of resource B."
     ind_useResourceB_M::Vector{Float64}
 
-    """
-        Zone(
-            starting_N::Integer,
-            total_loci::Integer,
-            location::Location,
-            size::Float32,
-            population::Real,
-            ecolDiff::Real
-        )
-
-    Set up the initial locations, genotypes, and resource use of every 
-    individual in the zone.
-
-    # Arguments
-    - `starting_N::Integer`: the starting number of individuals in the zone.
-    - `total_loci::Integer`: the number of loci in the genotypes.
-    - `location::Location`: the location of the lower left corner of the zone.
-    - `size::Float32`: the width of the zone.
-    - `species::Real`: the 'species' identifier for the initial occupants of the zone.
-    - `ecolDiff::Real`: the ecological difference between the two species.
-    """
     function Zone(
         starting_N::Integer,
         total_loci::Integer,
@@ -157,32 +161,11 @@ struct Zone
         )
     end
 
-    """
-        Zone(
-            genotypes_F::Vector{Matrix{Int8}},
-            genotypes_M::Vector{Matrix{Int8}},
-            locations_F::Vector{Location},
-            locations_M::Vector{Location},
-            competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
-            ecolDiff
-        )
-
-    Create a new Zone using the genotypes and locations of the offspring.
-
-    # Arguments
-    - `genotypes_F::Vector{Matrix{Int8}}`: the female genotypes.
-    - `genotypes_M::Vector{Matrix{Int8}}`: the male genotypes.
-    - `locations_F::Vector{Location}`: the female locations.
-    - `locations_M::Vector{Location}`: the male locations.
-    - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci 
-    specifying the ecological trait (used in fitness related to resource use).
-    - `ecolDiff::Real`: the ecological difference between the two species.
-    """
     function Zone(
         genotypes_F::Vector{Matrix{Int8}},
         genotypes_M::Vector{Matrix{Int8}},
-        locations_F::Vector{Location},
-        locations_M::Vector{Location},
+        locations_F::Vector{<:Location},
+        locations_M::Vector{<:Location},
         competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         ecolDiff::Real
     )
@@ -214,53 +197,63 @@ struct Zone
     end
 end
 
+"""
+    PopulationData
 
-"The population data (genotypes, locations, resource use, and growth rates) 
-for all individuals in the simulation. The data is subdivided by 'zone' into a matrix for 
-calculation efficiency."
+A PopulationData stores the genotypes, locations, and growth rates for all individuals in 
+the simulation. The data is subdivided by 'zone' into a matrix for 
+calculation efficiency.
+
+# Fields
+- `population::Matrix{Zone}`: all of the zones (containing the genotypes, locations, and resource use) in the simulation.
+- `growth_rates_F::Matrix{Vector{Float64}}`: the growth rates of every female for each zone.
+
+# Constructors
+```julia
+- PopulationData(
+    K_total::Integer,
+    ecolDiff::Real,
+    total_loci::Integer,
+    intrinsic_R::Real,
+    sigma_comp::Real
+)
+- PopulationData(
+    genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
+    genotypes_sons::Matrix{Vector{Matrix{Int8}}},
+    locations_daughters::Matrix{Vector{Location}},
+    locations_sons::Matrix{Vector{Location}},
+    competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
+    K_total::Integer,
+    sigma_comp::Real,
+    intrinsic_R::Real,
+    ecolDiff::Real
+)
+```
+# Details on behaviour of different constructors
+
+The first constructor sets up the initial population for the simulation.
+
+The second constructor creates a new PopulationData using the genotypes and locations of the 
+offspring.
+"""
 struct PopulationData
-    "All of the zones (containing the genotypes, locations, and resource use) 
-    in the simulation."
     population::Matrix{Zone}
-
-    "A list of the growth rates of every female for each zone."
     growth_rates_F::Matrix{Vector{Float64}}
 
-    """
-        calc_zone_population(K_total::Integer, ecolDiff::Real)
-
+    #=
     Compute the initial number of individuals in each zone. 
-    
+
     When ecolDiff=0 this will just 
     be the carrying capacity (K_total) divided by the number of zones. But when there is an 
     ecological difference between the two species the effective carrying capacity is reduced 
     since not all of the available resources will be used.
-    """
+    =#
     function calc_zone_population(K_total::Integer, ecolDiff::Real)
         effective_K = K_total / (1 + ecolDiff)
 
         floor(Int, effective_K / (NUM_ZONES^2))
     end
 
-    """
-        PopulationData(
-            K_total::Integer,
-            ecolDiff::Real,
-            total_loci::Integer,
-            intrinsic_R::Real,
-            sigma_comp::Real
-        )
-
-    Set up the initial population for the simulation.
-
-    # Arguments
-    - `K_total::Integer`: the carrying capacity.
-    - `ecolDiff::Real`: the ecological difference between the two species.
-    - `total_loci::Integer`: the total number of loci for the genotypes.
-    - `intrinsic_R::Real`: the intrinsic growth rate.
-    - `sigma_comp::Real`: the standard deviation for the normal curve used in calculating 
-    local density.
-    """
     function PopulationData(
         K_total::Integer,
         ecolDiff::Real,
@@ -268,7 +261,6 @@ struct PopulationData
         intrinsic_R::Real,
         sigma_comp::Real
     )
-
         # the number of individuals per zone (innitially constant throughout range)
         num_individuals_per_zone = calc_zone_population(K_total, ecolDiff)
 
@@ -309,35 +301,6 @@ struct PopulationData
         new(zones, growth_rates_F)
     end
 
-    """
-        PopulationData(
-            genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
-            genotypes_sons::Matrix{Vector{Matrix{Int8}}},
-            locations_daughters::Matrix{Vector{Location}},
-            locations_sons::Matrix{Vector{Location}},
-            competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
-            K_total::Integer,
-            sigma_comp::Real,
-            intrinsic_R::Real,
-            ecolDiff::Real
-        )
-
-    Create a new PopulationData using the genotypes and locations of the 
-    offspring.
-
-    # Arguments
-    - `genotypes_daughters::Matrix{Vector{Matrix{Int8}}}`: the female genotypes.
-    - `genotypes_sons::Matrix{Vector{Matrix{Int8}}}`: the male genotypes.
-    - `locations_daughters::Matrix{Vector{Location}}`: the female locations.
-    - `locations_sons::Matrix{Vector{Location}}`: the male locations.
-    - `competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: list of the 
-    loci specifying the ecological trait (used in fitness related to resource use).
-    - `K_total::Integer`: the carrying capacity of the environment
-    - `sigma_comp::Real`: the standard deviation for the normal curve used in calculating 
-    local density.
-    - `intrinsic_R::Real`: the intrinsic growth rate.
-    - `ecolDiff::Real`: the ecological difference between the two species.
-    """
     function PopulationData(
         genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
         genotypes_sons::Matrix{Vector{Matrix{Int8}}},
@@ -402,13 +365,11 @@ Compute the individual contributions to the use of resource A according to a lin
 between the resource use of species 0 and species 1.
 
 # Arguments
-- `competition_traits::Vector{Real}`: the ecological competition trait values
+- `competition_traits::Vector{Real}`: the ecological competition trait values.
 - `ecolDiff::Real`: the ecological difference between the species. 
 """
 function calc_ind_useResourceA(competition_traits::Vector, ecolDiff::Real)
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1
-
-    #return competAbility .+ (1 .- round.(competition_traits)) 
 
     ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
 
@@ -423,13 +384,12 @@ Compute the individual contributions to the use of resource B according to a lin
 between the resource use of species 0 and species 1.
 
 # Arguments
-- `competition_traits::Vector{Real}`: the ecological competition trait values
+- `competition_traits::Vector{Real}`: the ecological competition trait values.
 - `ecolDiff::Real`: the ecological difference between the species. 
 """
 function calc_ind_useResourceB(competition_traits::Vector, ecolDiff::Real)
     competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
 
-    #return competAbility .+ round.(competition_traits)
     ind_useResourceB = competAbility .+ (competition_traits .* ecolDiff)
 
     return ind_useResourceB
@@ -441,8 +401,7 @@ end
 Compute the distance from a point along an angle to the limit of the range 
 (defined by x∈[0,1), y∈[0,1)). 
 
-The distance gets cut off at max_dist. Used in calculating 
-the ideal densities.
+The distance gets cut off at max_dist. Used in calculating the ideal densities.
 
 # Arguments
 - `location::Location`: the starting location.
@@ -476,37 +435,33 @@ end
     calc_ideal_densities(
         K_total::Integer,
         sigma_comp::Real,
-        locations_F::Vector{Location},
+        locations_F::Vector{<:Location},
         max_dist::Real
     )
 
 Compute expected local densities, based on geographically even distribution of individuals 
 at carrying capacity.
 
+
+Densities are calculated using the following integral:
+
+``K_{total}\\int\\limits_0^{2\\pi}\\int\\limits_0^{0.03} 
+\\exp(-\\frac{r^2}{2σ_{comp}^2})rdrdθ``
+
+where the density function is equal to 0 outside of the range limits.
+
 # Arguments
 - `K_total::Integer`: the carrying capacity.
-- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating 
-local density.
-- `locations_F::Vector{Location}`: a list of the locations where the ideal density is to be 
-computed.
-- `max_dist::Real`: the cutoff for the furthest away an individual can be and affect the 
-density calculation. Should be 3x sigma_comp.
+- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating local density.
+- `locations_F::Vector{<:Location}`: a list of the locations where the ideal density is to be computed.
+- `max_dist::Real`: the cutoff for the furthest away an individual can be and affect the density calculation. Should be 3x sigma_comp.
 """
 function calc_ideal_densities(
     K_total::Integer,
     sigma_comp::Real,
-    locations_F::Vector{Location},
+    locations_F::Vector{<:Location},
     max_dist::Real
 )
-
-    """
-    Compute densities using the equation:
-
-    ``K_{total}\\int\\limits_0^{2\\pi}\\int\\limits_0^{0.03} 
-    \\exp(-\\frac{r^2}{2σ_{comp}^2})rdrdθ``
-
-    where the density function is equal to 0 outside of the range limits.
-    """
     function calc_ideal_density(location)
         if max_dist < location.x < (1 - max_dist) &&
            max_dist < location.y <= (1 - max_dist)
@@ -532,11 +487,12 @@ function calc_ideal_densities(
 end
 
 """
-    calc_squared_distances(location_list::Vector{Location}, focal_location::Location)
+    calc_squared_distances(location_list::Vector{<:Location}, focal_location::Location)
 
 Compute the squared distances from a set of locations to a single location.
 
 # Example
+
 ```jldoctest
 julia> calc_squared_distances([Location(0.5f0, 0.5f0), Location(0.4f0, 0.4f0), 
 Location(0f0,0f0)], Location(0.5f0, 0.5f0))
@@ -544,9 +500,10 @@ Location(0f0,0f0)], Location(0.5f0, 0.5f0))
  0.0
  0.019999998
  0.5
- ```
+```
+ 
 """
-function calc_squared_distances(location_list::Vector{Location}, focal_location::Location)
+function calc_squared_distances(location_list::Vector{<:Location}, focal_location::Location)
     dif_x = [l.x for l in location_list] .- focal_location.x
     dif_y = [l.y for l in location_list] .- focal_location.y
 
@@ -570,23 +527,24 @@ end
 """
     calc_real_densities(
         neighbourhood::Matrix{Zone},
-        locations_F::Vector{Location},
-        max_dist::Real
+        locations_F::Vector{<:Location},
+        max_dist::Real,
+        sigma_comp::Real
     )
 
 Compute the population density at each female's location for both resources.
 
 # Arguments
-- `neighbourhood::Matrix{Zone}`: the zone indices for all the zones close enough to affect 
-the density calculation.
-- `locations_F::Vector{Location}`: the locations of every female in the focal zone.
+- `neighbourhood::Matrix{Zone}`: the zone indices for all the zones close enough to affect the density calculation.
+- `locations_F::Vector{<:Location}`: the locations of every female in the focal zone.
 - `max_dist::Real`: the distance cutoff for the density calculation.
+- `sigma_comp::Real`: the standard deviation used in the density calculation.
 """
 function calc_real_densities(
     neighbourhood::Matrix{Zone},
-    locations_F::Vector{Location},
+    locations_F::Vector{<:Location},
     max_dist::Real,
-    sigma_comp
+    sigma_comp::Real
 )
     # collect the individual contributions to the use of both resources.
     ind_useResourceA_all = vcat(
@@ -636,12 +594,10 @@ end
 Compute the female growth rates.
 
 # Arguments
-- `population::Matrix{Zone}`: the matrix of zones storing all the locations, and genotypes 
-in the simulation.
+- `population::Matrix{Zone}`: the matrix of zones storing all the locations, and genotypes in the simulation.
 - `zone_index::CartesianIndex`: the index of the focal zone.
 - `K_total::Integer`: the carrying capacity.
-- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating 
-local density.
+- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating local density.
 - `intrinsic_R::Real`: the intrinsic growth rate.
 """
 function calc_growth_rates(
@@ -752,8 +708,7 @@ parameter set to one as a default.
 
 # Arguments
 - `genotype:Matrix{<:Integer}`: the individual's genotype.
-- `hybrid_survival_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci 
-responsible for heterozygote disadvantage in computing the survival fitness.
+- `hybrid_survival_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci responsible for heterozygote disadvantage in computing the survival fitness.
 - `w_hyb::Real`: the simulation's hybrid fitness value.
 - `beta::Real`
 """

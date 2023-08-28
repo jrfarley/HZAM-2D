@@ -28,10 +28,8 @@ no eligible male is found.
 
 # Arguments
 - `zones::Matrix{Zone}`: the matrix storing the population data for each zone.
-- `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the 
-closest male.
-- `elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}`: the indices of all the eligible males in 
-each zone.
+- `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the closest male.
+- `elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}`: the indices of all the eligible males in each zone.
 - `location_mother::Location`: the location from which the males' distances are computed.
 - `neighbourhood_size::Float32`: the distance cutoff for the search.
 """
@@ -114,11 +112,11 @@ along a Gaussian acceptance curve.
 The acceptance curve is bounded between 0 and 1.
 
 # Arguments
-- `female_genotype::Matrix{<:Integer}`: the genotype of the focal female
-- `male_genotype::Matrix{<:Integer}`: the genotype of the focal male
-- `pref_SD::Float64`: width of the Gaussian acceptance curve
-- `female_mating_trait_loci`: the loci contributing to the female's mate preference
-- `male_mating_trait_loci`: the loci contributing to the male's trait
+- `female_genotype::Matrix{<:Integer}`: the genotype of the focal female.
+- `male_genotype::Matrix{<:Integer}`: the genotype of the focal male.
+- `pref_SD::Float64`: width of the Gaussian acceptance curve.
+- `female_mating_trait_loci`: the loci contributing to the female's mate preference.
+- `male_mating_trait_loci`: the loci contributing to the male's trait.
 """
 function calc_match_strength(
     female_genotype::Matrix{<:Integer},

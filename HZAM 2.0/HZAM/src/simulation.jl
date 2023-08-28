@@ -2,7 +2,6 @@ using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
 using Test
 
 
-# This is the function to run a single HZAM simulation
 """
     run_one_HZAM_sim(
         w_hyb::Real, 
@@ -24,32 +23,21 @@ Run a single HZAM simulation.
 - `total_loci::Integer=6`: the total number of loci in the genome.
 - `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
 - `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
-- `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in 
-fitness related to resource use).
-- `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood
-- `survival_fitness_method:String="epistasis"`: the method used to calculate the probability 
-of survival to adulthood.
-- `per_reject_cost=0`: the fitness loss of female per male rejected 
-(due to search time, etc.). Can take values of 0 to 1.
-- `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far 
-offspring will disperse from their mothers.
-- `sigma_comp=0.01`: the standard deviation for the normal curve used in calculating 
-local density.
-- `do_plot=true`: the program will display a plot of the locations and hybrid indices of 
-every individual while the simulation is running if this is true.
+- `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in fitness related to resource use).
+- `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood.
+- `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
+- `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
+- `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
+- `sigma_comp=0.01`: the standard deviation for the normal curve used in calculating local density.
+- `do_plot=true`: the program will display a plot of the locations and hybrid indices of every individual while the simulation is running if this is true.
 - `plot_int=10`: the interval (measured in generations) between updating the plot.
 - `gene_plot=false`: if true, generates phenotype plots.
 - `save_plot=false`: if true, saves each plot to a PNG file.
-- `track_spatial_data=false`: if true, keeps track of bimodality, gene flow, variance, cline 
-widths, and cline positions.
-- `track_population_data=true`: if true, keeps track of population size, hybridness, 
-overlap, and hybrid zone width.
-- `track_fitness=false`: if true, keeps track of the average number of offspring for each 
-phenotype.
-- `track_mating_success=false`: if true, keeps track of the average number of mates per 
-male for each phenotype.
-- `track_phenotypes=false`: if true, keeps track of the number of individuals with each 
-phenotype.
+- `track_spatial_data=false`: if true, keeps track of bimodality, gene flow, variance, cline widths, and cline positions.
+- `track_population_data=true`: if true, keeps track of population size, hybridness, overlap, and hybrid zone width.
+- `track_fitness=false`: if true, keeps track of the average number of offspring for each phenotype.
+- `track_mating_success=false`: if true, keeps track of the average number of mates per male for each phenotype.
+- `track_phenotypes=false`: if true, keeps track of the number of individuals with each phenotype.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::Real;
     # the semicolon makes the following optional keyword arguments  
@@ -65,7 +53,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     spatial_data = DataAnalysis.SpatialData[]
     fitnesses = Vector{Dict}(undef, max_generations)
     mating_success = Vector{Dict}(undef, max_generations)
-    tracking_data = DataAnalysis.PopulationTrackingData[]
+    population_tracking_data = DataAnalysis.PopulationTrackingData[]
     genotypes = Matrix{Int8}[]
     locations = Location[]
     phenotypes = Vector{NamedTuple}(undef, max_generations)
@@ -153,7 +141,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         if gene_plot
             create_gene_plot(genotypes, loci, save_plot)
         else
-            create_new_plot(
+            create_population_plot(
                 DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
                 locations,
                 save_plot
@@ -429,7 +417,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
 
         if track_population_data
             push!(
-                tracking_data,
+                population_tracking_data,
                 DataAnalysis.PopulationTrackingData(genotypes, locations, loci)
             )
         end
@@ -480,10 +468,35 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     end # of loop through generations
 
     if track_spatial_data
-        spatial_data = DataAnalysis.SpatialData(spatial_data, fitnesses)
+        spatial_data = DataAnalysis.SpatialData(spatial_data)
     end
 
-    return genotypes, locations, spatial_data, tracking_data, fitnesses, mating_success,
-    phenotypes
+    parameters = DataAnalysis.SimParams(
+                intrinsic_R,
+                ecolDiff,
+                w_hyb,
+                S_AM,
+                K_total,
+                max_generations,
+                sigma_disp,
+                total_loci,
+                female_mating_trait_loci,
+                male_mating_trait_loci,
+                competition_trait_loci,
+                hybrid_survival_loci,
+                per_reject_cost
+            )
+    output = DataAnalysis.OutputData(
+        parameters,
+        genotypes,
+        locations,
+        spatial_data,
+        population_tracking_data,
+        fitnesses,
+        mating_success,
+        phenotypes
+    )
+
+    return output
 end # of module
 

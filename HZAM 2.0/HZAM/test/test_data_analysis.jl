@@ -10,15 +10,13 @@
         locations,
         0.05,
         genotypes,
-        loci,
-        true
+        loci
     )
 
 
     gene_flows = collect(values(output_data.gene_flows))
 
     [@test gene_flows[i] == 0.0 for i in eachindex(gene_flows)]
-    readline()
 
     cline_widths = collect(values(output_data.cline_widths))
 
@@ -45,8 +43,7 @@ end
         locations,
         0.05,
         genotypes,
-        loci,
-        true
+        loci
     )
 
     outputs = fill(output_data, 20)
@@ -502,4 +499,21 @@ end
     genotypes = [[1 1; 1 1], [0 0; 0 0]]
 
     @test DataAnalysis.find_fixed_alleles(genotypes) == []
+end
+
+@testset "calc_chi_squared" begin
+    genotypes = [[1 1 1; 1 1 1], [1 0 1; 1 1 1], [1 1 0; 1 1 0], [0 0 0; 0 0 0],
+        [0 1 0; 1 0 1]]
+
+    x = DataAnalysis.calc_chi_squared(genotypes, 1)
+
+    @test abs(x - 1.3719) < 0.001
+
+    x = DataAnalysis.calc_chi_squared(genotypes, 2)
+
+    @test abs(x - 0.1389) < 0.001
+
+    x = DataAnalysis.calc_chi_squared(genotypes, 3)
+
+    @test abs(x - 1.8) < 0.001
 end

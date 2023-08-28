@@ -3,6 +3,7 @@ module DataAnalysis
 # export functions to be used in the PlotData module
 export calc_sigmoid_curves, calc_length, calc_width, calc_bimodality_overall,
     calc_overlap_overall, spaced_locations, sort_y
+export OutputData, SpatialData, PopulationTrackingData, SimParams
 
 using LsqFit: curve_fit
 using Statistics: mean
@@ -15,32 +16,72 @@ global initial_par = [0.0, 1.0]
 "Evenly spaced locations across the range (one-dimensional)."
 global spaced_locations = collect(Float32, 0:0.001:1)
 
-"Key data for each generation"
+"""
+    SimParams
+
+A SimParams stores the parameters used in a simulation.
+
+# Fields
+- `intrinsic_R::Real`: the intrinsic growth rate.
+- `ecolDiff::Real`: the ecological difference between the two populations.
+- `w_hyb::Real`: the hybrid fitness.
+- `S_AM::Real`: the strength of assortative mating.
+- `K_total::Integer`: the carrying capacity of the environment.
+- `max_generations::Integer`: the number of generations the simulation ran for.
+- `sigma_disp::Real`: the standard deviation for dispersal distance.
+- `total_loci::Integer`: the number of loci in the genotypes.
+- `female_mating_trait_loci`: the loci controlling mating preference.
+- `male_mating_trait_loci`: the loci controlling mating cue.
+- `competition_trait_loci`: the loci controlling what resources the individual uses.
+- `hybrid_survival_loci`: the loci controlling hybrid fitness.
+- `per_reject_cost::Real`: the loss in fitness incurred by a female after rejecting one male.
+"""
+struct SimParams
+    intrinsic_R::Real
+    ecolDiff::Real
+    w_hyb::Real
+    S_AM::Real
+    K_total::Integer
+    max_generations::Integer
+    sigma_disp::Real
+    total_loci::Integer
+    female_mating_trait_loci
+    male_mating_trait_loci
+    competition_trait_loci
+    hybrid_survival_loci
+    per_reject_cost::Real
+end
+
+"""
+    PopulationTrackingData
+
+A PopulationTrackingData stores the size, average hybrid index, overlap, and hybrid zone 
+width of the population.
+
+As the simulation runs a vector of PopulationTrackingData is used to keep track of the key 
+population data each generation.
+
+# Fields
+- `population_size::Real`: the total number of individuals.
+- `hybridness::Real`: the average hybrid index in the population (0 means phenotypically pure, 1 means that half of the genetic material is from one species and half from the other).
+- `overlap::Real`: the proportion of the range containing both species.
+- `width::Real`: the width of the hybrid zone over all functional loci.
+
+# Constructors
+```julia
+- PopulationTrackingData(
+    genotypes::Vector{<:Matrix{<:Integer}},
+    locations::Vector,
+    loci::NamedTuple
+)
+```
+"""
 struct PopulationTrackingData
-    "The total nubmer of individuals"
     population_size::Real
-    "The average hybrid value for the population (0 is phenotypically pure, 1 is an F1 
-    hybrid)"
     hybridness::Real
-    "The proportion of the range containing both species."
-    overlap::Real
-    "The width of the hybrid zone over all functional loci"
+    overlap::Base.Real
     width::Real
 
-    """
-        PopulationTrackingData(
-            genotypes::Vector{<:Matrix{<:Integer}},
-            locations::Vector,
-            loci::NamedTuple
-        )
-
-    Compute the key population data for each generation.
-
-    # Arguments
-    - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual
-    - `locations::Vector`: the locations of every individual
-    - `loci::NamedTuple`: the loci range for each trait
-    """
     function PopulationTrackingData(
         genotypes::Vector{<:Matrix{<:Integer}},
         locations::Vector,
@@ -67,47 +108,53 @@ struct PopulationTrackingData
     end
 end
 
+"""
+    SpatialData
 
-"All the key data on the outcome of the simulation"
-struct SpatialData
-    "The proportion of phenotypically pure individuals within half a dispersal distance of 
-    the middle of the hybrid zone."
-    bimodality::Real
-    "The proportion of genetic material originating in the other species found in 
-    individuals above a phenotypic purity cutoff."
-    gene_flows::NamedTuple
-    "The average movement of the hybrid zone each generation."
-    variance::Union{Real,Missing}
-    "The width of the cline for each trait."
-    cline_widths::NamedTuple
-    "The position of the midpoint of the cline for each trait."
-    cline_positions::NamedTuple
-    """
-    SpatialData(
+A SpatialData stores the bimodality, gene flow, hybrid zone movement, cline width, and cline 
+position data for the hybrid zone.
+
+# Fields
+- `bimodality::Real`: the proportion of phenotypically pure individuals within half a dispersal distance of the middle of the hybrid zone.
+- `gene_flows::NamedTuple`: the proportion of genetic material originating in the other species found in individuals above a phenotypic purity cutoff.
+- `cline_widths::NamedTuple`: the width of the cline for each trait.
+- `cline_positions::NamedTuple`: the position of the midpoint of the cline for each trait.
+- `variance::Real`: the average movement of the hybrid zone each generation.
+
+# Constructors
+```julia
+- SpatialData(
         locations::Vector,
         sigma_disp::Real,
         genotypes::Vector{<:Matrix{<:Integer}},
         loci::NamedTuple,
         last_generation::Bool
     )
+- SpatialData(output_data::Vector{SpatialData})
+```
 
-Compute the key statistics used to determine the outcome of the simulation.
+# Details on behaviour of different constructors
 
-# Arguments
-- `locations::Vector{Location}`: the location of every individual.
-- `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
-- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
-- `loci::NamedTuple`: the name and loci range of each trait of interest.
-- `last_generation::Bool`: true if it is the end of the simulation, otherwise false.
+The first constructor computes the spatial data from the population's genotypes, standard 
+deviation in dispersal distance, genotypes, and which loci control which traits.
+
+The second constructor accepts a vector of SpatialData, computes the variance in the 
+functional cline position, and the average over time of all remaining fields.
+
 """
+struct SpatialData
+    bimodality::Real
+    gene_flows::NamedTuple    
+    cline_widths::NamedTuple    
+    cline_positions::NamedTuple    
+    variance::Real
+
     function SpatialData(
         locations::Vector,
         sigma_disp::Real,
         genotypes::Vector{<:Matrix{<:Integer}},
-        loci::NamedTuple,
-        last_generation::Bool
+        loci::NamedTuple
     )
-        trait_correlations = missing
         locations_x = [l.x for l in locations]
         locations_y = [l.y for l in locations]
 
@@ -130,13 +177,6 @@ Compute the key statistics used to determine the outcome of the simulation.
             loci
         )
 
-        if last_generation
-            trait_correlations = calc_all_trait_correlations(
-                genotypes,
-                loci
-            )
-        end
-
         sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
 
         bimodality = calc_bimodality_overall(
@@ -150,16 +190,10 @@ Compute the key statistics used to determine the outcome of the simulation.
         new(
             bimodality,
             gene_flows,
-            missing,
             cline_widths,
             cline_positions)
     end
 
-    """
-        SpatialData(output_data::Vector{SpatialData})
-
-    Summarize the simulation data from a list of the key statistics measured over a timeframe. 
-    """
     function SpatialData(output_data::Vector{SpatialData})
         bimodality = mean([o.bimodality for o in output_data])
         gene_flows = average_gene_data([o.gene_flows for o in output_data])
@@ -172,12 +206,39 @@ Compute the key statistics used to determine the outcome of the simulation.
         new(
             bimodality,
             gene_flows,
-            variance,
             cline_widths,
-            cline_positions
+            cline_positions,
+            variance
         )
     end
 end
+
+"""
+    OutputData
+
+An OutputData stores all of the key data from a simulation run.
+
+# fields
+- `sim_params::SimParams`: the parameters of the simulation.
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of the population at the end of the simulation.
+- `locations::Vector{<:Any}`: the locations of the population at the end of the simulation.
+- `spatial_data::Union{SpatialData,Vector{<:SpatialData}}`: the spatial characteristics of the hybrid zone over time.
+- `population_tracking_data::Vector{<:PopulationTrackingData}`: the key measures of the population over time.
+- `fitnesses::Vector{<:Dict}`: the average number of offspring per phenotype per generation.
+- `mating_success::Vector{<:Dict}`: the average number of mates per male phenotype per generation.
+- `phenotypes::Vector{NamedTuple}`: the number of individuals with each phenotype per generation.
+"""
+struct OutputData    
+    sim_params::SimParams    
+    genotypes::Vector{<:Matrix{<:Integer}}    
+    locations::Vector{<:Any}    
+    spatial_data::Union{SpatialData,Vector{<:SpatialData}}    
+    population_tracking_data::Vector{<:PopulationTrackingData}    
+    fitnesses::Vector{<:Dict}    
+    mating_success::Vector{<:Dict}    
+    phenotypes::Vector{NamedTuple}
+end
+
 
 """
     calc_position(sigmoid_curves::Vector{<:Vector{T} where <:Real})
@@ -314,8 +375,7 @@ found in individuals above a phenotypic purity cutoff.
 # Arguments
 
 - `genotypes::Vector{<:Matrix{<:Real}}`: the genotypes of all individuals.
-- `hybrid_indices_functional::Vector{<:Real}`: the mean values of the genotypes over the 
-functional loci only.
+- `hybrid_indices_functional::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
 - `loci::NamedTuple`: the name and loci range of each trait of interest.
 """
 function calc_all_gene_flow(
@@ -431,10 +491,9 @@ Compute the total overlap area between the two species.
 
 # Arguments
 - `locations_x::Vector`: the x values of all the locations.
-- `hybrid_indices_functional::Vector{<:Real}`: the mean values of the genotypes over the 
-functional loci only.
+- `hybrid_indices_functional::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
 - `sorted_indices::Vector{<:Vector{<:Integer}}`: the indices of the locations sorted into 
-bins bins corresponding to non-overlapping ranges of the y values.
+bins corresponding to non-overlapping ranges of the y values.
 """
 function calc_overlap_overall(
     locations_x::Vector,
@@ -465,8 +524,7 @@ of the cline midpoint.
 # Arguments
 - `sigmoid_curve::Vector{<:Real}`: the sigmoid curve fitting the cline.
 - `locations_x::Vector{<:Real}`: the x values of the locations.
-- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the 
-functional loci only.
+- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
 - `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
 """
 function calc_bimodality_in_range(
@@ -505,13 +563,10 @@ Compute the bimodality across the entire range (see above for further descriptio
     )
 
 # Arguments
-- `sigmoid_curves::Vector{<:Real}`: the sigmoid curves for each horizontal strip of the 
-range.
-- `sorted_indices::Vector{<:Vector{<:Integer}}`: the indices of the locations sorted into 
-bins bins corresponding to non-overlapping ranges of the y values.
+- `sigmoid_curves::Vector{<:Real}`: the sigmoid curves for each horizontal strip of the range.
+- `sorted_indices::Vector{<:Vector{<:Integer}}`: the indices of the locations sorted into bins bins corresponding to non-overlapping ranges of the y values.
 - `locations_x::Vector{<:Real}`: the x values of the locations.
-- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the 
-functional loci only.
+- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
 - `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
 """
 function calc_bimodality_overall(
@@ -619,10 +674,8 @@ Compute the correlation between two traits.
 
 # Arguments
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotype of every individual.
-- `loci_range1::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range of the first 
-trait.
-- `loci_range2::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range of the 
-second trait.
+- `loci_range1::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range of the first trait.
+- `loci_range2::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range of the second trait.
 """
 function calc_trait_correlation(
     genotypes::Vector{<:Matrix{<:Integer}},
@@ -728,7 +781,10 @@ function average_gene_data(gene_data::Vector{<:NamedTuple})
 end
 
 """
-    calc_traits_additive(genotypes::Vector, loci)::Vector{Float32}
+    calc_traits_additive(
+        genotypes::Vector{<:Matrix{<:Integer}},
+        loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+    )::Vector{Float32}
 
 Compute the mean values of the genotypes passed to it at the given loci. Used to determine 
 trait values in an additive way.
@@ -759,11 +815,9 @@ Compute the average number of mates for males of each phenotype for a given
 loci range.
 
 # Arguments
-- `data::Vector{<:Integer}`: a list of the data to be averaged for each element in the 
-genotypes vector
-- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes for each individual
-- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}`: the loci range governing the trait 
-of interest.
+- `data::Vector{<:Integer}`: a list of the data to be averaged for each element in the genotypes vector
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes for each individual 
+- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}`: the loci range governing the trait of interest.
 """
 function average_data_per_phenotype(
     data::Vector{<:Integer},
@@ -800,8 +854,7 @@ Return the number of individuals with each phenotype for the given loci range.
 
 # Arguments
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual
-- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range over which the 
-phenotypes are calculated.
+- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range over which the phenotypes are calculated.
 """
 function count_phenotypes_at_loci(
     genotypes::Vector{<:Matrix{<:Integer}},
@@ -829,11 +882,34 @@ Determine at which loci the population has lost its genetic diversity.
 function find_fixed_alleles(genotypes::Vector{<:Matrix{<:Integer}})
     extinct = []
     for i in 1:size(genotypes[1], 2)
-        genotypes_at_locus = [g[:,i] for g in genotypes]
-        if all(genotypes_at_locus[1] .== genotypes_at_locus)
+        genotypes_at_locus = [g[:, i] for g in genotypes]
+        if all(Ref(genotypes_at_locus[1]) .== genotypes_at_locus)
             push!(extinct, i)
         end
     end
     return extinct
+end
+
+"""
+    calc_chi_squared(genotypes::Vector{<:Matrix{<:Integer}}, locus::Integer)
+    
+Compare the observed genotype frequencies at the given locus to those expected from 
+Hardy-Weinberg analysis.
+"""
+function calc_chi_squared(genotypes::Vector{<:Matrix{<:Integer}}, locus::Integer)
+    genotypes = [g[:, locus] for g in genotypes]
+    alleles = vcat([g[1] for g in genotypes], [g[2] for g in genotypes])
+
+    N = length(genotypes)
+    p_A = count(x -> x == 0, alleles) / (2 * N)
+    p_B = 1 - p_A
+    n_AB = count(x -> x == [0; 1] || x == [1; 0], genotypes)
+    n_AA = count(x -> x == [0; 0], genotypes)
+    n_BB = count(x -> x == [1; 1], genotypes)
+
+
+    return (((n_AA - N * p_A^2)^2) / (N * p_A^2)) +
+           (((n_AB - 2 * N * p_A * p_B)^2) / (2 * N * p_A * p_B)) +
+           (((n_BB - N * p_B^2)^2) / (N * p_B^2))
 end
 end
