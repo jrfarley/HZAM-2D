@@ -4,7 +4,7 @@ module PlotData
 export create_population_plot, update_population_plot, create_gene_plot, update_gene_plot
 
 # for plotting:
-#using Plots
+import Plots.savefig
 #gr()  # use GR backend for graphs
 using Colors, ColorSchemes
 import ColorSchemes.plasma
@@ -14,17 +14,21 @@ using ..DataAnalysis
 
 GLMakie.activate!(inline=false) # set up the plot to display in its own window
 
-"Colors for cline curves"
+"Colors for cline curves."
 global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25),
     (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25),
     (:black, 0.25)]
-"The figure showing locations and hybrid indices"
+
+"The figure that updates every generation."
 global fig
-"Axes on which the locations are plotted"
+
+"Axes on which the locations are plotted."
 global ax
-"Points showing the location and hybrid index of every individual"
+
+"Points showing the location and hybrid index of every individual."
 global points
-"Sigmoid curves representing the clines"
+
+"Sigmoid curves representing the clines."
 global sigmoid_lines = []
 
 """
@@ -71,13 +75,20 @@ function create_population_plot(
     ylims!(-0.03, 1.03)
 
     # add the location of every individual to the plot
-    global points = scatter!(ax, locations_x, locations_y, color=hybrid_indices_functional)
+    global points = scatter!(
+        ax,
+        locations_x,
+        locations_y,
+        color=hybrid_indices_functional,
+        markersize=10
+    )
+    display(fig)
+    sleep(0.01)
 
     if save_plot
         dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
         save(string(dir, "/", 1, ".png"), fig)
     end
-    display(fig)
 end
 
 """
@@ -123,20 +134,22 @@ function update_population_plot(
         markersize=10
     )
 
-
     sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
 
     hybrid_zone_widths = [calc_width(sigmoid_curves[i]) for i in eachindex(sigmoid_curves)]
 
     # add the curves to the plot
-    [push!(sigmoid_lines, lines!(
-        ax,
-        spaced_locations,
-        scale_curve(sigmoid_curves[i], i),
-        color=colors[i], linewidth=20
-    )) for i in eachindex(sigmoid_curves)]
+    for i in eachindex(sigmoid_curves)
+        push!(sigmoid_lines, lines!(
+            ax,
+            spaced_locations,
+            scale_curve(sigmoid_curves[i], i),
+            color=colors[i], linewidth=20
+        ))
+    end
 
     ax.title = string("HZAM simulation, generation = ", generation)
+
 
     println("generation: ", generation, "; individuals: ", length(locations))
     println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
@@ -154,11 +167,12 @@ function update_population_plot(
         sorted_indices
     ))
     println("")
-
+    
     if save_plot
         dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
         save(string(dir, "/", generation, ".png"), fig)
     end
+    readline()
 end
 
 """

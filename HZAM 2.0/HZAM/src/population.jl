@@ -1,5 +1,4 @@
-"Functions and datatypes for managing population data (locations, genotypes, 
-and growth rates)"
+"Types and functions used for managing population data (locations, genotypes, and growth rates)."
 module Population
 import ..DataAnalysis.calc_traits_additive
 import QuadGK.quadgk

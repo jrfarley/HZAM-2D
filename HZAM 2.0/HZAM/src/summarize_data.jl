@@ -6,12 +6,23 @@ using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
 
+"The directory where all files are saved"
+global results_folder = "HZAM_Sym_Julia_results_GitIgnore"
+
 """
-    run_one_HZAM_sim(
-        w_hyb::Real, 
-        S_AM::Real, 
-        ecolDiff::Real, 
-        intrinsic_R::Real; 
+    set_results_folder(dir::String)
+
+Set the output directory for all methods in summarize_data.jl.
+"""
+function set_results_folder(dir::String)
+    global results_folder = dir
+end
+
+"""
+    run_HZAM_set(
+        set_name::String, 
+        intrinsic_R::Real,
+        ecolDiff::Real; 
         <keyword arguments>
     )
 
@@ -54,7 +65,7 @@ function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # th
     # set up array of strings to record outcomes
     outcome_array = Array{DataAnalysis.OutputData,2}(undef, length(w_hyb_set), length(S_AM_set))
 
-    dir = mkpath(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", set_name))
+    dir = mkpath(string(results_folder, "/simulation_outcomes/", set_name))
 
     # Loop through the different simulation sets
     Threads.@threads for i in eachindex(w_hyb_set)
@@ -180,32 +191,36 @@ end
 
 """
     convert_to_CSV(
-        outcome_array::Array{<:DataAnalysis.OutputData},
-        field_name::Symbol,
-        output_folder::String
+        outcome_array::Array{<:Real},
+        w_hyb_array::Array{<:Real},
+        S_AM_array::Array{<:Real},
+        name::String
     )
 
 Convert an array of outcomes to a csv file for the given output field.
 
 # Arguments
-- `outcome_array::Array{<:DataAnalysis.OutputData}`: the array of output data from a set of simulations.
+- `outcome_array::Array{<:Real}`: the array of the output data of interest.
+- `w_hyb_array::Array{<:Real}`: the array of the w_hyb parameters used.
+- `S_AM_array::Array{<:Real}`: the array of the S_AM parameters used.
 - `field_name::Symbol`: the name of the output field of interest.
-- `output_folder::String`: the destination for the CSV.
+- `name::String`: the name for the CSV.
 """
 function convert_to_CSV(
-    outcome_array::Array{<:DataAnalysis.OutputData},
-    field_name::Symbol,
-    output_folder::String
+    outcome_array::Array{<:Real},
+    w_hyb_array::Array{<:Real},
+    S_AM_array::Array{<:Real},
+    name::String
 )
-    output = [[getfield(outcome, field_name) for outcome in outcome_array]...]
-    w_hybs = [[o.sim_params.w_hyb for o in outcome_array]...]
-    S_AMs = [[o.sim_params.S_AM for o in outcome_array]...]
+    output = [outcome_array...]
+    w_hybs = [w_hyb_array...]
+    S_AMs = [S_AM_array...]
 
     df = DataFrame(S_AM=S_AMs, w_hyb=w_hybs, output_field=output)
 
-    dir = mkpath(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/CSV_data/", output_folder))
+    dir = mkpath(string(results_folder, "/simulation_outcomes/CSV_data/"))
 
-    CSV.write(string(dir, "/", String(output_field), ".csv"), df)
+    CSV.write(string(dir, "/", name, ".csv"), df)
 end
 
 """
@@ -217,7 +232,8 @@ Produce a plot of fitnesses per phenotype over time.
 - `fitnesses::Vector{<:Dict}`: number of offspring per phenotype each generation.
 """
 function plot_fitnesses(fitnesses::Vector{<:Dict})
-    @save "fitness.jld2" fitnesses
+    dir = mkpath(string(results_folder, "/plots/"))
+    @save string(dir, "fitness.jld2") fitnesses
     generations = collect(eachindex(fitnesses))
     num_generations = length(generations)
     phenotypes = collect(keys(fitnesses[1]))
@@ -315,8 +331,11 @@ function plot_population_tracking_data(filepath::String)
     ax[4].yticklabelspace = yspace
 
     display(fig)
+    
+    dir = mkpath(string(results_folder, "/plots/"))
 
     save(string(
+        dir,
         "hz_formation_ecolDiff",
         sim_params.ecolDiff,
         "_S_AM",
@@ -331,15 +350,19 @@ function plot_population_tracking_data(filepath::String)
 end
 
 """
-    summarize_gene_correlations(dir::String)
+    summarize_gene_correlations(source_dir::String; filename="gene_correlations")
 
 Create plots of the gene correlations between different traits vs S_AM and w_hyb for 
 different combinations of the same loci controlling different traits.
 
+source_dir should point to a folder containing magic_preference.jld2, magic_cue.jld2, 
+search_cost.jld2, and no_magic.jld2. Each file should contain an outcome array from a simulation set.
+
 # Arguments
-- `dir::String`: the folder where the outcomes of all the simulations are stored.
+- `source_dir::String`: the folder where the outcomes of all the simulations are stored.
+- `file_name="gene_correlations`: the name of the image file for the plot. 
 """
-function summarize_gene_correlations(dir::String)
+function summarize_gene_correlations(source_dir::String; filename="gene_correlations")
     names = ["magic_preference", "magic_cue", "search_cost", "no_magic"]
     xlabelnames = ["Female mating trait", "Male mating trait", "Neutral trait"]
     ylabelnames = ["Magic preference", "Magic cue", "Search cost", "No pleiotropy"]
@@ -353,7 +376,7 @@ function summarize_gene_correlations(dir::String)
     neutral_loci = [6:9, 6:9, 7:10, 7:10]
 
     for i in 1:4
-        filename = string(dir, "/", names[i], ".jld2")
+        filename = string(source_dir, "/", names[i], ".jld2")
         @load filename sim_params outcome_array
         correlations[i, 1] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], fmt_loci[i]), outcome_array)...)
         correlations[i, 2] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], mmt_loci[i]), outcome_array)...)
@@ -400,20 +423,21 @@ function summarize_gene_correlations(dir::String)
 
     Colorbar(fig[:, 4], hm[1, 1], label="Pearson coefficient", ticklabelsize=15)
     display(fig)
-    save(string(dir, "/gene_correlations.png"), fig)
+    dir = mkpath(string(results_folder, "/plots/"))
+    save(string(dir, "/", filename, ".png"), fig)
     readline()
 end
 
 """
-    plot_phenotypes(phenotypes; filepath="phenotype_frequencies.png")
+    plot_phenotypes(phenotypes; filename="phenotype_frequencies")
 
 Create plots of mating preference, mating cue, and hybrid survival trait phenotype 
 frequencies over time.
 
 # Arguments
-- `filepath="phenotype_frequencies.png"`: the destination filepath for the plot image.
+- `filename="phenotype_frequencies"`: the name for the saved plot image.
 """
-function plot_phenotypes(phenotypes; filepath="phenotype_frequencies.png")
+function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
     ylabels = ["Mating preference", "Mating cue", "Hybrid survival trait"]
     function calc_proportion(dict)
         return_dict = Dict(collect(keys(dict)) .=> Float32.(collect(values(dict))))
@@ -444,6 +468,8 @@ function plot_phenotypes(phenotypes; filepath="phenotype_frequencies.png")
     hm[2] = plot_phenotypes_at_loci(:male_mating_trait, ax[2])
     hm[3] = plot_phenotypes_at_loci(:hybrid_survival, ax[3])
     display(fig)
-    save(filepath, fig)
+    
+    dir = mkpath(string(results_folder, "/plots/"))
+    save(string(dir, filename, ".png"), fig)
     readline()
 end

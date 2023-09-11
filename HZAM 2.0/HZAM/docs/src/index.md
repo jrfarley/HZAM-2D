@@ -1,35 +1,10 @@
-# HZAM
+# HZAM.jl
 
-## Contents
-```@contents
-```
+HZAM (Hybrid Zone with Assortative Mating) is a system for modelling the behaviour of a 
+hybrid zone arising from secondary contact between two species.
 
-## Functions
-```@docs
-HZAM.run_one_HZAM_sim(
-        w_hyb::Real, 
-        S_AM::Real, 
-        ecolDiff::Real, 
-        intrinsic_R::Real;
-    )
-HZAM.run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;)
-HZAM.plot_output_field(
-    outcomes::Array{:Real},
-    sim_params::Array{<:HZAM.DataAnalysis.SimParams}
-)
-HZAM.load_from_folder(dir::String)
-HZAM.load_from_csv(filepath::String)
-HZAM.convert_to_CSV(
-    outcome_array::Array{<:HZAM.DataAnalysis.OutputData},
-    field_name::Symbol,
-    output_folder::String
-)
-HZAM.plot_fitnesses(fitnesses::Vector{<:Dict})
-HZAM.plot_population_tracking_data(filepath::String)
-HZAM.summarize_gene_correlations(dir::String)
-HZAM.plot_phenotypes(phenotypes;)
-```
-
-## Index
-```@index
-```
+## Package features
+- Run hybrid zone simulations with a wide variety of different parameters (hybrid fitness, strength of assortative mating, amount of ecological difference, etc.)
+- Track different variables over time (gene flow, population overlap, cline width, etc.)
+- Save the results in JLD2 or CSV format
+- Create plots showing how variables change over time or how changing the hybrid fitnesss and assortative mating parameters affect the outcome of the simulation.

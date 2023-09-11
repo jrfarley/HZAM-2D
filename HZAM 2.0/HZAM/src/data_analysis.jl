@@ -1,4 +1,4 @@
-"Functions for cline fitting and measuring key statistics on the hybrid zone"
+"Types and functions used for analyzing data produced by the simulation."
 module DataAnalysis
 # export functions to be used in the PlotData module
 export calc_sigmoid_curves, calc_length, calc_width, calc_bimodality_overall,
