@@ -9,15 +9,18 @@ import Plots.savefig
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 #using Plots.PlotMeasures  # needed for plot margin adjustment
-using GLMakie
+using Plots
+gr()
 using ..DataAnalysis
 
-GLMakie.activate!(inline=false) # set up the plot to display in its own window
+#GLMakie.activate!(inline=false) # set up the plot to display in its own window
 
 "Colors for cline curves."
 global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25),
     (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25),
     (:black, 0.25)]
+
+global plt
 
 "The figure that updates every generation."
 global fig
@@ -54,9 +57,29 @@ function create_population_plot(
     save_plot::Bool
 )
 
+    default(
+        seriescolor=:plasma,
+        seriestype=:scatter,
+        xlimits=(-0.03, 1.03),
+        ylimits=(-0.03, 1.03),
+        aspect_ratio=:equal,
+        size=(1000, 1000),
+        markersize=3,
+        markerstrokewidth=0,
+        label=nothing,
+        title = "HZAM simulation, generation = 0",
+        xlabel = "location_x",
+        ylabel = "location_y",
+        guidefontsize=16,
+        titlefontsize=18,
+        tickfontsize=14
+    )
+
+
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
+    #=
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # set the standard font size
     global fig = Figure(resolution=(1800, 1200), figure_padding=60)
@@ -70,25 +93,34 @@ function create_population_plot(
         yticklabelsize=45,
         titlegap=30
     )
-    # set the limits for the plotted area
+       # set the limits for the plotted area
     xlims!(-0.03, 1.03)
     ylims!(-0.03, 1.03)
+    =#
 
     # add the location of every individual to the plot
+    plt = plot(
+        locations_x,
+        locations_y,
+        marker_z=hybrid_indices_functional
+    )
+    gui(plt)
+    #=
     global points = scatter!(
         ax,
         locations_x,
         locations_y,
         color=hybrid_indices_functional,
         markersize=10
-    )
-    display(fig)
-    sleep(0.01)
+    )=#
+    #=
+        if save_plot
+            dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+            save(string(dir, "/", 1, ".png"), fig)
+        end
 
-    if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-        save(string(dir, "/", 1, ".png"), fig)
-    end
+        gui(plt)
+        readline()=#
 end
 
 """
@@ -115,78 +147,41 @@ function update_population_plot(
     generation::Integer,
     save_plot::Bool
 )
+    println(generation)
+    println(string("Population: ", length(locations)))
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
-    sorted_indices = sort_y(locations_y) # sort the indices of the y coordinates
-
-    delete!(ax, points) # remove the old points from the plot
-    # remove the sigmoid curves from the plot
-    [delete!(ax, sigmoid_line) for sigmoid_line in sigmoid_lines]
-    global sigmoid_lines = []
-
-    # add the location of every individual to the plot
-    global points = scatter!(
-        ax,
+    plt = plot(
         locations_x,
         locations_y,
-        color=hybrid_indices_functional,
-        markersize=10
+        marker_z=hybrid_indices_functional,
+        title = string("HZAM simulation, generation = ", generation)
     )
+    gui(plt)
 
-    sigmoid_curves = calc_sigmoid_curves(locations, hybrid_indices_functional)
+    #=
+        delete!(ax, points) # remove the old points from the plot
+        # remove the sigmoid curves from the plot
 
-    hybrid_zone_widths = [calc_width(sigmoid_curves[i]) for i in eachindex(sigmoid_curves)]
-
-    # add the curves to the plot
-    for i in eachindex(sigmoid_curves)
-        push!(sigmoid_lines, lines!(
+        # add the location of every individual to the plot
+        global points = scatter!(
             ax,
-            spaced_locations,
-            scale_curve(sigmoid_curves[i], i),
-            color=colors[i], linewidth=20
-        ))
-    end
+            locations_x,
+            locations_y,
+            color=hybrid_indices_functional,
+            markersize=10
+        )
 
-    ax.title = string("HZAM simulation, generation = ", generation)
+        ax.title = string("HZAM simulation, generation = ", generation)
 
+        readline()
 
-    println("generation: ", generation, "; individuals: ", length(locations))
-    println("hybrid zone width: ", sum(hybrid_zone_widths) / 10)
-    println("hybrid zone length: ", calc_length(sigmoid_curves))
-    println("bimodality: ", calc_bimodality_overall(
-        sigmoid_curves,
-        sorted_indices,
-        locations_x,
-        hybrid_indices_functional,
-        0.05
-    ))
-    println("overlap: ", calc_overlap_overall(
-        locations_x,
-        hybrid_indices_functional,
-        sorted_indices
-    ))
-    println("")
-    
-    if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-        save(string(dir, "/", generation, ".png"), fig)
-    end
-    readline()
-end
-
-"""
-    scale_curve(curve, index::Integer)
-
-Scale the curve output to display on the plot over the corresponding y-axis range.
-
-# Arguments
-- `curve`: the output of a function approximating the data whose range is [0,1].
-- `index::Integer`: the index of the corresponding range on the y-axis. 1 refers to 
-[0, 0.1), 2 to [0.1, 0.2) and so on.
-"""
-function scale_curve(curve, index::Integer)
-    (curve .* 0.1) .+ Ref((index - 1) * 0.1)
+        if save_plot
+            dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+            save(string(dir, "/", generation, ".png"), fig)
+        end
+        =#
 end
 
 """

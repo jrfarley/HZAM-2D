@@ -283,11 +283,14 @@ Create plots of the population size, hybrid zone width, hybrid index, and popula
 - `filepath::String`:: the filepath for the file containing the outcome of the simulation.
 """
 function plot_population_tracking_data(filepath::String)
-    @load filepath population_tracking_data
+    @load filepath outcome
+    population_tracking_data = outcome.population_tracking_data
+    sim_params = outcome.sim_params
+
     overlaps = [t.overlap for t in population_tracking_data]
-    hybridnesses = [t.hybridness for t in population_tracking_data]
-    widths = [t.width for t in tracking_data]
-    populations = [t.population for t in population_tracking_data]
+    hybridity = [t.hybridity for t in population_tracking_data]
+    widths = [t.width for t in population_tracking_data]
+    populations = [t.population_size for t in population_tracking_data]
 
     xs = collect(eachindex(population_tracking_data))
     ax = Vector(undef, 4)
@@ -309,7 +312,7 @@ function plot_population_tracking_data(filepath::String)
     )
     ax[3] = Axis(
         fig[3, 1],
-        ylabel="hybridness",
+        ylabel="hybridity",
         yticklabelsize=30.0f0
     )
     ax[4] = Axis(
@@ -320,7 +323,7 @@ function plot_population_tracking_data(filepath::String)
     )
     points[1] = scatter!(ax[1], xs, populations)
     points[2] = scatter!(ax[2], xs, widths)
-    points[3] = scatter!(ax[3], xs, hybridnesses)
+    points[3] = scatter!(ax[3], xs, hybridity)
     points[4] = scatter!(ax[4], xs, overlaps)
 
     yspace = 1.5 * maximum(tight_yticklabel_spacing!, [ax[1], ax[2]])
@@ -331,7 +334,9 @@ function plot_population_tracking_data(filepath::String)
     ax[4].yticklabelspace = yspace
 
     display(fig)
-    
+
+    readline()
+
     dir = mkpath(string(results_folder, "/plots/"))
 
     save(string(
@@ -468,7 +473,7 @@ function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
     hm[2] = plot_phenotypes_at_loci(:male_mating_trait, ax[2])
     hm[3] = plot_phenotypes_at_loci(:hybrid_survival, ax[3])
     display(fig)
-    
+
     dir = mkpath(string(results_folder, "/plots/"))
     save(string(dir, filename, ".png"), fig)
     readline()

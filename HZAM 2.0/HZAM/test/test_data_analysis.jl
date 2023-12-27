@@ -129,6 +129,34 @@ end
     @test avg_gene_data == (l1=5, l2=4, l3=6, l4=5)
 end
 
+@testset "sort_locations_2D" begin
+    locations_x = [0.0f0, 0.3f0, 0.2f0, 0.9f0, 0.99f0]
+    locations_y = [0.0f0, 0.5f0, 0.3f0, 0.4f0, 0.9f0]
+
+    locations = Location.(locations_x, locations_y)
+
+    sorted_indices = DataAnalysis.sort_locations_2D(locations, 3)
+
+    A = fill([], 3, 3)
+    A[1, 1] = [1, 3]
+    A[1, 2] = [2]
+    A[3, 2] = [4]
+    A[3, 3] = [5]
+
+    @test sorted_indices == A
+
+    sorted_indices = DataAnalysis.sort_locations_2D(locations, 4)
+
+    A = fill([], 4, 4)
+    A[1, 1] = [1]
+    A[1, 2] = [3]
+    A[2, 3] = [2]
+    A[4, 2] = [4]
+    A[4, 4] = [5]
+
+    @test sorted_indices == A
+end
+
 @testset "sort_locations" begin
     A = [0, 0, 0.5, 1, 0.76, 0.23]
     bin_size = 0.5
@@ -290,64 +318,37 @@ end
     @test bimodality ≈ 0.9
 end
 
-@testset "calc_overlap_in_range" begin
-    locations_x = collect(0.001:0.01:0.999)
-    hybrid_indices = [fill(0, 50); fill(1, 50)]
+@testset "calc_overlap" begin
+    sorted_indices = fill([], 3, 3)
 
-    overlap = DataAnalysis.calc_overlap_in_range(
-        locations_x,
-        hybrid_indices
-    )
+    sorted_indices[1, 1] = [1, 4]
+    sorted_indices[1, 2] = [2, 6]
+    sorted_indices[2, 2] = [3, 8]
+    sorted_indices[3, 2] = [5, 7]
 
-    @test overlap == 0
+    hybrid_indices = [1, 1, 1, 1, 0, 0, 0, 0.5]
 
-    hybrid_indices = fill(0.99, 100)
+    overlap = DataAnalysis.calc_overlap(hybrid_indices, sorted_indices)
 
-    overlap = DataAnalysis.calc_overlap_in_range(
-        locations_x,
-        hybrid_indices
-    )
+    @test overlap ≈ 1 / 9
 
-    @test overlap == 0
+    hybrid_indices = [1, 1, 1, 1, 1, 1, 1, 1]
 
-    hybrid_indices = vcat(fill([0.0f0, 1.0f0], 50)...)
-
-    overlap = DataAnalysis.calc_overlap_in_range(
-        locations_x,
-        hybrid_indices
-    )
-
-    @test overlap ≈ 0.1
-end
-
-@testset "calc_overlap_overall" begin
-    locations_x = collect(0.001:0.01:0.999)
-    hybrid_indices = [fill(0, 50); fill(1, 50)]
-    sorted_indices = [collect(((i-1)*100+1):(((i-1)*100+1)+99)) for i in 1:10]
-
-    locations_x = vcat(fill(locations_x, 10)...)
-    hybrid_indices = vcat(fill(hybrid_indices, 10)...)
-
-    overlap = DataAnalysis.calc_overlap_overall(
-        locations_x,
-        hybrid_indices,
-        sorted_indices
-    )
+    overlap = DataAnalysis.calc_overlap(hybrid_indices, sorted_indices)
 
     @test overlap ≈ 0
 
-    h0 = [fill(0, 50); fill(1, 50)]
-    h1 = vcat(fill([0.0f0, 1.0f0], 50)...)
+    hybrid_indices = [0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0, 0]
 
-    hybrid_indices = vcat(h0, h1, h0, h1, h0, h1, h0, h1, h0, h1)
+    overlap = DataAnalysis.calc_overlap(hybrid_indices, sorted_indices)
 
-    overlap = DataAnalysis.calc_overlap_overall(
-        locations_x,
-        hybrid_indices,
-        sorted_indices
-    )
+    @test overlap ≈ 0
 
-    @test overlap ≈ 0.5
+    hybrid_indices = [1, 1, 1, 0, 1, 0, 0, 0]
+
+    overlap = DataAnalysis.calc_overlap(hybrid_indices, sorted_indices)
+
+    @test overlap ≈ 4 / 9
 end
 
 @testset "calc_length" begin
