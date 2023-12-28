@@ -9,18 +9,10 @@ import Plots.savefig
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 #using Plots.PlotMeasures  # needed for plot margin adjustment
-using Plots
-gr()
+using GLMakie
 using ..DataAnalysis
 
-#GLMakie.activate!(inline=false) # set up the plot to display in its own window
-
-"Colors for cline curves."
-global colors = [(:blue, 0.25), (:red, 0.25), (:purple, 0.25), (:yellow, 0.25),
-    (:orange, 0.25), (:brown, 0.25), (:green, 0.25), (:gray, 0.25), (:cyan, 0.25),
-    (:black, 0.25)]
-
-global plt
+GLMakie.activate!(inline=false) # set up the plot to display in its own window
 
 "The figure that updates every generation."
 global fig
@@ -30,9 +22,6 @@ global ax
 
 "Points showing the location and hybrid index of every individual."
 global points
-
-"Sigmoid curves representing the clines."
-global sigmoid_lines = []
 
 """
     create_population_plot(
@@ -57,29 +46,9 @@ function create_population_plot(
     save_plot::Bool
 )
 
-    default(
-        seriescolor=:plasma,
-        seriestype=:scatter,
-        xlimits=(-0.03, 1.03),
-        ylimits=(-0.03, 1.03),
-        aspect_ratio=:equal,
-        size=(1000, 1000),
-        markersize=3,
-        markerstrokewidth=0,
-        label=nothing,
-        title = "HZAM simulation, generation = 0",
-        xlabel = "location_x",
-        ylabel = "location_y",
-        guidefontsize=16,
-        titlefontsize=18,
-        tickfontsize=14
-    )
-
-
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
-    #=
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # set the standard font size
     global fig = Figure(resolution=(1800, 1200), figure_padding=60)
@@ -93,34 +62,25 @@ function create_population_plot(
         yticklabelsize=45,
         titlegap=30
     )
-       # set the limits for the plotted area
+    # set the limits for the plotted area
     xlims!(-0.03, 1.03)
     ylims!(-0.03, 1.03)
-    =#
 
     # add the location of every individual to the plot
-    plt = plot(
-        locations_x,
-        locations_y,
-        marker_z=hybrid_indices_functional
-    )
-    gui(plt)
-    #=
     global points = scatter!(
         ax,
         locations_x,
         locations_y,
         color=hybrid_indices_functional,
         markersize=10
-    )=#
-    #=
-        if save_plot
-            dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-            save(string(dir, "/", 1, ".png"), fig)
-        end
+    )
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", 1, ".png"), fig)
+    end
 
-        gui(plt)
-        readline()=#
+    display(fig)
+
 end
 
 """
@@ -147,41 +107,31 @@ function update_population_plot(
     generation::Integer,
     save_plot::Bool
 )
-    println(generation)
-    println(string("Population: ", length(locations)))
     locations_x = [l.x for l in locations] # x coordinates of all individuals
     locations_y = [l.y for l in locations] # y coordinates of all individuals
 
-    plt = plot(
+    delete!(ax, points) # remove the old points from the plot
+
+    # add the location of every individual to the plot
+    global points = scatter!(
+        ax,
         locations_x,
         locations_y,
-        marker_z=hybrid_indices_functional,
-        title = string("HZAM simulation, generation = ", generation)
+        color=hybrid_indices_functional,
+        markersize=10
     )
-    gui(plt)
 
-    #=
-        delete!(ax, points) # remove the old points from the plot
-        # remove the sigmoid curves from the plot
+    ax.title = string("HZAM simulation, generation = ", generation)
 
-        # add the location of every individual to the plot
-        global points = scatter!(
-            ax,
-            locations_x,
-            locations_y,
-            color=hybrid_indices_functional,
-            markersize=10
-        )
 
-        ax.title = string("HZAM simulation, generation = ", generation)
-
-        readline()
-
-        if save_plot
-            dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
-            save(string(dir, "/", generation, ".png"), fig)
-        end
-        =#
+    println("generation: ", generation, "; individuals: ", length(locations))
+    println("")
+    
+    if save_plot
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        save(string(dir, "/", generation, ".png"), fig)
+    end
+    display(fig)
 end
 
 """
@@ -236,7 +186,7 @@ function create_gene_plot(
     save_plot::Bool
 )
     plot_titles = ["Neutral trait", "Female mating trait", "Male mating trait",
-        "Competition trait", "Hybrid survival trait", "Expected neutral distribution"]
+        "Competition trait", "Hybrid survival trait", "Expected"]
     global ax = Vector(undef, 6)
     global points = Vector(undef, 6)
 

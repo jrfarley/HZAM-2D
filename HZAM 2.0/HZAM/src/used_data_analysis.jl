@@ -4,6 +4,11 @@ global initial_par = [0.0, 1.0]
 "Evenly spaced locations across the range (one-dimensional)."
 global spaced_locations = collect(Float32, 0:0.001:1)
 
+struct Location
+    x
+    y
+end
+
 """
     SimParams
 
@@ -81,6 +86,8 @@ struct PopulationTrackingData
 
         sorted_indices = sort_locations_2D(locations, 50)
 
+        @time calc_overlap(mmt_hybrid_indices, sorted_indices)
+
         overlap = calc_overlap(mmt_hybrid_indices, sorted_indices)
 
         sigmoid_curves = calc_sigmoid_curves(locations, mmt_hybrid_indices)
@@ -113,6 +120,7 @@ struct OutputData
     locations::Vector{<:Any}
     hybrid_zone_width::Real
     population_overlap::Real
+    bimodality::Real
     population_tracking_data::Vector{PopulationTrackingData}
 
     function OutputData(
@@ -124,12 +132,28 @@ struct OutputData
     )
         mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
-        sorted_indices = sort_locations_2D(locations, 50)
+        sorted_indices = sort_locations_2D(locations, 20)
 
-        overlap = calc_overlap(mmt_hybrid_indices, sorted_indices)
+        @time calc_overlap(mmt_hybrid_indices, locations, 0.01)
+
+        println("Overlap2: ", calc_overlap2(mmt_hybrid_indices, locations, 0.01))
+
+        overlap = calc_overlap(mmt_hybrid_indices, locations, 0.01)
 
         sigmoid_curves = calc_sigmoid_curves(locations, mmt_hybrid_indices)
         mmt_cline_width = average_width(sigmoid_curves)
+
+        locations_y = [l.y for l in locations]
+
+        sorted_indices = sort_y(locations_y)
+
+        bimodality = calc_bimodality_overall(
+            sigmoid_curves,
+            sorted_indices,
+            [l.x for l in locations],
+            mmt_hybrid_indices,
+            0.05
+        )
 
         new(
             sim_params,
@@ -137,6 +161,7 @@ struct OutputData
             locations,
             mmt_cline_width,
             overlap,
+            bimodality,
             pop_track_data
         )
     end
@@ -216,53 +241,92 @@ function average_width(sigmoid_curves::Vector{<:Vector{<:Real}})
 end
 
 """
-    calc_overlap(
-        hybrid_indices::Vector{<:Real},
-        sorted_indices::Matrix{<:Vector}
-    )
+For testing
+"""
+function calc_overlap2(
+    hybrid_indices::Vector{<:Real},
+    locations::Vector,
+    sigma_comp::Real
+)
+    spaced_locations_2D = Location.(collect(0:0.01:1), collect(0:0.01:1)')
+
+    function calc_squared_distances(focal_location, locations)
+        dif_x = [l.x for l in locations] .- focal_location.x
+        dif_y = [l.y for l in locations] .- focal_location.y
+
+        return dif_x .^ 2 .+ dif_y .^ 2
+    end
+
+    function calc_density(focal_location, locations, sigma_comp)
+        squared_distances = calc_squared_distances(focal_location, locations)
+
+        return sum(exp.(-squared_distances ./ Ref(2 * (sigma_comp^2))))
+    end
+
+    species_A_locations = locations[Bool[h == 0 for h in hybrid_indices]]
+    species_B_locations = locations[Bool[h == 1 for h in hybrid_indices]]
+
+    densities_A = calc_density.(spaced_locations_2D, Ref(species_A_locations), Ref(sigma_comp))
+    densities_B = calc_density.(spaced_locations_2D, Ref(species_B_locations), Ref(sigma_comp))
+    total_density = calc_density.(spaced_locations_2D, Ref(locations), Ref(sigma_comp))
+
+    min_proportion = 0.05
+
+    return count(
+        i -> densities_A[i] > min_proportion * total_density[i] &&
+            densities_B[i] > min_proportion * total_density[i],
+        eachindex(spaced_locations_2D)
+    ) / length(spaced_locations_2D)
+end
+
+"""
+function calc_overlap(
+    hybrid_indices::Vector{<:Real},
+    locations::Vector,
+    sigma_comp::Real
+)
 
 Compute the total overlap area between the two species.
 
 # Arguments
 - `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the loci of interest.
-- `sorted_indices::Vector{<:Vector{<:Integer}}`: the indices of the locations sorted into 
-zones spanning the range.
+- `locations::Vector`: the locations of all individuals in the simulation.
+- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating local density.
 """
 function calc_overlap(
     hybrid_indices::Vector{<:Real},
-    sorted_indices::Matrix{<:Vector}
+    locations::Vector,
+    sigma_comp::Real
 )
-    min_proportion = 0.1
+    spaced_locations = collect(0:0.01:1)
 
-    """
-    Compute the proportion of phenotypically pure individuals from species A.
-    """
-    function calc_proportion(hybrid_indices, species)
-        return count(x -> x == species, hybrid_indices) /
-               length(hybrid_indices)
+    function calc_overlap_in_ribbon(hybrid_indices, locations, sigma_comp)
+        locations_x = [l.x for l in locations]
+
+        function calc_density(focal_location, locations_x, sigma_comp)
+            return sum(exp.(-(Ref(focal_location) .- locations_x).^2 ./ Ref(2 * (sigma_comp^2))))
+        end
+
+        species_A_locations = locations_x[Bool[h == 0 for h in hybrid_indices]]
+        species_B_locations = locations_x[Bool[h == 1 for h in hybrid_indices]]
+
+        densities_A = calc_density.(spaced_locations, Ref(species_A_locations), Ref(sigma_comp))
+        densities_B = calc_density.(spaced_locations, Ref(species_B_locations), Ref(sigma_comp))
+        total_density = calc_density.(spaced_locations, Ref(locations_x), Ref(sigma_comp))
+
+        min_proportion = 0.05
+
+        return count(
+            i -> densities_A[i] > min_proportion * total_density[i] &&
+                densities_B[i] > min_proportion * total_density[i],
+            eachindex(spaced_locations)
+        ) / length(spaced_locations)
     end
 
-    """
-    Determine if a list of hybrid indices contains proportions of both species A and species 
-    B above the cutoff.
-    """
-    function overlaps(hybrid_indices)
-        return (calc_proportion(hybrid_indices, 0) > min_proportion &&
-                calc_proportion(hybrid_indices, 1) > min_proportion)
-    end
+    sorted_indices = sort_y([l.y for  l in locations])
 
-    num_overlap_zones = count(
-        x -> overlaps(hybrid_indices[sorted_indices[x]]),
-        eachindex(sorted_indices)
-    )
-
-    """
-    Divide the number of zones with individuals from both species by the total number of zones 
-    to measure the total amount of population overlap.
-    """
-    return num_overlap_zones / length(sorted_indices)
+    return mean([calc_overlap_in_ribbon(hybrid_indices[i], locations[i], sigma_comp) for i in sorted_indices])
 end
-
 
 """
     sort_y(y_locations::Vector{<:Real})
@@ -286,7 +350,7 @@ sort_y([0.01, 0.5, 0.24, 0.9])
  ```
 """
 function sort_y(y_locations::Vector{<:Real})
-    return sort_locations(y_locations, 0.1)
+    return sort_locations(y_locations, 0.05)
 end
 
 """

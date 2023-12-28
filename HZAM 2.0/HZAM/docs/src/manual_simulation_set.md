@@ -2,7 +2,7 @@
 
 To run a set of simulations use the [`HZAM.run_HZAM_set`](@ref) method.
 
-This will run the simulation for 64 different combinations of hybrid fitness and assortative mating strength. The values for hybrid fitness (`w_hyb`) are `[1, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]` and the values for assortative mating strength (`S_AM`) are `[1, 3, 10, 30, 100, 300, 1000, Inf]`.
+This will run the simulation for 64 different combinations of hybrid fitness and assortative mating strength. The values for hybrid fitness (`w_hyb`) are `[1, 0.95, 0.9, 0.8, 0.75, 0.6, 0.5, 0.3]` and the values for assortative mating strength (`S_AM`) are `[1, 3, 10, 30, 100, 300, 1000, Inf]`.
 
 The outcome of each simulation is stored in the results folder which by default is `HZAM_results_GitIgnore/simulation_outcomes`. The results folder can be changed using the [`HZAM.set_results_folder`](@ref) method.
 
@@ -41,5 +41,6 @@ HZAM.onvert_to_CSV(
     "bimodality"
 )
 ```
+
 
 

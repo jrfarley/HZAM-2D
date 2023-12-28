@@ -418,6 +418,15 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         hybrid_survival_loci,
         per_reject_cost
     )
+    
+    genotypes = [
+        vcat([d.genotypes_F for d in pd.population]...)
+        vcat([d.genotypes_M for d in pd.population]...)
+    ]
+    locations = [
+        vcat([d.locations_F for d in pd.population]...)
+        vcat([d.locations_M for d in pd.population]...)
+    ]
 
     output = DataAnalysis.OutputData(
         genotypes,

@@ -29,19 +29,15 @@ Plots are updated every 10 generations by default or the interval specified by t
 
 ## Specifying which data to track.
 
-By default the simulation only calculates and saves the [`HZAM.DataAnalysis.PopulationTrackingData`](@ref).
+Setting `track_population_data=true` will make the simulation record a [`HZAM.DataAnalysis.PopulationTrackingData`](@ref) data structure each generation and then output an ordered list of them in the [`HZAM.DataAnalysis.OutputData`](@ref).
 
-To calculate and save the [`HZAM.DataAnalysis.SpatialData`](@ref) set `track_population_data=true`.
+[`HZAM.DataAnalysis.PopulationTrackingData`](@ref) stores the overlap, cline width, size, and hybridity of the population. These measures are calculated with respect to the male mating trait.
 
-To track the average number of offspring per phenotype (over all functional loci) set `track_fitness=true`.
-
-To track the average number of mates per male mating phenotype set `track_mating_success=true`.
-
-To track the number of individuals with each phenotype set `track_phenotypes=true`.
+This data can be plotted by running the [`HZAM.plot_population_tracking_data`](@ref) command.
 
 ## Saving simulation output
 
-The [`HZAM.run_one_HZAM_sim`](@ref) method returns a [`HZAM.DataAnalysis.OutputData`](@ref) data structure that has the simulation parameters, the final locations and genotypes of the population, and any tracked data.
+The [`HZAM.run_one_HZAM_sim`](@ref) method returns a [`HZAM.DataAnalysis.OutputData`](@ref) data structure that has the simulation parameters, the final locations and genotypes of the population, and key statistics on the population recorded at the end of the simulation.
 
 This method does not automatically save the output, so it is recommended that you use the JLD2 packge to save the outcome of each simulation.
 
@@ -55,14 +51,28 @@ simulation_outcome = HZAM.HZAM.run_one_HZAM_sim(
     0.4, 
     300, 
     0, 
-    1.1; 
-    track_population_data=true, 
-    track_phenotypes=true
+    1.1
 )
 
 @save "trial1.JLD2" simulation_outcome
 ```
 
+## Plotting population data over time
+
+The [`HZAM.plot_population_tracking_data`](@ref) function is used to generate plots of the data collected using the [`HZAM.DataAnalysis.PopulationTrackingData`](@ref) structure.
+
+An example of this function being used:
+
+```julia
+using JLD2
+import HZAM
+
+outcome = HZAM.run_one_HZAM_sim(0.4, 300, 0.0, 1.1)
+
+@save "plotting_over_time.JLD2" outcome
+
+HZAM.plot_population_tracking_data("plotting_over_time.JLD2")
+```
 
 
 

@@ -50,15 +50,13 @@ store the outcome of each simulation in a JLD2 file.
 - `track_phenotypes=false`: if true, keeps track of the number of individuals with each phenotype.
 """
 function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # the semicolon makes the following optional keyword arguments 
-    K_total::Int=20000, max_generations::Int=1000,
-    total_loci::Int=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
+    K_total::Int=10000, max_generations::Int=400,
+    total_loci::Int=3, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     competition_trait_loci=1:3, hybrid_survival_loci=1:3,
-    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.05,
-    track_spatial_data=false, track_population_data=true, track_fitness=false,
-    track_mating_success=false, track_phenotypes=false)
+    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.03)
 
     # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]
+    w_hyb_set = [1, 0.95, 0.9, 0.8, 0.75, 0.6, 0.5, 0.3]
     S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
 
@@ -81,9 +79,9 @@ function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # th
                 K_total, max_generations,
                 total_loci, female_mating_trait_loci, male_mating_trait_loci,
                 competition_trait_loci, hybrid_survival_loci,
-                survival_fitness_method, per_reject_cost, sigma_disp, do_plot=false,
-                track_spatial_data, track_population_data, track_fitness,
-                track_mating_success, track_phenotypes)
+                survival_fitness_method, per_reject_cost, sigma_disp, do_plot=false)
+
+            println("Overlap: ", outcome.population_overlap)
 
 
 
@@ -100,8 +98,8 @@ end
 
 """
     plot_output_field(
-        outcomes::Array{:Real},
-        sim_params::Array{<:DataAnalysis.SimParams}
+        outcomes::Array{<:Real},
+        sim_params::Array{DataAnalysis.SimParams}
     )
 
 Create a heatmap of an output variable vs hybrid fitness and assortative mating.
@@ -111,8 +109,8 @@ Create a heatmap of an output variable vs hybrid fitness and assortative mating.
 - `sim_params::Array{<:DataAnalysis.SimParams}`: the simulation parameters resulting in the outcomes.
 """
 function plot_output_field(
-    outcomes::Array{:Real},
-    sim_params::Array{<:DataAnalysis.SimParams}
+    outcomes::Array{<:Real},
+    sim_params::Array{DataAnalysis.SimParams}
 )
     output = [outcomes...]
     w_hybs = [[s.w_hyb for s in sim_params]...]
@@ -143,7 +141,7 @@ function plot_output_field(
         xlabelsize=15,
         ylabelsize=15
     )
-    hm = heatmap!(ax, xs, ys, output)
+    hm = heatmap!(ax, xs, ys, output, colorrange=(0, 0.5))
 
     Colorbar(fig[:, 2], hm, ticklabelsize=15)
     display(fig)
@@ -476,5 +474,146 @@ function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
 
     dir = mkpath(string(results_folder, "/plots/"))
     save(string(dir, filename, ".png"), fig)
+    readline()
+end
+
+function plot_hybrid_index(hybrid_indices)
+    xs = eachindex(hybrid_indices)
+    ys = hybrid_indices
+
+    plot(xs, ys)
+    readline()
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function make_subplot(outcome_array, plot_title)
+    sim_params = [o.sim_params for o in outcome_array]
+    bimodality = [o.bimodality for o in outcome_array]
+    cline_width = [o.hybrid_zone_width for o in outcome_array]
+    overlap = [o.population_overlap for o in outcome_array]
+
+    output = copy(cline_width)
+
+    for i in eachindex(bimodality)
+        if bimodality[i] > 0.95 && overlap[i] > 0.1
+            output[i] = -overlap[i]
+        end
+    end
+
+    output = [output...]
+    w_hybs = [[s.w_hyb for s in sim_params]...]
+    S_AMs = [[s.S_AM for s in sim_params]...]
+
+    w_hyb_set = sort(union(w_hybs))
+    S_AM_set = sort(union(S_AMs))
+    xticks = collect(1:length(w_hyb_set))
+    yticks = collect(1:length(S_AM_set))
+
+    xs = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
+    ys = map(s -> indexin(s, S_AM_set)[1], S_AMs)
+
+    fontsize_theme = Theme(fontsize=25)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colormap=:balance)
+
+    ax = Axis(
+        fig[1, 1],
+        title=plot_title,
+        xlabel="w_hyb",
+        ylabel="S_AM",
+        xticks=(xticks, string.(w_hyb_set)),
+        yticks=(yticks, string.(S_AM_set)),
+        xticklabelsize=20,
+        yticklabelsize=20,
+        xlabelsize=15,
+        ylabelsize=15,
+        aspect=1
+    )
+    hm = heatmap!(ax, xs, ys, output, colorrange=(-0.5, 0.5))
+
+    Colorbar(fig[:, 2], hm, ticklabelsize=15)
+    display(fig)
+    
+    readline()
+    save(string(plot_title,".png"), fig)
+    return fig
+end
+
+
+function summarize_overlap_and_cline_width(source_dir::String; filename="gene_correlations")
+    names = ["magic_preference", "magic_cue", "search_cost", "no_magic"]
+    xlabelnames = ["Female mating trait", "Male mating trait", "Neutral trait"]
+    ylabelnames = ["Magic preference", "Magic cue", "Search cost", "No pleiotropy"]
+    xlabels = []
+    ylabels = []
+    correlations = Matrix(undef, 4, 3)
+
+    magic_loci = [[1, 5], [3, 5], [5, 6], [5, 6]]
+    fmt_loci = [[2], 1:2, 1:2, 1:2]
+    mmt_loci = [3:4, [4], 3:4, 3:4]
+    neutral_loci = [6:9, 6:9, 7:10, 7:10]
+
+    for i in 1:4
+        filename = string(source_dir, "/", names[i], ".jld2")
+        @load filename sim_params outcome_array
+        correlations[i, 1] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], fmt_loci[i]), outcome_array)...)
+        correlations[i, 2] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], mmt_loci[i]), outcome_array)...)
+
+        correlations[i, 3] = vcat(map(genotypes -> DataAnalysis.calc_trait_correlation(genotypes, magic_loci[i], neutral_loci[i]), outcome_array)...)
+    end
+
+    w_hyb_set = string.([0.95, 0.9, 0.7, 0.5])
+    S_AM_set = string.([1, 10, 100, 1000])
+    xticks = [4, 3, 2, 1]
+    yticks = [1, 2, 3, 4]
+
+    xs = vcat(fill(xticks, 4)...)
+    ys = vcat([fill(s, 4) for s in yticks]...)
+
+    ax = Matrix(undef, 4, 4)
+    hm = Matrix(undef, 4, 4)
+
+
+    fontsize_theme = Theme(fontsize=25)
+    set_theme!(fontsize_theme)  # this sets the standard font size
+
+    fig = Figure(resolution=(1800, 1200), figure_padding=60, colorrange=(0, 1), colormap=:curl)
+
+    println(correlations)
+
+    for j in 1:4
+        for i in 1:3
+            ax[j, i] = Axis(fig[j, i], xlabel="w_hyb", ylabel="S_AM", xticks=(xticks, w_hyb_set), yticks=(yticks, S_AM_set), xticklabelsize=20, yticklabelsize=20, xlabelsize=15, ylabelsize=15)
+            hm[j, i] = heatmap!(ax[j, i], xs, ys, correlations[j, i], colorrange=(-1, 1))
+            println(correlations[j, i][16])
+        end
+        println("")
+    end
+
+    for i in 1:3
+        push!(xlabels, Label(fig[0, i], xlabelnames[i], tellwidth=false))
+    end
+
+    for i in 1:4
+        push!(ylabels, Label(fig[i, 0], ylabelnames[i], rotation=pi / 2, tellheight=false))
+    end
+
+    Colorbar(fig[:, 4], hm[1, 1], label="Pearson coefficient", ticklabelsize=15)
+    display(fig)
+    dir = mkpath(string(results_folder, "/plots/"))
+    save(string(dir, "/", filename, ".png"), fig)
     readline()
 end
