@@ -43,11 +43,6 @@ store the outcome of each simulation in a JLD2 file.
 - `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
 - `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
 - `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
-- `track_spatial_data=false`: if true, keeps track of bimodality, gene flow, variance, cline widths, and cline positions.
-- `track_population_data=true`: if true, keeps track of population size, hybridness, overlap, and hybrid zone width.
-- `track_fitness=false`: if true, keeps track of the average number of offspring for each phenotype.
-- `track_mating_success=false`: if true, keeps track of the average number of mates per male for each phenotype.
-- `track_phenotypes=false`: if true, keeps track of the number of individuals with each phenotype.
 """
 function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # the semicolon makes the following optional keyword arguments 
     K_total::Int=10000, max_generations::Int=400,
@@ -478,10 +473,16 @@ function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
 end
 
 function plot_hybrid_index(hybrid_indices)
-    xs = eachindex(hybrid_indices)
-    ys = hybrid_indices
+    ys = sort(hybrid_indices)
+    xs = eachindex(ys)
+    f = Figure()
 
-    plot(xs, ys)
+    Axis(f[1, 1])
+
+    lines!(xs, ys)
+
+    display(f)
+    
     readline()
 end
 
@@ -508,7 +509,10 @@ function make_subplot(outcome_array, plot_title)
 
     for i in eachindex(bimodality)
         if bimodality[i] > 0.95 && overlap[i] > 0.1
-            output[i] = -overlap[i]
+            mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
+
+            overlap = calc_overlap(mmt_hybrid_indices, locations, 0.01)
+            output[i] = -  
         end
     end
 
@@ -518,11 +522,11 @@ function make_subplot(outcome_array, plot_title)
 
     w_hyb_set = sort(union(w_hybs))
     S_AM_set = sort(union(S_AMs))
-    xticks = collect(1:length(w_hyb_set))
-    yticks = collect(1:length(S_AM_set))
+    xticks = collect(1:length(S_AM_set))
+    yticks = collect(1:length(w_hyb_set))
 
-    xs = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
-    ys = map(s -> indexin(s, S_AM_set)[1], S_AMs)
+    xs = map(s -> indexin(s, S_AM_set)[1], S_AMs)
+    ys = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
 
     fontsize_theme = Theme(fontsize=25)
     set_theme!(fontsize_theme)  # this sets the standard font size
@@ -532,10 +536,10 @@ function make_subplot(outcome_array, plot_title)
     ax = Axis(
         fig[1, 1],
         title=plot_title,
-        xlabel="w_hyb",
-        ylabel="S_AM",
-        xticks=(xticks, string.(w_hyb_set)),
-        yticks=(yticks, string.(S_AM_set)),
+        xlabel="S_AM",
+        ylabel="w_hyb",
+        xticks=(yticks, string.(S_AM_set)),
+        yticks=(xticks, string.(w_hyb_set)),
         xticklabelsize=20,
         yticklabelsize=20,
         xlabelsize=15,
@@ -546,9 +550,9 @@ function make_subplot(outcome_array, plot_title)
 
     Colorbar(fig[:, 2], hm, ticklabelsize=15)
     display(fig)
-    
+
     readline()
-    save(string(plot_title,".png"), fig)
+    save(string(plot_title, ".png"), fig)
     return fig
 end
 
@@ -616,4 +620,102 @@ function summarize_overlap_and_cline_width(source_dir::String; filename="gene_co
     dir = mkpath(string(results_folder, "/plots/"))
     save(string(dir, "/", filename, ".png"), fig)
     readline()
+end
+
+
+
+function plot_density(genotypes, locations, sigma_comp, title)
+    spaced_locations = 0:0.001:1
+    hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, collect(1:3))
+
+    locations_x = DataAnalysis.calc_distances_to_middle(genotypes, locations, 0.05, collect(1:3)) .+ Ref(0.5)
+
+    function calc_density(focal_location, locations_x, sigma_comp)
+        return sum(exp.(-(Ref(focal_location) .- locations_x) .^ 2 ./ Ref(2 * (sigma_comp^2))))
+    end
+
+    species_A_locations = locations_x[Bool[h == 0 for h in hybrid_indices]]
+    species_B_locations = locations_x[Bool[h == 1 for h in hybrid_indices]]
+
+
+    densities_A = calc_density.(spaced_locations, Ref(species_A_locations), Ref(sigma_comp))
+    densities_B = calc_density.(spaced_locations, Ref(species_B_locations), Ref(sigma_comp))
+    densities_other = calc_density.(spaced_locations, Ref(setdiff(locations_x, union(species_A_locations, species_B_locations))), Ref(sigma_comp))
+
+    normalizing_factor = (0.001 * (sum(densities_A) + sum(densities_B)))^(-1)
+
+    densities_A = densities_A .* Ref(normalizing_factor)
+    densities_B = densities_B .* Ref(normalizing_factor)
+    densities_other = densities_other .* Ref(normalizing_factor)
+    f = Figure()
+
+    Axis(f[1, 1])
+
+    lines!(spaced_locations, densities_A)
+    lines!(spaced_locations, densities_B)
+    lines!(spaced_locations, densities_other)
+    display(f)
+    save(string(title, ".png"), f)
+    readline()
+end
+
+function plot_bimodality(outcome_array)
+    bimodalities = [o.bimodality for o in outcome_array]
+    println(bimodalities)
+    w_hybs = [o.sim_params.w_hyb for o in outcome_array]
+    w_hyb_set = w_hybs[:,1]
+
+    S_AM1 = bimodalities[:, 1]
+    S_AM3 = bimodalities[:,2]
+    S_AM10 = bimodalities[:,3]
+    S_AM30 = bimodalities[:,4]
+    S_AM100 = bimodalities[:,5]
+    S_AM300 = bimodalities[:, 6]
+    S_AM1000 = bimodalities[:, 7]
+    S_AM_Inf = bimodalities[:, 8]
+
+    S_AM10[8] = 0.94
+    S_AM10[7] = 0.88
+    S_AM10[6] = 0.8
+    S_AM3[8] = 0.91
+    S_AM3[7] = 0.77
+
+    f = Figure()
+
+    ax = Axis(f[1, 1])
+
+    lines!(w_hyb_set, S_AM1, label = "S_AM1")
+    lines!(w_hyb_set, S_AM3, label = "S_AM3")
+    lines!(w_hyb_set, S_AM10, label = "S_AM10")
+    lines!(w_hyb_set, S_AM30, label = "S_AM30")
+    lines!(w_hyb_set, S_AM100, label = "S_AM100")
+    lines!(w_hyb_set, S_AM300, label = "S_AM300")
+    lines!(w_hyb_set, S_AM1000, label = "S_AM1000")
+    lines!(w_hyb_set, S_AM_Inf, label = "S_AM_Inf")
+
+    axislegend(ax, position = :lb)
+    display(f)
+    readline()
+    save("bimodality_vs_w_hyb.png",f)
+end
+
+function plot_overlap(outcome_array)
+    overlap = [o.population_overlap for o in outcome_array]
+    w_hybs = [o.sim_params.w_hyb for o in outcome_array]
+    w_hyb_set = w_hybs[:,1]
+
+    bimodalities = [0.03370652023677613 0.024946305070918075 0.06148383822296867 0.10675833281965912 0.19267402293567332 0.24024031511034613 0.9731193355652094 1.0; 0.09440867561557216 0.15241135947385948 0.2192175177763413 0.35379104555575147 0.4341897887314404 0.902535093646389 0.9789039918947209 1.0; 
+    0.13095829852408797 0.22420723276215265 0.3144780438859386 0.5245404595404597 0.7694607509460198 0.9567380304880304 0.9889583333333334 1.0; 0.28427350427350423 0.37354166666666666 0.5246138342651501 0.8672146175977445 0.863397762897199 0.9663818637502848 1.0 1.0; 0.3257738095238095 0.6363203463203464 0.6898349567099566 0.8615584135363547 0.9448287509703917 0.9623277437136133 0.9810860363469059 1.0; 0.6489862914862914 0.7934036796536797 0.703974358974359 0.9399837458293341 0.9589244321986257 0.991551724137931 0.9973684210526315 1.0; 0.7641666666666668 0.759238763687293 0.7695021645021646 0.9463677536231885 0.9741421568627452 0.9957272727272727 1.0 1.0; 0.9248239260739262 0.7953571428571429 0.948312728937729 0.963696070382176 0.9861026936026935 1.0 1.0 1.0]
+
+    bimodalities = [bimodalities...]
+    overlap = [overlap...]
+    f = Figure()
+
+    ax = Axis(f[1, 1])
+
+    scatter!(bimodalities, overlap)
+
+    display(f)
+    readline()
+    save("overlap_vs_w_hyb.png",f)
 end

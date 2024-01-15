@@ -5,8 +5,7 @@ using Test
 """
     run_one_HZAM_sim(
         w_hyb::Real, 
-        S_AM::Real, 
-        ecolDiff::Real, 
+        S_AM::Real,
         intrinsic_R::Real; 
         <keyword arguments>
     )
@@ -16,14 +15,12 @@ Run a single HZAM simulation.
 # Arguments
 - `w_hyb::Real`: the hybrid fitness.
 - `S_AM::Real`: the strength of assortative mating.
-- `ecolDiff::Real`: the ecological difference between the two species.
 - `intrinsic_R::Real`: the intrinsic growth rate.
 - `K_total::Integer=20000`: the carrying capacity of the environment.
 - `max_generations::Integer=1000`: the number of generations that the simulation will run for.
 - `total_loci::Integer=6`: the total number of loci in the genome.
 - `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
 - `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
-- `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in fitness related to resource use).
 - `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood.
 - `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
 - `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
@@ -35,17 +32,14 @@ Run a single HZAM simulation.
 - `save_plot=false`: if true, saves each plot to a PNG file.
 - `track_population_data=false`: if true, stores the population size, hybridity, overlap, and cline width for each generation
 """
-function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::Real;
+function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     # the semicolon makes the following optional keyword arguments  
     K_total::Integer=20000, max_generations::Integer=1000,
     total_loci::Integer=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
-    competition_trait_loci=1:3, hybrid_survival_loci=1:3,
-    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.05,
+    hybrid_survival_loci=1:3, survival_fitness_method::String="epistasis", 
+    per_reject_cost=0, sigma_disp=0.03,
     sigma_comp=0.01, do_plot=true, plot_int=10, gene_plot=false, save_plot=false,
     track_population_data=false)
-
-    genotypes = Matrix{Int8}[]
-    locations = Location[]
 
     population_tracking_data = DataAnalysis.PopulationTrackingData[]
 
@@ -55,7 +49,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     functional_loci_range = union(
         female_mating_trait_loci,
         male_mating_trait_loci,
-        competition_trait_loci,
         hybrid_survival_loci
     )
 
@@ -69,7 +62,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         neutral,
         female_mating_trait,
         male_mating_trait,
-        competition_trait,
         hybrid_survival
     }((
         overall_loci_range,
@@ -77,7 +69,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         neutral_loci_range,
         female_mating_trait_loci,
         male_mating_trait_loci,
-        competition_trait_loci,
         hybrid_survival_loci
     ))
 
@@ -111,11 +102,12 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
     Generate the starting genotypes/locations and calculate the growth rates based on 
     individual resource use for all individuals in the simulation.
     =#
-    pd = PopulationData(K_total,
-        ecolDiff,
+    pd = PopulationData(
+        K_total,
         total_loci,
         intrinsic_R,
-        sigma_comp)
+        sigma_comp
+    )
 
 
     if do_plot
@@ -124,9 +116,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             vcat([d.genotypes_F for d in pd.population]...)
             vcat([d.genotypes_M for d in pd.population]...)
         ]
-        locations = [
-            vcat([d.locations_F for d in pd.population]...)
-            vcat([d.locations_M for d in pd.population]...)
+        x_locations = [
+            vcat([d.x_locations_F for d in pd.population]...)
+            vcat([d.x_locations_M for d in pd.population]...)
+        ]
+        y_locations = [
+            vcat([d.y_locations_F for d in pd.population]...)
+            vcat([d.y_locations_M for d in pd.population]...)
         ]
 
         if gene_plot
@@ -134,7 +130,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         else
             create_population_plot(
                 DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
-                locations,
+                x_locations,
+                y_locations,
                 save_plot
             )
         end
@@ -147,21 +144,23 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         # set up empty matrices to store the offspring data
         genotypes_daughters_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_ZONES, NUM_ZONES)
         genotypes_sons_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_ZONES, NUM_ZONES)
-        locations_daughters_all = Matrix{Vector{Location}}(undef, NUM_ZONES, NUM_ZONES)
-        locations_sons_all = Matrix{Vector{Location}}(undef, NUM_ZONES, NUM_ZONES)
+        x_locations_daughters_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
+        y_locations_daughters_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
+        x_locations_sons_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
+        y_locations_sons_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
         offspring_per_parent_F = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
         offspring_per_parent_M = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
-        mates_per_M = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
 
         # fill all the matrices with empty vectors
         for i in eachindex(genotypes_daughters_all)
             genotypes_daughters_all[i] = Matrix{Int8}[]
             genotypes_sons_all[i] = Matrix{Int8}[]
-            locations_daughters_all[i] = Location[]
-            locations_sons_all[i] = Location[]
-            offspring_per_parent_F[i] = zeros(length(pd.population[i].locations_F))
-            offspring_per_parent_M[i] = zeros(length(pd.population[i].locations_M))
-            mates_per_M[i] = zeros(length(pd.population[i].locations_M))
+            x_locations_daughters_all[i] = Float32[]
+            y_locations_daughters_all[i] = Float32[]
+            x_locations_sons_all[i] = Float32[]
+            y_locations_sons_all[i] = Float32[]
+            offspring_per_parent_F[i] = zeros(length(pd.population[i].x_locations_F))
+            offspring_per_parent_M[i] = zeros(length(pd.population[i].x_locations_M))
         end
 
         for zone_index in eachindex(IndexCartesian(), pd.population)
@@ -171,7 +170,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             father_zone = missing
 
             # loop through mothers, mating and reproducing
-            for mother in eachindex(zone.locations_F)
+            for mother in eachindex(zone.x_locations_F)
                 # initialize tracking variables
                 mate = false # becomes true when female is paired with male
                 rejects = 0 # will track number of rejected males 
@@ -185,7 +184,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 elig_M = Dict{CartesianIndex,Vector{Int64}}()
 
                 for i in eachindex(IndexCartesian(), pd.population)
-                    elig_M[i] = 1:length(pd.population[i].locations_M)
+                    elig_M[i] = 1:length(pd.population[i].x_locations_M)
                 end
 
                 # set a distance cutoff on the search for a mate
@@ -199,11 +198,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     towards the bottom left.
                     =#
                     lower_left = max(
-                        Population.assign_zone(Location(
-                            zone.locations_F[mother].x -
-                            neighbourhood_size,
-                            zone.locations_F[mother].y -
-                            neighbourhood_size)),
+                        Population.assign_zone(
+                            zone.x_locations_F[mother] - neighbourhood_size,
+                            zone.y_locations_F[mother] - neighbourhood_size
+                        ),
                         CartesianIndex(1, 1)
                     )
 
@@ -213,11 +211,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                     towards the top right.
                     =#
                     upper_right = min(
-                        Population.assign_zone(Location(
-                            zone.locations_F[mother].x +
-                            neighbourhood_size,
-                            zone.locations_F[mother].y +
-                            neighbourhood_size)),
+                        Population.assign_zone(
+                            zone.x_locations_F[mother] + neighbourhood_size,
+                            zone.y_locations_F[mother] + neighbourhood_size
+                        ),
                         CartesianIndex(NUM_ZONES, NUM_ZONES)
                     )
 
@@ -243,7 +240,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                             pd.population,
                             neighbourhood,
                             elig_M,
-                            zone.locations_F[mother],
+                            zone.x_locations_F[mother],
+                            zone.y_locations_F[mother],
                             neighbourhood_size
                         )
 
@@ -295,7 +293,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 value of the reproductive_fitness.
                 =#
                 if !isempty(father)
-                    mates_per_M[father_zone][father] += 1
                     # determine fitness cost due to mate search (number of rejected males)
                     search_fitness = (1 - per_reject_cost)^rejects # typically equals 1
 
@@ -325,21 +322,24 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                                 offspring_per_parent_M[father_zone][father] += 1
 
                                 # generate offspring location
-                                new_location = Location(
-                                    zone.locations_F[mother],
+                                x, y = Population.new_location(
+                                    zone.x_locations_F[mother],
+                                    zone.y_locations_F[mother],
                                     sigma_disp
                                 )
 
                                 # determine which zone the offspring dispersed into
-                                kid_zone = Population.assign_zone(new_location)
+                                kid_zone = Population.assign_zone(x, y)
 
                                 # update variables for tracking offspring data
                                 if rand() > 0.5 # kid is daughter
                                     push!(genotypes_daughters_all[kid_zone], kid_genotype)
-                                    push!(locations_daughters_all[kid_zone], new_location)
+                                    push!(x_locations_daughters_all[kid_zone], x)
+                                    push!(y_locations_daughters_all[kid_zone], y)
                                 else # kid is son
                                     push!(genotypes_sons_all[kid_zone], kid_genotype)
-                                    push!(locations_sons_all[kid_zone], new_location)
+                                    push!(x_locations_sons_all[kid_zone], x)
+                                    push!(y_locations_sons_all[kid_zone], y)
                                 end
                                 #end
                             end
@@ -353,13 +353,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         pd = PopulationData(
             genotypes_daughters_all,
             genotypes_sons_all,
-            locations_daughters_all,
-            locations_sons_all,
-            competition_trait_loci,
+            x_locations_daughters_all,
+            y_locations_daughters_all,
+            x_locations_sons_all,
+            y_locations_sons_all,
             K_total,
             sigma_comp,
-            intrinsic_R,
-            ecolDiff
+            intrinsic_R
         )
 
         # update the plot of locations and hybrid indices
@@ -368,9 +368,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 vcat([d.genotypes_F for d in pd.population]...)
                 vcat([d.genotypes_M for d in pd.population]...)
             ]
-            locations = [
-                vcat([d.locations_F for d in pd.population]...)
-                vcat([d.locations_M for d in pd.population]...)
+            x_locations = [
+                vcat([d.x_locations_F for d in pd.population]...)
+                vcat([d.x_locations_M for d in pd.population]...)
+            ]
+            y_locations = [
+                vcat([d.y_locations_F for d in pd.population]...)
+                vcat([d.y_locations_M for d in pd.population]...)
             ]
 
 
@@ -379,11 +383,28 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
             else
                 update_population_plot(
                     DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
-                    locations,
+                    x_locations,
+                    y_locations,
                     generation,
                     save_plot
                 )
             end
+
+
+
+            if generation % 100 == 0
+                #mmt_hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, male_mating_trait_loci)
+
+                overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)
+
+                println("generation: ", generation, "; overlap: ", overlap)
+                #sigmoid_curves = DataAnalysis.calc_sigmoid_curves(locations, mmt_hybrid_indices)
+                #mmt_cline_width = DataAnalysis.average_width(sigmoid_curves)
+                #println("generation: ", generation, "; width: ", DataAnalysis.average_width(sigmoid_curves))
+            end
+
+
+
         end
 
         if track_population_data
@@ -391,21 +412,27 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
                 vcat([d.genotypes_F for d in pd.population]...)
                 vcat([d.genotypes_M for d in pd.population]...)
             ]
-            locations = [
-                vcat([d.locations_F for d in pd.population]...)
-                vcat([d.locations_M for d in pd.population]...)
+
+            x_locations = [
+                vcat([d.x_locations_F for d in pd.population]...)
+                vcat([d.x_locations_M for d in pd.population]...)
             ]
+            y_locations = [
+                vcat([d.y_locations_F for d in pd.population]...)
+                vcat([d.y_locations_M for d in pd.population]...)
+            ]
+
+            overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)
 
             push!(
                 population_tracking_data,
-                DataAnalysis.PopulationTrackingData(genotypes, locations, male_mating_trait_loci)
+                DataAnalysis.PopulationTrackingData(genotypes, locations, male_mating_trait_loci, overlap)
             )
         end
     end # of loop through generations
 
     parameters = DataAnalysis.SimParams(
         intrinsic_R,
-        ecolDiff,
         w_hyb,
         S_AM,
         K_total,
@@ -414,26 +441,33 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, ecolDiff::Real, intrinsic_R::
         total_loci,
         female_mating_trait_loci,
         male_mating_trait_loci,
-        competition_trait_loci,
         hybrid_survival_loci,
         per_reject_cost
     )
-    
+
     genotypes = [
         vcat([d.genotypes_F for d in pd.population]...)
         vcat([d.genotypes_M for d in pd.population]...)
     ]
-    locations = [
-        vcat([d.locations_F for d in pd.population]...)
-        vcat([d.locations_M for d in pd.population]...)
+    x_locations = [
+        vcat([d.x_locations_F for d in pd.population]...)
+        vcat([d.x_locations_M for d in pd.population]...)
     ]
+    y_locations = [
+        vcat([d.y_locations_F for d in pd.population]...)
+        vcat([d.y_locations_M for d in pd.population]...)
+    ]
+
+    overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)
 
     output = DataAnalysis.OutputData(
         genotypes,
-        locations,
+        x_locations,
+        y_locations,
         male_mating_trait_loci,
         parameters,
-        population_tracking_data
+        population_tracking_data,
+        overlap
     )
 
     return output

@@ -9,15 +9,10 @@ Pages = ["population.md", "mating.md", "data_analysis.md", "plot_data.md", "inde
 ```@docs
 HZAM.run_one_HZAM_sim(
         w_hyb::Real, 
-        S_AM::Real, 
-        ecolDiff::Real, 
+        S_AM::Real,
         intrinsic_R::Real;
     )
 HZAM.run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;)
-HZAM.plot_output_field(
-    outcomes::Array{:Real},
-    sim_params::Array{<:HZAM.DataAnalysis.SimParams}
-)
 HZAM.load_from_folder(dir::String)
 HZAM.load_from_csv(filepath::String)
 HZAM.convert_to_CSV(

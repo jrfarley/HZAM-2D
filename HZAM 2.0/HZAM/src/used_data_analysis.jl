@@ -16,7 +16,6 @@ A SimParams stores the parameters used in a simulation.
 
 # Fields
 - `intrinsic_R::Real`: the intrinsic growth rate.
-- `ecolDiff::Real`: the ecological difference between the two populations.
 - `w_hyb::Real`: the hybrid fitness.
 - `S_AM::Real`: the strength of assortative mating.
 - `K_total::Integer`: the carrying capacity of the environment.
@@ -25,13 +24,11 @@ A SimParams stores the parameters used in a simulation.
 - `total_loci::Integer`: the number of loci in the genotypes.
 - `female_mating_trait_loci`: the loci controlling mating preference.
 - `male_mating_trait_loci`: the loci controlling mating cue.
-- `competition_trait_loci`: the loci controlling what resources the individual uses.
 - `hybrid_survival_loci`: the loci controlling hybrid fitness.
 - `per_reject_cost::Real`: the loss in fitness incurred by a female after rejecting one male.
 """
 struct SimParams
     intrinsic_R::Real
-    ecolDiff::Real
     w_hyb::Real
     S_AM::Real
     K_total::Integer
@@ -40,7 +37,6 @@ struct SimParams
     total_loci::Integer
     female_mating_trait_loci
     male_mating_trait_loci
-    competition_trait_loci
     hybrid_survival_loci
     per_reject_cost::Real
 end
@@ -78,19 +74,14 @@ struct PopulationTrackingData
 
     function PopulationTrackingData(
         genotypes::Vector{<:Matrix{<:Integer}},
-        locations::Vector,
-        male_mating_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+        x_locations::Vector{Float32},
+        y_locations::Vector{Float32},
+        male_mating_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
+        overlap::Real
     )
-
         mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
-        sorted_indices = sort_locations_2D(locations, 50)
-
-        @time calc_overlap(mmt_hybrid_indices, sorted_indices)
-
-        overlap = calc_overlap(mmt_hybrid_indices, sorted_indices)
-
-        sigmoid_curves = calc_sigmoid_curves(locations, mmt_hybrid_indices)
+        sigmoid_curves = calc_sigmoid_curves(x_locations, y_locations, mmt_hybrid_indices)
         mmt_cline_width = average_width(sigmoid_curves)
 
         population_size = length(genotypes)
@@ -110,14 +101,18 @@ An OutputData stores all of the key data from a simulation run.
 # fields
 - `sim_params::SimParams`: the parameters of the simulation.
 - `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of the population at the end of the simulation.
-- `locations::Vector{<:Any}`: the locations of the population at the end of the simulation.
-- `hybrid_zone_width::Real`: the cline width associated with the male mating trait
-- `population_overlap::Real`: the proportion of the range occupied by males of both mating trait phenotypes
+- `x_locations::Vector{Float32}`: the x coordinates of the population at the end of the simulation.
+- `y_locations::Vector{Float32}`: the y coordinates of the population at the end of the simulation.
+- `hybrid_zone_width::Real`: the cline width associated with the male mating trait.
+- `population_overlap::Real`: the proportion of the range occupied by males of both mating trait phenotypes.
+- `bimodality::Real`: the extent to which phenotypically pure individuals occur in the hybrid zone
+- `population_tracking_data::Vector{PopulationTrackingData}`: the population size, hybridity, overlap, and cline width over time.
 """
 struct OutputData
     sim_params::SimParams
     genotypes::Vector{<:Matrix{<:Integer}}
-    locations::Vector{<:Any}
+    x_locations::Vector{Float32}
+    y_locations::Vector{Float32}
     hybrid_zone_width::Real
     population_overlap::Real
     bimodality::Real
@@ -125,32 +120,24 @@ struct OutputData
 
     function OutputData(
         genotypes::Vector{<:Matrix{<:Integer}},
-        locations::Vector{<:Any},
+        x_locations::Vector{Float32},
+        y_locations::Vector{Float32},
         male_mating_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         sim_params::SimParams,
-        pop_track_data::Vector{PopulationTrackingData}
+        pop_track_data::Vector{PopulationTrackingData},
+        overlap::Real
     )
         mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
-        sorted_indices = sort_locations_2D(locations, 20)
-
-        @time calc_overlap(mmt_hybrid_indices, locations, 0.01)
-
-        println("Overlap2: ", calc_overlap2(mmt_hybrid_indices, locations, 0.01))
-
-        overlap = calc_overlap(mmt_hybrid_indices, locations, 0.01)
-
-        sigmoid_curves = calc_sigmoid_curves(locations, mmt_hybrid_indices)
+        sigmoid_curves = calc_sigmoid_curves(x_locations, y_locations, mmt_hybrid_indices)
         mmt_cline_width = average_width(sigmoid_curves)
 
-        locations_y = [l.y for l in locations]
-
-        sorted_indices = sort_y(locations_y)
+        sorted_indices = sort_y(y_locations)
 
         bimodality = calc_bimodality_overall(
             sigmoid_curves,
             sorted_indices,
-            [l.x for l in locations],
+            x_locations,
             mmt_hybrid_indices,
             0.05
         )
@@ -158,7 +145,8 @@ struct OutputData
         new(
             sim_params,
             genotypes,
-            locations,
+            x_locations,
+            y_locations,
             mmt_cline_width,
             overlap,
             bimodality,
@@ -182,20 +170,17 @@ function calc_sigmoid_curve(locations_x::Vector{<:Real}, hybrid_indices::Vector{
 end
 
 """
-    calc_sigmoid_curves(locations::Vector, hybrid_indices::Vector{<:Real})
+    calc_sigmoid_curves(x_locations::Vector{Float32}, y_locations::Vector{Float32}, hybrid_indices::Vector{<:Real})
 
 Divide the range into ten horizontal strips and compute a sigmoid curve fitting the hybrid 
 indices along each strip.
 """
-function calc_sigmoid_curves(locations::Vector, hybrid_indices::Vector{<:Real})
-    locations_x = [l.x for l in locations]
-    locations_y = [l.y for l in locations]
-
-    sorted_indices = sort_y(locations_y)
+function calc_sigmoid_curves(x_locations::Vector{Float32}, y_locations::Vector{Float32}, hybrid_indices::Vector{<:Real})
+    sorted_indices = sort_y(y_locations)
 
     return [
         calc_sigmoid_curve(
-            locations_x[sorted_indices[i]],
+            x_locations[sorted_indices[i]],
             hybrid_indices[sorted_indices[i]])
         for i in eachindex(sorted_indices)
     ]
@@ -241,94 +226,6 @@ function average_width(sigmoid_curves::Vector{<:Vector{<:Real}})
 end
 
 """
-For testing
-"""
-function calc_overlap2(
-    hybrid_indices::Vector{<:Real},
-    locations::Vector,
-    sigma_comp::Real
-)
-    spaced_locations_2D = Location.(collect(0:0.01:1), collect(0:0.01:1)')
-
-    function calc_squared_distances(focal_location, locations)
-        dif_x = [l.x for l in locations] .- focal_location.x
-        dif_y = [l.y for l in locations] .- focal_location.y
-
-        return dif_x .^ 2 .+ dif_y .^ 2
-    end
-
-    function calc_density(focal_location, locations, sigma_comp)
-        squared_distances = calc_squared_distances(focal_location, locations)
-
-        return sum(exp.(-squared_distances ./ Ref(2 * (sigma_comp^2))))
-    end
-
-    species_A_locations = locations[Bool[h == 0 for h in hybrid_indices]]
-    species_B_locations = locations[Bool[h == 1 for h in hybrid_indices]]
-
-    densities_A = calc_density.(spaced_locations_2D, Ref(species_A_locations), Ref(sigma_comp))
-    densities_B = calc_density.(spaced_locations_2D, Ref(species_B_locations), Ref(sigma_comp))
-    total_density = calc_density.(spaced_locations_2D, Ref(locations), Ref(sigma_comp))
-
-    min_proportion = 0.05
-
-    return count(
-        i -> densities_A[i] > min_proportion * total_density[i] &&
-            densities_B[i] > min_proportion * total_density[i],
-        eachindex(spaced_locations_2D)
-    ) / length(spaced_locations_2D)
-end
-
-"""
-function calc_overlap(
-    hybrid_indices::Vector{<:Real},
-    locations::Vector,
-    sigma_comp::Real
-)
-
-Compute the total overlap area between the two species.
-
-# Arguments
-- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the loci of interest.
-- `locations::Vector`: the locations of all individuals in the simulation.
-- `sigma_comp::Real`: the standard deviation for the normal curve used in calculating local density.
-"""
-function calc_overlap(
-    hybrid_indices::Vector{<:Real},
-    locations::Vector,
-    sigma_comp::Real
-)
-    spaced_locations = collect(0:0.01:1)
-
-    function calc_overlap_in_ribbon(hybrid_indices, locations, sigma_comp)
-        locations_x = [l.x for l in locations]
-
-        function calc_density(focal_location, locations_x, sigma_comp)
-            return sum(exp.(-(Ref(focal_location) .- locations_x).^2 ./ Ref(2 * (sigma_comp^2))))
-        end
-
-        species_A_locations = locations_x[Bool[h == 0 for h in hybrid_indices]]
-        species_B_locations = locations_x[Bool[h == 1 for h in hybrid_indices]]
-
-        densities_A = calc_density.(spaced_locations, Ref(species_A_locations), Ref(sigma_comp))
-        densities_B = calc_density.(spaced_locations, Ref(species_B_locations), Ref(sigma_comp))
-        total_density = calc_density.(spaced_locations, Ref(locations_x), Ref(sigma_comp))
-
-        min_proportion = 0.05
-
-        return count(
-            i -> densities_A[i] > min_proportion * total_density[i] &&
-                densities_B[i] > min_proportion * total_density[i],
-            eachindex(spaced_locations)
-        ) / length(spaced_locations)
-    end
-
-    sorted_indices = sort_y([l.y for  l in locations])
-
-    return mean([calc_overlap_in_ribbon(hybrid_indices[i], locations[i], sigma_comp) for i in sorted_indices])
-end
-
-"""
     sort_y(y_locations::Vector{<:Real})
 
 Sort the y coordinate indices into 10 vectors [0, 0.1), [0.1, 0.2), etc.
@@ -368,32 +265,6 @@ function sort_locations(A::AbstractArray{<:Real}, bin_size::Real)
     return map(get_indices, bins)
 end
 
-
-
-"""
-    sort_locations_2D(locations::Vector{<:Any}, w::Integer)
-
-Sort the indices of the locations into a w by w matrix with each cell in the matrix 
-holding a vector of indices corresponding to the individuals in that (1/w) by (1/w) portion 
-of the range.
-"""
-function sort_locations_2D(locations::Vector{<:Any}, w::Integer)
-
-    output = Matrix{Vector{Int64}}(undef, w, w)
-
-    for i in eachindex(output)
-        output[i] = []
-    end
-
-    for i in eachindex(locations)
-        x = min(Int(floor(w * locations[i].x)) + 1, 50)
-        y = min(Int(floor(w * locations[i].y)) + 1, 50)
-        push!(output[x, y], i)
-    end
-
-    return output
-end
-
 """
     calc_traits_additive(
         genotypes::Vector{<:Matrix{<:Integer}},
@@ -417,3 +288,114 @@ function calc_traits_additive(
     traits = map(x -> mean(genotypes[x], loci), 1:N)
     return traits
 end
+
+
+"""
+    calc_bimodality_in_range(
+        sigmoid_curve::Vector{<:Real},
+        locations_x::Vector{<:Real},
+        hybrid_indices::Vector{<:Real},
+        sigma_disp::Real
+    )
+
+Compute the proportion of phenotypically pure individuals within half a dispersal distance 
+of the cline midpoint.
+
+# Arguments
+- `sigmoid_curve::Vector{<:Real}`: the sigmoid curve fitting the cline.
+- `locations_x::Vector{<:Real}`: the x values of the locations.
+- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
+- `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
+"""
+function calc_bimodality_in_range(
+    sigmoid_curve::Vector{<:Real},
+    locations_x::Vector{<:Real},
+    hybrid_indices::Vector{<:Real},
+    sigma_disp::Real
+)
+    center = spaced_locations[argmin(abs.(sigmoid_curve .- 0.5))]
+    left = center - (sigma_disp / 2)
+    right = center + (sigma_disp / 2)
+    hybrid_indices_at_center =
+        hybrid_indices[
+            filter(i -> left <= locations_x[i] <= right, eachindex(hybrid_indices))
+        ]
+
+    bimodality = count(x -> x == 0 || x == 1, hybrid_indices_at_center) /
+                 length(hybrid_indices_at_center)
+
+    if isnan(bimodality)
+        return 1
+    else
+        return bimodality
+    end
+end
+
+"""
+Compute the bimodality across the entire range (see above for further description).
+
+    calc_bimodality_overall(
+        sigmoid_curves::Vector{<:Vector{<:Real}},
+        sorted_indices::Vector{<:Vector{<:Integer}},
+        locations_x::Vector{<:Real},
+        hybrid_indices::Vector{<:Real},
+        sigma_disp::Real
+    )
+
+# Arguments
+- `sigmoid_curves::Vector{<:Real}`: the sigmoid curves for each horizontal strip of the range.
+- `sorted_indices::Vector{<:Vector{<:Integer}}`: the indices of the locations sorted into bins bins corresponding to non-overlapping ranges of the y values.
+- `locations_x::Vector{<:Real}`: the x values of the locations.
+- `hybrid_indices::Vector{<:Real}`: the mean values of the genotypes over the functional loci only.
+- `sigma_disp::Real`: the standard deviation in the dispersal distance distribution.
+"""
+function calc_bimodality_overall(
+    sigmoid_curves::Vector{<:Vector{<:Real}},
+    sorted_indices::Vector{<:Vector{<:Integer}},
+    locations_x::Vector{<:Real},
+    hybrid_indices::Vector{<:Real},
+    sigma_disp::Real
+)
+    sorted_locations_x = [
+        locations_x[sorted_indices[i]] for i in eachindex(sorted_indices)
+    ]
+    sorted_hybrid_indices = [
+        hybrid_indices[sorted_indices[i]] for i in eachindex(sorted_indices)
+    ]
+
+    bimodality_per_range = calc_bimodality_in_range.(
+        sigmoid_curves,
+        sorted_locations_x,
+        sorted_hybrid_indices,
+        Ref(sigma_disp)
+    )
+
+    return mean(bimodality_per_range)
+end
+
+#=
+function calc_distances_to_middle(genotypes, locations, sigma_disp, loci)
+    locations_x = [l.x for l in locations]
+    locations_y = [l.y for l in locations]
+
+    sorted_indices = sort_y(locations_y)
+
+    function calc_midpoint(locations, genotypes)
+        hybrid_indices = calc_traits_additive(genotypes, loci)
+
+        sigmoid_curve = calc_sigmoid_curve(locations, hybrid_indices)
+
+        return spaced_locations[argmin(abs.(sigmoid_curve .- 0.5))]
+    end
+
+    midpoints = [calc_midpoint(locations_x[i], genotypes[i]) for i in sorted_indices]
+
+    function calc_distance(location)
+        ribbon = Int(ceil(20 * location.y))
+
+        return location.x - midpoints[ribbon]
+    end
+
+    return calc_distance.(locations)
+end
+=#

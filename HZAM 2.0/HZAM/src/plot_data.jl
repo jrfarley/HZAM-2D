@@ -42,13 +42,10 @@ every individual.
 """
 function create_population_plot(
     hybrid_indices_functional::Vector,
-    locations::Vector,
+    x_locations::Vector,
+    y_locations::Vector,
     save_plot::Bool
 )
-
-    locations_x = [l.x for l in locations] # x coordinates of all individuals
-    locations_y = [l.y for l in locations] # y coordinates of all individuals
-
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # set the standard font size
     global fig = Figure(resolution=(1800, 1200), figure_padding=60)
@@ -69,8 +66,8 @@ function create_population_plot(
     # add the location of every individual to the plot
     global points = scatter!(
         ax,
-        locations_x,
-        locations_y,
+        x_locations,
+        y_locations,
         color=hybrid_indices_functional,
         markersize=10
     )
@@ -103,20 +100,18 @@ hybrid indices).
 """
 function update_population_plot(
     hybrid_indices_functional::Vector,
-    locations::Vector,
+    x_locations::Vector,
+    y_locations::Vector,
     generation::Integer,
     save_plot::Bool
 )
-    locations_x = [l.x for l in locations] # x coordinates of all individuals
-    locations_y = [l.y for l in locations] # y coordinates of all individuals
-
     delete!(ax, points) # remove the old points from the plot
 
     # add the location of every individual to the plot
     global points = scatter!(
         ax,
-        locations_x,
-        locations_y,
+        x_locations,
+        y_locations,
         color=hybrid_indices_functional,
         markersize=10
     )
@@ -124,7 +119,7 @@ function update_population_plot(
     ax.title = string("HZAM simulation, generation = ", generation)
 
 
-    println("generation: ", generation, "; individuals: ", length(locations))
+    println("generation: ", generation, "; individuals: ", length(x_locations))
     println("")
     
     if save_plot

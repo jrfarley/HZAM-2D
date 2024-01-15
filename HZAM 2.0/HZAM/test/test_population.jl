@@ -7,15 +7,16 @@
     sigma_comp = 0.01
 
     pd = PopulationData(K_total,
-        ecolDiff,
         total_loci,
         intrinsic_R,
         sigma_comp)
 
     genotypes_F = vcat([d.genotypes_F for d in pd.population]...)
     genotypes_M = vcat([d.genotypes_M for d in pd.population]...)
-    locations_F = vcat([d.locations_F for d in pd.population]...)
-    locations_M = vcat([d.locations_M for d in pd.population]...)
+    x_locations_F = vcat([d.x_locations_F for d in pd.population]...)
+    x_locations_M = vcat([d.x_locations_M for d in pd.population]...)
+    y_locations_F = vcat([d.y_locations_F for d in pd.population]...)
+    y_locations_M = vcat([d.y_locations_M for d in pd.population]...)
 
 
 
@@ -25,17 +26,39 @@
     @test count(i -> i == [1 1 1; 1 1 1], genotypes_M) == n^2 / 2
     @test length(genotypes_F) == n^2
     @test length(genotypes_M) == n^2
-    @test length(locations_F) == n^2
-    @test length(locations_M) == n^2
+    @test length(x_locations_F) == n^2
+    @test length(x_locations_M) == n^2
+    @test length(y_locations_F) == n^2
+    @test length(y_locations_M) == n^2
 
-    [@test length(d.locations_F) == 1 for d in pd.population]
-    [@test length(d.locations_M) == 1 for d in pd.population]
+    [@test length(d.x_locations_F) == 1 for d in pd.population]
+    [@test length(d.x_locations_M) == 1 for d in pd.population]
     [@test length(d.genotypes_F) == 1 for d in pd.population]
     [@test length(d.genotypes_M) == 1 for d in pd.population]
-    [@test Population.assign_zone(pd.population[i].locations_F[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
-    [@test Population.assign_zone(pd.population[i].locations_M[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].genotypes_F[1] == [0 0 0; 0 0 0] && i[1] <= 5 || pd.population[i].genotypes_F[1] == [1 1 1; 1 1 1] && i[1] > 5 for i in eachindex(IndexCartesian(), pd.population)]
-    [@test pd.population[i].genotypes_M[1] == [0 0 0; 0 0 0] && i[1] <= 5 || pd.population[i].genotypes_M[1] == [1 1 1; 1 1 1] && i[1] > 5 for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].x_locations_F[1], pd.population[i].y_locations_F[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
+    [@test Population.assign_zone(pd.population[i].x_locations_M[1], pd.population[i].y_locations_M[1]) == i for i in eachindex(IndexCartesian(), pd.population)]
+
+
+    genotypes = [
+        vcat([d.genotypes_F for d in pd.population]...)
+        vcat([d.genotypes_M for d in pd.population]...)
+    ]
+    x_locations = [
+        vcat([d.x_locations_F for d in pd.population]...)
+        vcat([d.x_locations_M for d in pd.population]...)
+    ]
+    y_locations = [
+        vcat([d.y_locations_F for d in pd.population]...)
+        vcat([d.y_locations_M for d in pd.population]...)
+    ]
+
+    for i in eachindex(genotypes)
+        if x_locations[i]<0.5
+            @test genotypes[i] == [0 0 0; 0 0 0]
+        else
+            @test genotypes[i] == [1 1 1; 1 1 1]
+        end
+    end
 
     [@test length(pd.growth_rates_F[i]) == 1 for i in eachindex(IndexCartesian(), pd.population)]
 end
@@ -51,22 +74,24 @@ end
 end
 
 @testset "disperse_individual" begin
-    locations = Location[]
+    x_locations = Float32[]
+    y_locations = Float32[]
     sigma_disp = 0.01
 
     num_fail = 0
 
     for i in 1:1000
-        new_location = Location(Location(0.5f0, 0.5f0), sigma_disp)
-        push!(locations, new_location)
-        if new_location.x < 0.5 - 2 * sigma_disp || new_location.x > 0.5 + 2 * sigma_disp || new_location.y < 0.5 - 2 * sigma_disp || new_location.y > 0.5 + 2 * sigma_disp
+        x, y = Population.new_location(0.5f0, 0.5f0, sigma_disp)
+        push!(x_locations, x)
+        push!(y_locations, y)
+        if x < 0.5 - 2 * sigma_disp || x > 0.5 + 2 * sigma_disp || y < 0.5 - 2 * sigma_disp || y > 0.5 + 2 * sigma_disp
             num_fail += 1
         end
     end
 
-    average_x = sum([l.x for l in locations]) / 1000
+    average_x = sum(x_locations) / 1000
 
-    average_y = sum([l.y for l in locations]) / 1000
+    average_y = sum(y_locations) / 1000
 
     @test num_fail < 70
 
@@ -85,9 +110,10 @@ end
 end
 
 @testset "assign_zone" begin
-    locations = [Location(0.01f0, 0.0f0), Location(0.32f0, 0.75f0), Location(0.5f0, 0.5f0)]
+    x_locations = [0.01f0, 0.32f0, 0.5f0]
+    y_locations = [0.0f0, 0.75f0, 0.5f0]
 
-    zones = Population.assign_zone.(locations)
+    zones = Population.assign_zone.(x_locations, y_locations)
 
     @test zones == [CartesianIndex(1, 1), CartesianIndex(4, 8), CartesianIndex(6, 6)]
 end
@@ -114,9 +140,9 @@ end
     @test fitnesses == [1, 1, 1, 1]
 
     fitnesses = Population.calc_survival_fitness_epistasis.(genotypes, Ref(loci), Ref(0))
-    @test fitnesses ≈ [0, 1/9, 1, 1/9]
+    @test fitnesses ≈ [0, 1 / 9, 1, 1 / 9]
 
     fitnesses = Population.calc_survival_fitness_epistasis.(genotypes, Ref(loci), Ref(0.9))
-    expected = [0.9, 41/45, 1, 41/45]
+    expected = [0.9, 41 / 45, 1, 41 / 45]
     [@test abs(fitnesses[i] - expected[i]) < 0.001 for i in eachindex(expected)]
 end

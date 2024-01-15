@@ -1,40 +1,48 @@
 using Random
 
 @testset "choose_closest_male_no_zones" begin
-    elig_M = collect(1:1001)
-    location_mother = Location(0.5f0, 0.5f0)
+    elig_M = collect(1:1000)
+    female_x, female_y = 0.5f0, 0.5f0
 
-    locations_M = Location.(Float32.(rand(1000)), Float32.(rand(1000)))
-    male_loc = Location(0.5f0, 0.5f0)
-    locations_M = shuffle(push!(locations_M, male_loc))
+    x_locations_M = Float32.(rand(1000))
+    y_locations_M = Float32.(rand(1000))
+    male_x, male_y = 0.50001f0, 0.49999f0
+    x_locations_M[579] = male_x
+    y_locations_M[579] = male_y
 
     closest_male =
         Mating.choose_closest_male_from_zone(
             elig_M,
-            locations_M,
-            location_mother
+            x_locations_M,
+            y_locations_M,
+            female_x,
+            female_y
         )
 
-    @test locations_M[closest_male] == male_loc
+    @test x_locations_M[closest_male] == male_x
+    @test y_locations_M[closest_male] == male_y
 
     for i in 1:100
-        male_loc = Location(0.55f0, 0.45f0)
-        locations_M =
-            Location.(
-                Float32.(rand(1000) .* Ref(0.4)),
-                Float32.(rand(1000) .* Ref(0.4) .+ Ref(0.55))
-            )
+        male_x, male_y = 0.55f0, 0.45f0
+        x_locations_M = Float32.(rand(1000) .* Ref(0.4))
+        y_locations_M = Float32.(rand(1000) .* Ref(0.4) .+ Ref(0.55))
 
-        locations_M = shuffle(push!(locations_M, male_loc))
+        i = Int(round(rand() * 1000))
+
+        x_locations_M[i] = male_x
+        y_locations_M[i] = male_y
 
         closest_male =
             Mating.choose_closest_male_from_zone(
                 elig_M,
-                locations_M,
-                location_mother
+                x_locations_M,
+                y_locations_M,
+                female_x,
+                female_y
             )
 
-        @test locations_M[closest_male] == male_loc
+        @test x_locations_M[closest_male] == male_x
+        @test y_locations_M[closest_male] == male_y
     end
 end
 
@@ -42,79 +50,94 @@ end
     # locations of the zones along an axis
     intervals = collect(0.0f0:0.1f0:0.99f0)
 
-    # location of each zone (lower left corner)
-    zone_locations = Location.(intervals, intervals')
+    zones = Matrix{Zone}(undef, 10, 10)
+    for i in 1:10
+        for j in 1:10
+            zones[i, j] = Zone(
+                1000,
+                10,
+                intervals[i],
+                intervals[j],
+                Float32(1 / 10),
+                0
+            )
+        end
+    end
 
-    # assign the population number to each zone
-    zone_populations = map(l -> l.x < 0.5 ? 1 : 1, zone_locations)
-
-    # initialize the genotypes and locations and for each zone
-    zones = Zone.(Ref(1000),
-        Ref(10),
-        zone_locations,
-        Ref(0.1f0),
-        zone_populations,
-        Ref(0))
-
-    location_mother = zones[5, 5].locations_F[1]
+    x_location_mother = 0.55f0
+    y_location_mother = 0.55f0
 
     elig_M = Dict{CartesianIndex,Vector{Int64}}()
 
     for i in eachindex(IndexCartesian(), zones)
-        elig_M[i] = 1:length(zones[i].locations_M)
+        elig_M[i] = 1:length(zones[i].x_locations_M)
     end
+    female_zone_index = Population.assign_zone(x_location_mother, y_location_mother)
 
     closest_male, zone_index =
         Mating.choose_closest_male(
-            zones, [CartesianIndex(5, 5)],
-            elig_M, location_mother, 0.1f0
+            zones, 
+            [female_zone_index],
+            elig_M, x_location_mother, y_location_mother, 0.1f0
         )
 
-    @test zones[zone_index].locations_M[closest_male] == location_mother
-    @test zone_index == CartesianIndex(5, 5)
+    distance = Mating.distance(
+        zones[zone_index].x_locations_M[closest_male],
+        zones[zone_index].y_locations_M[closest_male],
+        x_location_mother,
+        y_location_mother
+    )
+
+    @test distance < 0.01
+
+    @test zone_index == female_zone_index
 end
 
 @testset "choose_closest_male_multiple_zones" begin
     # locations of the zones along an axis
     intervals = collect(0.0f0:0.1f0:0.99f0)
-
-    # location of each zone (lower left corner)
-    zone_locations = Location.(intervals, intervals')
-
-    # assign the population number to each zone
-    zone_populations = map(l -> l.x < 0.5 ? 1 : 1, zone_locations)
+    zones = Matrix{Zone}(undef, 10, 10)
 
     for i in 1:10
-        # initializes the genotypes and locations for each zone
-        zones = Zone.(Ref(10),
-            Ref(10),
-            zone_locations,
-            Ref(0.1f0),
-            zone_populations,
-            Ref(0))
 
-        location_mother = Location(0.45f0, 0.45f0)
+        for i in 1:10
+            for j in 1:10
+                zones[i, j] = Zone(
+                    1000,
+                    10,
+                    intervals[i],
+                    intervals[j],
+                    Float32(1 / 10),
+                    0
+                )
+            end
+        end
 
-        locations_M = vcat(zones[i, i].locations_M, location_mother)
+        x_location_mother = 0.45f0
+        y_location_mother = 0.45f0
+
+        x_locations_M = vcat(zones[i, i].x_locations_M, x_location_mother)
+        y_locations_M = vcat(zones[i, i].x_locations_M, y_location_mother)
 
         genotypes_F = zones[i, i].genotypes_F
         genotypes_M = zones[i, i].genotypes_M
         push!(genotypes_M, genotypes_M[1])
-        locations_F = zones[i, i].locations_F
+        x_locations_F = zones[i, i].x_locations_F
+        y_locations_F = zones[i, i].y_locations_F
 
         zones[i, i] = Zone(
             genotypes_F,
             genotypes_M,
-            locations_F,
-            locations_M,
-            collect(1:2),
-            0
+            x_locations_F,
+            y_locations_F,
+            x_locations_M,
+            y_locations_M
         )
 
         elig_M = Dict{CartesianIndex,Vector{Int64}}()
 
         for i in eachindex(IndexCartesian(), zones)
-            elig_M[i] = 1:length(zones[i].locations_M)
+            elig_M[i] = 1:length(zones[i].x_locations_M)
         end
         neighbourhood =
             filter(e -> length(elig_M[e]) > 0, CartesianIndex(1, 1):CartesianIndex(10, 10))
@@ -124,17 +147,19 @@ end
                 zones,
                 neighbourhood,
                 elig_M,
-                location_mother,
+                x_location_mother,
+                y_location_mother,
                 1.0f0
             )
 
-        @test zones[zone_index].locations_M[closest_male] == location_mother
+        @test zones[zone_index].x_locations_M[closest_male] == x_location_mother
+        @test zones[zone_index].y_locations_M[closest_male] == y_location_mother
         @test zone_index == CartesianIndex(i, i)
     end
 end
 
 @testset "choose_closest_male_empty_zone" begin
-    zone = Zone(0, 0, Location(0.0f0, 0.0f0), 0.1f0, 0, 0)
+    zone = Zone(0, 0, 0.0f0, 0.0f0, 0.1f0, 0)
     zones = [zone zone; zone zone]
     elig_M = Dict{CartesianIndex,Vector{Int64}}()
     elig_M[CartesianIndex(1, 1)] = []
@@ -143,9 +168,11 @@ end
         zones,
         [CartesianIndex(1, 1)],
         elig_M,
-        Location(0.5f0, 0.6f0),
+        0.5f0,
+        0.6f0,
         0.5f0
     )
+    @test closest_male == (-1, -1)
 end
 
 
@@ -341,12 +368,8 @@ end
 end
 
 @testset "distance" begin
-    loc1 = Location(0.5f0, 0.5f0)
-    loc2 = Location(0.0f0, 0.0f0)
-    loc3 = Location(1.0f0, 1.0f0)
-
-    @test Mating.distance(loc1, loc1) == 0
-    @test Mating.distance(loc1, loc2) ≈ sqrt(0.5)
-    @test Mating.distance(loc1, loc3) ≈ sqrt(0.5)
-    @test Mating.distance(loc2, loc3) ≈ sqrt(2)
+    @test Mating.distance(0.5f0, 0.5f0, 0.5f0, 0.5f0) == 0
+    @test Mating.distance(0.5f0, 0.5f0, 0.0f0, 0.0f0) ≈ sqrt(0.5)
+    @test Mating.distance(0.5f0, 0.5f0, 1.0f0, 1.0f0) ≈ sqrt(0.5)
+    @test Mating.distance(0.0f0, 0.0f0, 1.0f0, 1.0f0) ≈ sqrt(2)
 end

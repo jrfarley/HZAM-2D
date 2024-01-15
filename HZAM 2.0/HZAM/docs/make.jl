@@ -13,8 +13,7 @@ makedocs(
         ]
         "Manual" => [
             "manual_one_simulation.md",
-            "manual_simulation_set.md",
-            "plotting_outcomes.md"
+            "manual_simulation_set.md"
         ]
     ]
 )

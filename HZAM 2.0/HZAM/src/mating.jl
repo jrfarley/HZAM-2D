@@ -3,20 +3,21 @@ module Mating
 using ..Population
 
 """
-    distance(location1::Location, location2::Location)
+    distance(x1::Float32, y1::Float32, x2::Float32, y2::Float32)
 
-Compute the distance between `location1` and `location2`.
+Compute the distance between `(x1,y1)` and `(x2,y2)`.
 """
-function distance(location1::Location, location2::Location)
-    return sqrt((location1.x - location2.x)^2 + (location1.y - location2.y)^2)
+function distance(x1::Float32, y1::Float32, x2::Float32, y2::Float32)
+    return sqrt((x1 - x2)^2 + (y1 - y2)^2)
 end
 
 """
     choose_closest_male(
-        zones::Matrix{Zone}, 
-        zone_indices::Vector{CartesianIndex{2}}, 
-        elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}, 
-        location_mother::Location, 
+        zones::Matrix{Zone},
+        zone_indices::Vector{CartesianIndex{2}},
+        elig_M::Dict{CartesianIndex,<:Vector{<:Integer}},
+        x_location_mother::Float32,
+        y_location_mother::Float32,
         neighbourhood_size::Float32
     )
 
@@ -30,14 +31,16 @@ no eligible male is found.
 - `zones::Matrix{Zone}`: the matrix storing the population data for each zone.
 - `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the closest male.
 - `elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}`: the indices of all the eligible males in each zone.
-- `location_mother::Location`: the location from which the males' distances are computed.
+- `x_location_mother::Float32`: the x coordinate from which the males' distances are computed.
+- `y_location_mother::Float32`: the y coordinate from which the males' distances are computed.
 - `neighbourhood_size::Float32`: the distance cutoff for the search.
 """
 function choose_closest_male(
     zones::Matrix{Zone},
     zone_indices::Vector{CartesianIndex{2}},
     elig_M::Dict{CartesianIndex,<:Vector{<:Integer}},
-    location_mother::Location,
+    x_location_mother::Float32,
+    y_location_mother::Float32,
     neighbourhood_size::Float32
 )
     shortest_distance = neighbourhood_size # males further than this distance are ignored
@@ -53,12 +56,19 @@ function choose_closest_male(
         # find the closest male in that zone to the female
         male_index = choose_closest_male_from_zone(
             elig_M[zone_index],
-            zones[zone_index].locations_M,
-            location_mother
+            zones[zone_index].x_locations_M,
+            zones[zone_index].y_locations_M,
+            x_location_mother,
+            y_location_mother
         )
 
         # calculate distance from the mother's location to the closest male
-        male_distance = distance(zones[zone_index].locations_M[male_index], location_mother)
+        male_distance = distance(
+            zones[zone_index].x_locations_M[male_index],
+            zones[zone_index].y_locations_M[male_index],
+            x_location_mother,
+            y_location_mother
+        )
 
         # check if the distance is smaller than the previous closest distance
         if male_distance < shortest_distance
@@ -73,26 +83,36 @@ end
 
 """
     choose_closest_male_from_zone(
-        elig_M::Vector{<:Integer}, 
-        locations_M::Vector{Location}, 
-        location_mother::Location
+        elig_M::Vector{<:Integer},
+        x_locations_M::Vector{Float32},
+        y_locations_M::Vector{Float32},
+        x_location_mother::Float32,
+        y_location_mother::Float32
     )
 
 Find the index of the closest male within a single zone from a list of eligible males.
 
 # Arguments
 - `elig_M::Vector{<:Integer}`: the indices of all the eligible males.
-- `locations_M::Vector{Location}`: the locations of all the males in the zone.
-- `location_mother::Location`: the location from which the males' distances are computed.
+- `x_locations_M::Vector{Location}`: the x coordinates of all the males in the zone.
+- `y_locations_M::Vector{Location}`: the x coordinates of all the males in the zone.
+- `x_location_mother::Float32`: the x coordinate from which the males' distances are computed.
+- `y_location_mother::Float32`: the y coordinate from which the males' distances are computed.
 """
 function choose_closest_male_from_zone(
     elig_M::Vector{<:Integer},
-    locations_M::Vector{Location},
-    location_mother::Location)
+    x_locations_M::Vector{Float32},
+    y_locations_M::Vector{Float32},
+    x_location_mother::Float32,
+    y_location_mother::Float32
+)
     return elig_M[argmin(
         Population.calc_squared_distances(
-            locations_M[elig_M],
-            location_mother
+            x_locations_M[elig_M],
+            y_locations_M[elig_M],
+            x_location_mother,
+            y_location_mother,
+            -1
         )
     )]
 end

@@ -3,101 +3,95 @@ module Population
 import ..DataAnalysis.calc_traits_additive
 import QuadGK.quadgk
 
-export PopulationData, Location, Zone
+export PopulationData, Zone
 
 "The width of the (square) grid of zones that divides the population into more manageable 
 chunks. Default is 10x10."
 NUM_ZONES = 10
 
 """
-    Location
+    new_location(
+        starting_range_x::Vector{Float32},
+        starting_range_y::Vector{Float32}
+    )::Tuple{Float32,Float32}
 
-A Location stores an x coordinate and a y coordinate.
+Randomly generate a location within the given range.
 
-# Constructors
-```julia
-- Location(x::Float32, y::Float32)
-- Location(starting_range::Vector{<:Location})
-- Location(starting_location::Location, sigma_disp::Real)
-```
+# Arguments 
 
-# Details on behaviour of different constructors
-
-The first constructor creates a new location with the given x and y coordinates.
-
-The second constructor generates a random location within the given range. Range is 
-specified by a vector containing the coordinates of the bottom left and top right corners.
-
-The third constructor generates an offspring's location based on the mother's location and 
-the standard deviation of the dispersal distance.
+- `starting_range_x::Vector{Float32}`: the x limits of the range
+- `starting_range_y::Vector{Float32}`: the y limits of the range
 """
-struct Location
-    x::Float32
-    y::Float32
+function new_location(
+    starting_range_x::Vector{Float32},
+    starting_range_y::Vector{Float32}
+)::Tuple{Float32,Float32}
+    x = rand() * (starting_range_x[2] - starting_range_x[1]) + starting_range_x[1]
+    y = rand() * (starting_range_y[2] - starting_range_y[1]) + starting_range_y[1]
+    return x, y
+end
 
-    function Location(x::Float32, y::Float32)
-        new(x, y)
-    end
+"""
+    new_location(x::Float32, y::Float32, sigma_disp::Real)::Tuple{Float32,Float32}
 
-    function Location(starting_range::Vector{<:Location})
-        x = rand() * (starting_range[2].x - starting_range[1].x) + starting_range[1].x
-        y = rand() * (starting_range[2].y - starting_range[1].y) + starting_range[1].y
-        new(x, y)
-    end
+Compute the location after dispersal of an offspring.
 
-    function Location(starting_location::Location, sigma_disp::Real)
-        x = -1
-        y = -1
-        # Keep generating new locations until there's one that's within the range.
-        while ~(0 <= x < 1 && 0 <= y < 1) # Check if the location is within the range.
-            dist = sigma_disp * randn()
-            dir = rand() * 2 * pi
-            x = starting_location.x + dist * cos(dir)
-            y = starting_location.y + dist * sin(dir)
-        end
-        new(x, y)
+# Arguments 
+
+- `x::Float32`: the x coordinate of the mother
+- `y::Float32`: the y coordinate of the mother
+- `sigma_disp::Real`: the standard deviation in the dispersal distance
+"""
+function new_location(x::Float32, y::Float32, sigma_disp::Real)::Tuple{Float32,Float32}
+    new_x = -1
+    new_y = -1
+    # Keep generating new locations until there's one that's within the range.
+    while ~(0 <= new_x < 1 && 0 <= new_y < 1) # Check if the location is within the range.
+        dist = sigma_disp * randn()
+        dir = rand() * 2 * pi
+        new_x = x + dist * cos(dir)
+        new_y = y + dist * sin(dir)
     end
+    return new_x, new_y
 end
 
 """
     Zone
 
-A Zone stores the genotypes locations and resource use for the individuals contained within 
+A Zone stores the genotypes and locations for the individuals contained within 
 a subset of the range.
 
 # Fields
 - `genotypes_F::Vector{Matrix{Int8}}`: the female genotypes. rows are alleles (row 1 from mother, row 2 from father) and columns are loci.
 - `genotypes_M::Vector{Matrix{Int8}}`: the male genotypes.
-- `locations_F::Vector{<:Location}`: the female locations.
-- `locations_M::Vector{<:Location}`: the male locations.
-- `ind_useResourceA_F::Vector{Float64}`: each female's contribution to the use of resource A.
-- `ind_useResourceA_M::Vector{Float64}`: each male's contribution to the use of resource A.
-- `ind_useResourceB_F::Vector{Float64}`: each female's contribution to the use of resource B.
-- `ind_useResourceB_M::Vector{Float64}`: each male's contribution to the use of resource B.
+- `x_locations_F::Vector{Float32}`: the x coordinates of the females
+- `y_locations_F::Vector{Float32}`: the y coordinates of the females
+- `x_locations_M::Vector{Float32}`: the x coordinates of the males
+- `y_locations_M::Vector{Float32}`: the y coordinates of the males
 
 # Constructors
 ```julia
 - Zone(
     starting_N::Integer,
     total_loci::Integer,
-    location::Location,
+    x_location::Float32,
+    y_location::Float32,
     size::Float32,
-    population::Real,
-    ecolDiff::Real
+    species::Real
 )
 - Zone(
     genotypes_F::Vector{Matrix{Int8}},
     genotypes_M::Vector{Matrix{Int8}},
-    locations_F::Vector{<:Location},
-    locations_M::Vector{<:Location},
-    competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
-    ecolDiff
+    x_locations_F::Vector{Float32},
+    y_locations_F::Vector{Float32},
+    x_locations_M::Vector{Float32},
+    y_locations_M::Vector{Float32}
 )
 ```
 
 # Details on behaviour of different constructors
 
-The first constructor sets up the initial locations, genotypes, and resource use of every 
+The first constructor sets up the initial locations and genotypes of every 
 individual in the zone.
 
 The second constructor creates a new Zone using the genotypes and locations of the 
@@ -106,92 +100,66 @@ offspring.
 struct Zone
     genotypes_F::Vector{Matrix{Int8}}
     genotypes_M::Vector{Matrix{Int8}}
-    locations_F::Vector{<:Location}
-    locations_M::Vector{<:Location}
-    ind_useResourceA_F::Vector{Float64}
-    ind_useResourceA_M::Vector{Float64}
-    ind_useResourceB_F::Vector{Float64}
-    ind_useResourceB_M::Vector{Float64}
+    x_locations_F::Vector{Float32}
+    y_locations_F::Vector{Float32}
+    x_locations_M::Vector{Float32}
+    y_locations_M::Vector{Float32}
 
     function Zone(
         starting_N::Integer,
         total_loci::Integer,
-        location::Location,
+        x_location::Float32,
+        y_location::Float32,
         size::Float32,
-        species::Real,
-        ecolDiff::Real
+        species::Real
     )
         species = Int8(species)
 
         N_half = trunc(Int, starting_N / 2) # the number of individuals in each sex
 
-        zone_range = [
-            location,
-            Location(min(location.x + size, 1.0f0), min(location.y + size, 1.0f0))
-        ] # the geographic limits of the zone
+        zone_range_x = [x_location, min(x_location + size, 1.0f0)]
+        zone_range_y = [y_location, min(y_location + size, 1.0f0)]
+        # the geographic limits of the zone
 
         genotype = fill(species, 2, total_loci)
-        #=
-        for i in 3:6
-            genotype[1, i] = 1 - species
-        end
-        =#
 
         genotypes = fill(genotype, N_half)
 
-        locations = [[Location(zone_range) for i in 1:N_half] for i in 1:2]
+        x_locations_F = Vector{Float32}(undef, N_half)
+        y_locations_F = Vector{Float32}(undef, N_half)
+        x_locations_M = Vector{Float32}(undef, N_half)
+        y_locations_M = Vector{Float32}(undef, N_half)
 
-        #=
-        Calculate individual contributions to resource use, according to linear gradient 
-        between use of species 0 and species 1.
-        =#
-        ind_useResourceA = calc_ind_useResourceA(fill(species, N_half), ecolDiff)
-        ind_useResourceB = calc_ind_useResourceB(fill(species, N_half), ecolDiff)
+        for i in 1:N_half
+            x_locations_F[i], y_locations_F[i] = new_location(zone_range_x, zone_range_y)
+            x_locations_M[i], y_locations_M[i] = new_location(zone_range_x, zone_range_y)
+        end
 
         new(
             genotypes,
             genotypes,
-            locations[1],
-            locations[1],
-            ind_useResourceA,
-            ind_useResourceA,
-            ind_useResourceB,
-            ind_useResourceB
+            x_locations_F,
+            y_locations_F,
+            x_locations_M,
+            y_locations_M
         )
     end
 
     function Zone(
         genotypes_F::Vector{Matrix{Int8}},
         genotypes_M::Vector{Matrix{Int8}},
-        locations_F::Vector{<:Location},
-        locations_M::Vector{<:Location},
-        competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
-        ecolDiff::Real
+        x_locations_F::Vector{Float32},
+        y_locations_F::Vector{Float32},
+        x_locations_M::Vector{Float32},
+        y_locations_M::Vector{Float32}
     )
-        # calculate new competition traits
-        competition_traits_F = calc_traits_additive(genotypes_F, competition_trait_loci)
-        competition_traits_M = calc_traits_additive(genotypes_M, competition_trait_loci)
-
-        #=
-        calculate individual contributions to resource use, according to linear gradient 
-        between use of species 0 and species 1
-        =#
-
-        ind_useResourceA_F = calc_ind_useResourceA(competition_traits_F, ecolDiff)
-        ind_useResourceA_M = calc_ind_useResourceA(competition_traits_M, ecolDiff)
-        ind_useResourceB_F = calc_ind_useResourceB(competition_traits_F, ecolDiff)
-        ind_useResourceB_M = calc_ind_useResourceB(competition_traits_M, ecolDiff)
-
-
         new(
             genotypes_F,
             genotypes_M,
-            locations_F,
-            locations_M,
-            ind_useResourceA_F,
-            ind_useResourceA_M,
-            ind_useResourceB_F,
-            ind_useResourceB_M
+            x_locations_F,
+            y_locations_F,
+            x_locations_M,
+            y_locations_M
         )
     end
 end
@@ -204,14 +172,13 @@ the simulation. The data is subdivided by 'zone' into a matrix for
 calculation efficiency.
 
 # Fields
-- `population::Matrix{Zone}`: all of the zones (containing the genotypes, locations, and resource use) in the simulation.
+- `population::Matrix{Zone}`: all of the zones (containing the genotypes and locations) in the simulation.
 - `growth_rates_F::Matrix{Vector{Float64}}`: the growth rates of every female for each zone.
 
 # Constructors
 ```julia
-- PopulationData(
+- function PopulationData(
     K_total::Integer,
-    ecolDiff::Real,
     total_loci::Integer,
     intrinsic_R::Real,
     sigma_comp::Real
@@ -219,13 +186,13 @@ calculation efficiency.
 - PopulationData(
     genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
     genotypes_sons::Matrix{Vector{Matrix{Int8}}},
-    locations_daughters::Matrix{Vector{Location}},
-    locations_sons::Matrix{Vector{Location}},
-    competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
+    x_locations_daughters::Matrix{Vector{Float32}},
+    y_locations_daughters::Matrix{Vector{Float32}},
+    x_locations_sons::Matrix{Vector{Float32}},
+    y_locations_sons::Matrix{Vector{Float32}},
     K_total::Integer,
     sigma_comp::Real,
-    intrinsic_R::Real,
-    ecolDiff::Real
+    intrinsic_R::Real
 )
 ```
 # Details on behaviour of different constructors
@@ -240,50 +207,39 @@ struct PopulationData
     growth_rates_F::Matrix{Vector{Float64}}
 
     #=
-    Compute the initial number of individuals in each zone. 
-
-    When ecolDiff=0 this will just 
-    be the carrying capacity (K_total) divided by the number of zones. But when there is an 
-    ecological difference between the two species the effective carrying capacity is reduced 
-    since not all of the available resources will be used.
+    Compute the initial number of individuals in each zone.
     =#
-    function calc_zone_population(K_total::Integer, ecolDiff::Real)
-        effective_K = K_total / (1 + ecolDiff)
-
-        floor(Int, effective_K / (NUM_ZONES^2))
+    function calc_zone_population(K_total::Integer)
+        floor(Int, K_total / (NUM_ZONES^2))
     end
 
     function PopulationData(
         K_total::Integer,
-        ecolDiff::Real,
         total_loci::Integer,
         intrinsic_R::Real,
         sigma_comp::Real
     )
         # the number of individuals per zone (innitially constant throughout range)
-        num_individuals_per_zone = calc_zone_population(K_total, ecolDiff)
+        num_individuals_per_zone = calc_zone_population(K_total)
 
         # the locations of the zones along an axis
         spaced_locations = collect(0.0f0:Float32(1 / NUM_ZONES):0.99f0)
 
-        # the location of each zone (lower left corner)
-        zone_locations = Location.(spaced_locations, spaced_locations')
-
-        #= 
-        Assign each zone the species identifier of the species that will initially
-        occupy it. The dividing line between species will initially be x=0.5.
-        =#
-        zone_species = map(l -> l.x < 0.5 ? 0 : 1, zone_locations)
+        zones = Matrix{Zone}(undef, NUM_ZONES, NUM_ZONES)
 
         # initialize the genotypes and locations for each zone
-        zones = Zone.(
-            Ref(num_individuals_per_zone),
-            Ref(total_loci),
-            zone_locations,
-            Ref(Float32(1 / NUM_ZONES)),
-            zone_species,
-            Ref(ecolDiff)
-        )
+        for i in 1:NUM_ZONES
+            for j in 1:NUM_ZONES
+                zones[i, j] = Zone(
+                    num_individuals_per_zone,
+                    total_loci,
+                    spaced_locations[i],
+                    spaced_locations[j],
+                    Float32(1 / NUM_ZONES),
+                    spaced_locations[i] < 0.5 ? 0 : 1
+                )
+            end
+        end
 
         # empty matrix for storing a list of growth rates of every female per zone
         growth_rates_F = Matrix{Vector{Float64}}(undef, NUM_ZONES, NUM_ZONES)
@@ -303,13 +259,13 @@ struct PopulationData
     function PopulationData(
         genotypes_daughters::Matrix{Vector{Matrix{Int8}}},
         genotypes_sons::Matrix{Vector{Matrix{Int8}}},
-        locations_daughters::Matrix{Vector{Location}},
-        locations_sons::Matrix{Vector{Location}},
-        competition_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
+        x_locations_daughters::Matrix{Vector{Float32}},
+        y_locations_daughters::Matrix{Vector{Float32}},
+        x_locations_sons::Matrix{Vector{Float32}},
+        y_locations_sons::Matrix{Vector{Float32}},
         K_total::Integer,
         sigma_comp::Real,
-        intrinsic_R::Real,
-        ecolDiff::Real
+        intrinsic_R::Real
     )
 
         #= 
@@ -321,12 +277,14 @@ struct PopulationData
 
         # initialize each zone with the offspring data
         for zone_index in CartesianIndices((1:NUM_ZONES, 1:NUM_ZONES))
-            zones[zone_index] = Zone(genotypes_daughters[zone_index],
+            zones[zone_index] = Zone(
+                genotypes_daughters[zone_index],
                 genotypes_sons[zone_index],
-                locations_daughters[zone_index],
-                locations_sons[zone_index],
-                competition_trait_loci,
-                ecolDiff)
+                x_locations_daughters[zone_index],
+                y_locations_daughters[zone_index],
+                x_locations_sons[zone_index],
+                y_locations_sons[zone_index]
+            )
         end
 
         # calculate growth rates for every female in each zone
@@ -348,9 +306,9 @@ end
 
 Determine which zone a location falls in.
 """
-function assign_zone(location::Location)
-    zone_x = convert(Integer, trunc(NUM_ZONES * location.x) + 1) # x index of the zone
-    zone_y = convert(Integer, trunc(NUM_ZONES * location.y) + 1) # y index of the zone
+function assign_zone(x::Float32, y::Float32)
+    zone_x = convert(Integer, trunc(NUM_ZONES * x) + 1) # x index of the zone
+    zone_y = convert(Integer, trunc(NUM_ZONES * y) + 1) # y index of the zone
     return CartesianIndex(
         min(zone_x, NUM_ZONES),
         min(zone_y, NUM_ZONES)
@@ -358,44 +316,89 @@ function assign_zone(location::Location)
 end
 
 """
-    calc_ind_useResourceA(competition_traits::Vector{Real}, ecolDiff::Real)
+    calc_species_overlap(
+        population::Matrix{Zone},
+        max_dist::Real,
+        sigma_comp::Real,
+        loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+    )
 
-Compute the individual contributions to the use of resource A according to a linear gradient 
-between the resource use of species 0 and species 1.
+Compute the total overlap between the two species.
 
 # Arguments
-- `competition_traits::Vector{Real}`: the ecological competition trait values.
-- `ecolDiff::Real`: the ecological difference between the species. 
+- `population::Matrix{Zone}`: the genotypes and locations of all individuals.
+- `max_dist::Real`: the distance cutoff for the density calculation.
+- `sigma_comp::Real`: the standard deviation used for the density calculation.
+- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci used to determine species.
 """
-function calc_ind_useResourceA(competition_traits::Vector, ecolDiff::Real)
-    competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1
+function calc_species_overlap(
+    population::Matrix{Zone},
+    max_dist::Real,
+    sigma_comp::Real,
+    loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+)
+    min_proportion = 0.05
+    spaced_locations = collect(0.0f0:0.01f0:0.09f0)
+    num_overlap = 0
 
-    ind_useResourceA = competAbility .+ ((1 .- competition_traits) .* ecolDiff)
+    function overlap_at_point(density_A, density_B, total_density)
+        return density_A > total_density * min_proportion &&
+               density_B > total_density * min_proportion
+    end
 
-    return ind_useResourceA
+    for i in 0:9
+        for j in 0:9
+            locations_x = Ref(Float32(i / 10)) .+ spaced_locations
+            locations_y = Ref(Float32(j / 10)) .+ spaced_locations
+
+            locations_x = vcat(fill(locations_x, 10)...)
+            locations_y = vcat(fill.(locations_y, Ref(10))...)
+
+            zone_index = CartesianIndex(i, j)
+            density_A = calc_real_densities(
+                population,
+                zone_index,
+                locations_x,
+                locations_y,
+                max_dist,
+                sigma_comp;
+                species=0,
+                loci
+            )
+
+            density_B = calc_real_densities(
+                population,
+                zone_index,
+                locations_x,
+                locations_y,
+                max_dist,
+                sigma_comp;
+                species=1,
+                loci
+            )
+
+            total_density = calc_real_densities(
+                population,
+                zone_index,
+                locations_x,
+                locations_y,
+                max_dist,
+                sigma_comp
+            )
+
+            num_overlap += count(
+                i -> overlap_at_point(density_A[i], density_B[i], total_density[i]),
+                eachindex(locations_x)
+            )
+        end
+    end
+
+    return num_overlap / 100^2
 end
 
 
 """
-    calc_ind_useResourceB(competition_traits::Vector{Real}, ecolDiff::Real)
-
-Compute the individual contributions to the use of resource B according to a linear gradient 
-between the resource use of species 0 and species 1.
-
-# Arguments
-- `competition_traits::Vector{Real}`: the ecological competition trait values.
-- `ecolDiff::Real`: the ecological difference between the species. 
-"""
-function calc_ind_useResourceB(competition_traits::Vector, ecolDiff::Real)
-    competAbility = (1 - ecolDiff) / 2    # equals 0 when ecolDiff = 1 
-
-    ind_useResourceB = competAbility .+ (competition_traits .* ecolDiff)
-
-    return ind_useResourceB
-end
-
-"""
-    max_radius_squared(x::Real, y::Real, t::Real, max_dist::Real)
+    max_radius_squared(x::Float32, y::Float32, t::Real, max_dist::Real)
 
 Compute the distance from a point along an angle to the limit of the range 
 (defined by x∈[0,1), y∈[0,1)). 
@@ -407,10 +410,7 @@ The distance gets cut off at max_dist. Used in calculating the ideal densities.
 - `t::Real`: the angle.
 - `max_dist`: the maximum distance.
 """
-function max_radius_squared(location::Location, t::Real, max_dist::Real)
-    x = location.x
-    y = location.y
-
+function max_radius_squared(x::Float32, y::Float32, t::Real, max_dist::Real)
     if y > (1 - max_dist) && t < pi
         y_dist = (1 - y) / sin(t)
     elseif y < max_dist && t > pi
@@ -434,7 +434,8 @@ end
     calc_ideal_densities(
         K_total::Integer,
         sigma_comp::Real,
-        locations_F::Vector{<:Location},
+        x_locations_F::Vector{Float32},
+        y_locations_F::Vector{Float32},
         max_dist::Real
     )
 
@@ -449,21 +450,23 @@ Densities are calculated using the following integral:
 
 where the density function is equal to 0 outside of the range limits.
 
-# Arguments
-- `K_total::Integer`: the carrying capacity.
+# Argument
+- `K_total::Integer`: the carrying capacity
 - `sigma_comp::Real`: the standard deviation for the normal curve used in calculating local density.
-- `locations_F::Vector{<:Location}`: a list of the locations where the ideal density is to be computed.
+- `x_locations_F::Vector{Float32}`: the x coordinates where the ideal density is to be computed.
+- `y_locations_F::Vector{Float32}`: the y coordinates where the ideal density is to be computed.
 - `max_dist::Real`: the cutoff for the furthest away an individual can be and affect the density calculation. Should be 3x sigma_comp.
 """
 function calc_ideal_densities(
     K_total::Integer,
     sigma_comp::Real,
-    locations_F::Vector{<:Location},
+    x_locations_F::Vector{Float32},
+    y_locations_F::Vector{Float32},
     max_dist::Real
 )
-    function calc_ideal_density(location)
-        if max_dist < location.x < (1 - max_dist) &&
-           max_dist < location.y <= (1 - max_dist)
+    function calc_ideal_density(x::Float32, y::Float32)
+        if max_dist < x < (1 - max_dist) &&
+           max_dist < y <= (1 - max_dist)
             # the ideal density is constant further than 3 sigma_comps from the range limits 
             return begin
                 1 +
@@ -472,7 +475,7 @@ function calc_ideal_densities(
             end
         else
             # density function
-            f(t) = exp(-(max_radius_squared(location, t, max_dist) / (2 * sigma_comp^2)))
+            f(t) = exp(-(max_radius_squared(x, y, t, max_dist) / (2 * sigma_comp^2)))
             return begin
                 1 +
                 K_total * (sigma_comp^2) *
@@ -482,31 +485,52 @@ function calc_ideal_densities(
         end
     end
 
-    return map(calc_ideal_density, locations_F)
+    return calc_ideal_density.(x_locations_F, y_locations_F)
 end
 
 """
-    calc_squared_distances(location_list::Vector{<:Location}, focal_location::Location)
+    function calc_squared_distances(
+        x_locations::Vector{Float32},
+        y_locations::Vector{Float32},
+        x::Float32,
+        y::Float32,
+        cutoff::Real
+    )
 
-Compute the squared distances from a set of locations to a single location.
+Compute the squared distances from a set of locations to a single location. Discards 
+distances above the given cutoff.
 
 # Example
 
 ```jldoctest
 julia> calc_squared_distances([Location(0.5f0, 0.5f0), Location(0.4f0, 0.4f0), 
-Location(0f0,0f0)], Location(0.5f0, 0.5f0))
-3-element Vector{Float32}:
+Location(0f0,0f0)], Location(0.5f0, 0.5f0), 0.1)
+2-element Vector{Float32}:
  0.0
  0.019999998
- 0.5
+```
+```jldoctest
+julia> calc_squared_distances([0.5f0, 0.4f0, 0f0], [0.5f0, 0.4f0, 0f0], 0.5f0, 0.5f0, 0.1)
+2-element Vector{Float32}:
+ 0.0
+ 0.019999998
 ```
  
 """
-function calc_squared_distances(location_list::Vector{<:Location}, focal_location::Location)
-    dif_x = [l.x for l in location_list] .- focal_location.x
-    dif_y = [l.y for l in location_list] .- focal_location.y
-
-    return dif_x .^ 2 .+ dif_y .^ 2
+function calc_squared_distances(
+    x_locations::Vector{Float32},
+    y_locations::Vector{Float32},
+    x::Float32,
+    y::Float32,
+    cutoff::Real
+)
+    dif_x = x_locations .- Ref(x)
+    dif_y = y_locations .- Ref(y)
+    if cutoff == -1
+        return dif_x .^ 2 .+ dif_y .^ 2
+    else
+        return filter!(x -> x < cutoff, dif_x .^ 2 .+ dif_y .^ 2)
+    end
 end
 
 """
@@ -523,62 +547,72 @@ function get_surrounding_zones(zone_index::CartesianIndex)
     return lower_left:upper_right
 end
 
+
+
 """
     calc_real_densities(
-        neighbourhood::Matrix{Zone},
-        locations_F::Vector{<:Location},
+        population::Matrix{Zone},
+        zone_index::CartesianIndex,
+        x_locations_F::Vector{Float32},
+        y_locations_F::Vector{Float32},
         max_dist::Real,
-        sigma_comp::Real
+        sigma_comp::Real;
+        species=-1,
+        loci=[-1]
     )
 
-Compute the population density at each female's location for both resources.
+Compute the population density at each female's location.
 
 # Arguments
-- `neighbourhood::Matrix{Zone}`: the zone indices for all the zones close enough to affect the density calculation.
-- `locations_F::Vector{<:Location}`: the locations of every female in the focal zone.
+- `population::Matrix{Zone}`: the matrix of zones storing all the locations, and genotypes in the simulation.
+- `zone_index::CartesianIndex`: the index of the focal zone.
+- `x_locations_F::Vector{Float32}`: the x coordinates of every female in the focal zone.
+- `y_locations_F::Vector{Float32}`: the y coordinates of every female in the focal zone.
 - `max_dist::Real`: the distance cutoff for the density calculation.
 - `sigma_comp::Real`: the standard deviation used in the density calculation.
 """
 function calc_real_densities(
-    neighbourhood::Matrix{Zone},
-    locations_F::Vector{<:Location},
+    population::Matrix{Zone},
+    zone_index::CartesianIndex,
+    x_locations_F::Vector{Float32},
+    y_locations_F::Vector{Float32},
     max_dist::Real,
-    sigma_comp::Real
+    sigma_comp::Real;
+    species=-1,
+    loci=[-1]
 )
-    # collect the individual contributions to the use of both resources.
-    ind_useResourceA_all = vcat(
-        [[z.ind_useResourceA_F; z.ind_useResourceA_M] for z in neighbourhood]...
-    )
-    ind_useResourceB_all = vcat(
-        [[z.ind_useResourceB_F; z.ind_useResourceB_M] for z in neighbourhood]...
-    )
-    locations_all = vcat([[z.locations_F; z.locations_M] for z in neighbourhood]...)
+    neighbourhood = population[get_surrounding_zones(zone_index)]
+
+    x_locations_all = vcat([[z.x_locations_F; z.x_locations_M] for z in neighbourhood]...)
+    y_locations_all = vcat([[z.y_locations_F; z.y_locations_M] for z in neighbourhood]...)
 
     """
-    Calculate the resource use density for both resources at the given location.
+    Calculate the density at a given location
     """
-    function calc_useResource_densities(focal_location)
-        squared_distances = calc_squared_distances(locations_all, focal_location)
-        useResource_densities = [0.0, 0.0]
-        for i in eachindex(squared_distances)
-            if squared_distances[i] <= max_dist^2
-                useResource_densities[1] += ind_useResourceA_all[i] *
-                                            exp(-squared_distances[i] /
-                                                (2 * (sigma_comp^2)))
-                useResource_densities[2] += ind_useResourceB_all[i] *
-                                            exp(-squared_distances[i] /
-                                                (2 * (sigma_comp^2)))
-            end
-        end
-        return useResource_densities
+    function calc_density(focal_x::Float32, focal_y::Float32)
+        squared_distances = calc_squared_distances(
+            x_locations_all,
+            y_locations_all,
+            focal_x,
+            focal_y,
+            max_dist^2
+        )
+        return sum(exp.(-squared_distances ./ Ref(2 * (sigma_comp^2))))
     end
 
-    # calculate the densities for both resources at the location of each female
-    real_densities = calc_useResource_densities.(locations_F)
+    if species ≠ -1
+        genotypes_all = vcat([[z.genotypes_F; z.genotypes_M] for z in neighbourhood]...)
+        hybrid_indices = calc_traits_additive(genotypes_all, loci)
+        filtered_indices = filter(i -> hybrid_indices[i] == species, eachindex(hybrid_indices))
 
-    # split the densities up by resource
-    return [d[1] for d in real_densities], [d[2] for d in real_densities]
+        x_locations_all = x_locations_all[filtered_indices]
+        y_locations_all = y_locations_all[filtered_indices]
 
+        return calc_density.(x_locations_F, y_locations_F)
+    end
+
+
+    return calc_density.(x_locations_F, y_locations_F)
 end
 
 """
@@ -590,7 +624,7 @@ end
         intrinsic_R::Real
     )
 
-Compute the female growth rates.
+Compute the female growth rates assuming no ecological difference.
 
 # Arguments
 - `population::Matrix{Zone}`: the matrix of zones storing all the locations, and genotypes in the simulation.
@@ -609,12 +643,6 @@ function calc_growth_rates(
     # maximum distance that the density calculation takes into account
     max_dist = 3 * sigma_comp
 
-    locations_F = population[zone_index].locations_F
-    neighbourhood = population[get_surrounding_zones(zone_index)]
-
-
-    locations_F = population[zone_index].locations_F
-
     #= 
     Set up the expected local densities, based on a geographically even distribution of 
     individuals at the carrying capacity.
@@ -622,15 +650,18 @@ function calc_growth_rates(
     ideal_densities = calc_ideal_densities(
         K_total,
         sigma_comp,
-        locations_F,
+        population[zone_index].x_locations_F,
+        population[zone_index].y_locations_F,
         max_dist
     )
 
-    # assume both resources have same constant density across range
-    ideal_densities_resourceA = ideal_densities ./ 2
-    ideal_densities_resourceB = ideal_densities_resourceA
-
-    real_densities_resourceA, real_densities_resourceB = calc_real_densities(neighbourhood, locations_F, max_dist, sigma_comp)
+    real_densities = calc_real_densities(
+        population, zone_index,
+        population[zone_index].x_locations_F,
+        population[zone_index].y_locations_F,
+        max_dist,
+        sigma_comp
+    )
 
     """
     Calculate the local growth rates according to discrete time logistic growth equation.
@@ -640,19 +671,7 @@ function calc_growth_rates(
                ideal_densities ./ (ideal_densities .+ (real_densities .* (intrinsic_R - 1)))
     end
 
-    #= 
-    Calculate the local growth rates due to each resource according to discrete time 
-    logistic growth equation.
-    =#
-    local_growth_rates_resourceA = logistic_growth_equation(ideal_densities_resourceA, real_densities_resourceA)
-    local_growth_rates_resourceB = logistic_growth_equation(ideal_densities_resourceB, real_densities_resourceB)
-
-    growth_rateA = population[zone_index].ind_useResourceA_F .* local_growth_rates_resourceA
-    growth_rateB = population[zone_index].ind_useResourceB_F .* local_growth_rates_resourceB
-
-    growth_rates = growth_rateA .+ growth_rateB
-
-    return growth_rates
+    return logistic_growth_equation(ideal_densities, real_densities)
 end
 
 """
