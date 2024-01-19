@@ -23,15 +23,34 @@ struct OverlapData
     bimodality::Real
 end
 
+function run_HZAM_sets_complete(trial_name::String)
+    set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
+        "separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
+        "low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
+    total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9]
+    female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
+    male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
+    hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
+    per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.01, 0.05, 0.05]
 
-"""
-    set_results_folder(dir::String)
+    set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
 
-Set the output directory for all methods in summarize_data.jl.
-"""
-function set_results_folder(dir::String)
-    global results_folder = dir
+    for i in 1:5
+        run_HZAM_set(
+            set_names[i],
+            total_loci[i],
+            female_mating_trait_loci[i],
+            male_mating_trait_loci[i],
+            hybrid_survival_loci[i],
+            per_reject_cost[i]
+        )
+        println("--------------------")
+        println(string(set_names[i], " completed successfully!"))
+        println("--------------------")
+    end
 end
+
+
 
 """
     run_HZAM_set(
@@ -107,31 +126,13 @@ function run_HZAM_set(
     return outcome_array
 end
 
-function run_HZAM_sets_complete(trial_name::String)
-    set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
-        "separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
-        "low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
-    total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9]
-    female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
-    male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
-    hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
-    per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.01, 0.05, 0.05]
+"""
+    set_results_folder(dir::String)
 
-    set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
-
-    for i in 1:5
-        run_HZAM_set(
-            set_names[i],
-            total_loci[i],
-            female_mating_trait_loci[i],
-            male_mating_trait_loci[i],
-            hybrid_survival_loci[i],
-            per_reject_cost[i]
-        )
-        println("--------------------")
-        println(string(set_names[i], " completed successfully!"))
-        println("--------------------")
-    end
+Set the output directory for all methods in summarize_data.jl.
+"""
+function set_results_folder(dir::String)
+    global results_folder = dir
 end
 
 """
