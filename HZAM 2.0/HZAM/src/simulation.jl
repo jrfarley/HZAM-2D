@@ -1,6 +1,4 @@
 using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
-using Test
-
 
 """
     run_one_HZAM_sim(
@@ -34,7 +32,7 @@ Run a single HZAM simulation.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     # the semicolon makes the following optional keyword arguments  
-    K_total::Integer=20000, max_generations::Integer=1000,
+    K_total::Integer=40000, max_generations::Integer=1000,
     total_loci::Integer=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
     hybrid_survival_loci=1:3, survival_fitness_method::String="epistasis", 
     per_reject_cost=0, sigma_disp=0.03,
@@ -102,7 +100,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     Generate the starting genotypes/locations and calculate the growth rates based on 
     individual resource use for all individuals in the simulation.
     =#
-    pd = PopulationData(
+    pd = Population.PopulationData(
         K_total,
         total_loci,
         intrinsic_R,
@@ -126,9 +124,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         ]
 
         if gene_plot
-            create_gene_plot(genotypes, loci, save_plot)
+            PlotData.create_gene_plot(genotypes, loci, save_plot)
         else
-            create_population_plot(
+            PlotData.create_population_plot(
                 DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
                 x_locations,
                 y_locations,
@@ -350,7 +348,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         end # of loop through the zones
 
         # assign surviving offspring to new adult population
-        pd = PopulationData(
+        pd = Population.PopulationData(
             genotypes_daughters_all,
             genotypes_sons_all,
             x_locations_daughters_all,
@@ -379,9 +377,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 
 
             if gene_plot
-                update_gene_plot(genotypes, loci, generation, save_plot)
+                PlotData.update_gene_plot(genotypes, loci, generation, save_plot)
             else
-                update_population_plot(
+                PlotData.update_population_plot(
                     DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
                     x_locations,
                     y_locations,

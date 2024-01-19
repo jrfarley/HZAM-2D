@@ -13,8 +13,8 @@ import .DataAnalysis
 import .Mating
 import .Population.NUM_ZONES
 
-using .PlotData
-using .Population
+import .PlotData
+import .Population
 
 include("simulation.jl") # main function for running a simulation
 include("summarize_data.jl")

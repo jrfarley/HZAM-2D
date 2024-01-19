@@ -7,7 +7,22 @@ using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
 
 "The directory where all files are saved"
-global results_folder = "HZAM_Sym_Julia_results_GitIgnore"
+global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
+
+
+"The set of hybrid fitnesses (w_hyb) values that will be run"
+global w_hyb_set = [1, 0.95, 0.9, 0.8, 0.75, 0.6, 0.5, 0.3, 0.0]
+
+"The set of assortative mating strengths (S_AM) values that will be run"
+global S_AM_set = [1, 3, 10, 30, 100, 300, 500, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+
+
+struct OverlapData
+    cline_width::Real
+    overlap::Real
+    bimodality::Real
+end
+
 
 """
     set_results_folder(dir::String)
@@ -21,8 +36,7 @@ end
 """
     run_HZAM_set(
         set_name::String, 
-        intrinsic_R::Real,
-        ecolDiff::Real; 
+        intrinsic_R::Real; 
         <keyword arguments>
     )
 
@@ -32,53 +46,55 @@ store the outcome of each simulation in a JLD2 file.
 # Arguments
 - `set_name::String`: the name assigned to the set of simulations.
 - `intrinsic_R::Real`: the intrinsic growth rate.
-- `ecolDiff::Real`: the ecological difference between the two species. Between 0 and 1.
-- `K_total::Integer=20000`: the carrying capacity of the environment.
+- `K_total::Integer=40000`: the carrying capacity of the environment.
 - `max_generations::Integer=1000`: the number of generations that the simulation will run for.
 - `total_loci::Integer=6`: the total number of loci in the genome.
 - `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
 - `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
-- `competition_trait_loci=1:3`: the loci specifying the ecological trait (used in fitness related to resource use).
 - `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood.
 - `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
 - `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
 - `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
 """
-function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # the semicolon makes the following optional keyword arguments 
-    K_total::Int=10000, max_generations::Int=400,
-    total_loci::Int=3, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
-    competition_trait_loci=1:3, hybrid_survival_loci=1:3,
-    survival_fitness_method::String="epistasis", per_reject_cost=0, sigma_disp=0.03)
-
-    # the set of hybrid fitnesses (w_hyb) values that will be run
-    w_hyb_set = [1, 0.95, 0.9, 0.8, 0.75, 0.6, 0.5, 0.3]
-    S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
-
-
+function run_HZAM_set(
+    set_name::String,
+    total_loci::Int=3,
+    female_mating_trait_loci=1:3,
+    male_mating_trait_loci=1:3,
+    hybrid_survival_loci=1:3,
+    per_reject_cost::Real=0;  # the semicolon makes the following optional keyword arguments 
+    intrinsic_R::Real=1.1, K_total::Int=40000, max_generations::Int=1000,
+    survival_fitness_method::String="epistasis", sigma_disp=0.03
+)
     # set up array of strings to record outcomes
     outcome_array = Array{DataAnalysis.OutputData,2}(undef, length(w_hyb_set), length(S_AM_set))
 
-    dir = mkpath(string(results_folder, "/simulation_outcomes/", set_name))
+    dir = mkpath(string(results_folder, "/", set_name))
 
     # Loop through the different simulation sets
     Threads.@threads for i in eachindex(w_hyb_set)
         for j in eachindex(S_AM_set)
             w_hyb = w_hyb_set[i]
             S_AM = S_AM_set[j]
-            println("ecolDiff = ", ecolDiff, "; w_hyb = ", w_hyb, "; S_AM = ", S_AM)
 
-            run_name = string("HZAM_animation_run", "_ecolDiff", ecolDiff, "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
+            run_name = string("HZAM_animation_run", "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
 
             # run one simulation by calling the function defined above:
-            outcome = run_one_HZAM_sim(w_hyb, S_AM, ecolDiff, intrinsic_R;
-                K_total, max_generations,
-                total_loci, female_mating_trait_loci, male_mating_trait_loci,
-                competition_trait_loci, hybrid_survival_loci,
-                survival_fitness_method, per_reject_cost, sigma_disp, do_plot=false)
-
-            println("Overlap: ", outcome.population_overlap)
-
-
+            outcome = run_one_HZAM_sim(
+                w_hyb,
+                S_AM,
+                intrinsic_R;
+                K_total,
+                max_generations,
+                total_loci,
+                female_mating_trait_loci,
+                male_mating_trait_loci,
+                hybrid_survival_loci,
+                survival_fitness_method,
+                per_reject_cost,
+                sigma_disp,
+                do_plot=false
+            )
 
             filename = string(dir, "/", run_name, ".jld2")
             @save filename outcome
@@ -89,6 +105,33 @@ function run_HZAM_set(set_name::String, intrinsic_R::Real, ecolDiff::Real;  # th
     end # of w_hyb loop   
 
     return outcome_array
+end
+
+function run_HZAM_sets_complete(trial_name::String)
+    set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
+        "separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
+        "low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
+    total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9]
+    female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
+    male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
+    hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
+    per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.01, 0.05, 0.05]
+
+    set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
+
+    for i in 1:5
+        run_HZAM_set(
+            set_names[i],
+            total_loci[i],
+            female_mating_trait_loci[i],
+            male_mating_trait_loci[i],
+            hybrid_survival_loci[i],
+            per_reject_cost[i]
+        )
+        println("--------------------")
+        println(string(set_names[i], " completed successfully!"))
+        println("--------------------")
+    end
 end
 
 """
@@ -169,6 +212,46 @@ function load_from_folder(dir::String)
     end
     return outcome_array
 end
+
+
+
+function load_overlap_data_from_folder(dir::String)
+    set_names = readdir(dir)
+    outcome_arrays = Array{OverlapData,2}[]
+
+    for set in set_names
+        set_dir = string(dir, "/", set)
+        if isdir(set_dir)
+            outcome_array = Array{OverlapData,2}(
+                undef, length(w_hyb_set), length(S_AM_set)
+            )
+            files = readdir(set_dir)
+
+            for file in files
+                path = string(set_dir, "/", file)
+                if occursin(".jld2", path)
+                    @load path outcome
+                    outcome_array[
+                        indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+                        indexin(outcome.sim_params.S_AM, S_AM_set)[1]
+                    ] = OverlapData(outcome.hybrid_zone_width, outcome.population_overlap, outcome.bimodality)
+                end
+            end
+
+            push!(outcome_arrays, outcome_array)
+        end
+    end
+
+    return Dict(zip(set_names, outcome_arrays))
+end
+
+
+
+
+
+
+
+
 
 """
     load_from_csv(filepath::String)
@@ -482,7 +565,7 @@ function plot_hybrid_index(hybrid_indices)
     lines!(xs, ys)
 
     display(f)
-    
+
     readline()
 end
 
@@ -512,7 +595,7 @@ function make_subplot(outcome_array, plot_title)
             mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
             overlap = calc_overlap(mmt_hybrid_indices, locations, 0.01)
-            output[i] = -  
+            output[i] = -
         end
     end
 
@@ -663,13 +746,13 @@ function plot_bimodality(outcome_array)
     bimodalities = [o.bimodality for o in outcome_array]
     println(bimodalities)
     w_hybs = [o.sim_params.w_hyb for o in outcome_array]
-    w_hyb_set = w_hybs[:,1]
+    w_hyb_set = w_hybs[:, 1]
 
     S_AM1 = bimodalities[:, 1]
-    S_AM3 = bimodalities[:,2]
-    S_AM10 = bimodalities[:,3]
-    S_AM30 = bimodalities[:,4]
-    S_AM100 = bimodalities[:,5]
+    S_AM3 = bimodalities[:, 2]
+    S_AM10 = bimodalities[:, 3]
+    S_AM30 = bimodalities[:, 4]
+    S_AM100 = bimodalities[:, 5]
     S_AM300 = bimodalities[:, 6]
     S_AM1000 = bimodalities[:, 7]
     S_AM_Inf = bimodalities[:, 8]
@@ -684,28 +767,28 @@ function plot_bimodality(outcome_array)
 
     ax = Axis(f[1, 1])
 
-    lines!(w_hyb_set, S_AM1, label = "S_AM1")
-    lines!(w_hyb_set, S_AM3, label = "S_AM3")
-    lines!(w_hyb_set, S_AM10, label = "S_AM10")
-    lines!(w_hyb_set, S_AM30, label = "S_AM30")
-    lines!(w_hyb_set, S_AM100, label = "S_AM100")
-    lines!(w_hyb_set, S_AM300, label = "S_AM300")
-    lines!(w_hyb_set, S_AM1000, label = "S_AM1000")
-    lines!(w_hyb_set, S_AM_Inf, label = "S_AM_Inf")
+    lines!(w_hyb_set, S_AM1, label="S_AM1")
+    lines!(w_hyb_set, S_AM3, label="S_AM3")
+    lines!(w_hyb_set, S_AM10, label="S_AM10")
+    lines!(w_hyb_set, S_AM30, label="S_AM30")
+    lines!(w_hyb_set, S_AM100, label="S_AM100")
+    lines!(w_hyb_set, S_AM300, label="S_AM300")
+    lines!(w_hyb_set, S_AM1000, label="S_AM1000")
+    lines!(w_hyb_set, S_AM_Inf, label="S_AM_Inf")
 
-    axislegend(ax, position = :lb)
+    axislegend(ax, position=:lb)
     display(f)
     readline()
-    save("bimodality_vs_w_hyb.png",f)
+    save("bimodality_vs_w_hyb.png", f)
 end
 
 function plot_overlap(outcome_array)
     overlap = [o.population_overlap for o in outcome_array]
     w_hybs = [o.sim_params.w_hyb for o in outcome_array]
-    w_hyb_set = w_hybs[:,1]
+    w_hyb_set = w_hybs[:, 1]
 
-    bimodalities = [0.03370652023677613 0.024946305070918075 0.06148383822296867 0.10675833281965912 0.19267402293567332 0.24024031511034613 0.9731193355652094 1.0; 0.09440867561557216 0.15241135947385948 0.2192175177763413 0.35379104555575147 0.4341897887314404 0.902535093646389 0.9789039918947209 1.0; 
-    0.13095829852408797 0.22420723276215265 0.3144780438859386 0.5245404595404597 0.7694607509460198 0.9567380304880304 0.9889583333333334 1.0; 0.28427350427350423 0.37354166666666666 0.5246138342651501 0.8672146175977445 0.863397762897199 0.9663818637502848 1.0 1.0; 0.3257738095238095 0.6363203463203464 0.6898349567099566 0.8615584135363547 0.9448287509703917 0.9623277437136133 0.9810860363469059 1.0; 0.6489862914862914 0.7934036796536797 0.703974358974359 0.9399837458293341 0.9589244321986257 0.991551724137931 0.9973684210526315 1.0; 0.7641666666666668 0.759238763687293 0.7695021645021646 0.9463677536231885 0.9741421568627452 0.9957272727272727 1.0 1.0; 0.9248239260739262 0.7953571428571429 0.948312728937729 0.963696070382176 0.9861026936026935 1.0 1.0 1.0]
+    bimodalities = [0.03370652023677613 0.024946305070918075 0.06148383822296867 0.10675833281965912 0.19267402293567332 0.24024031511034613 0.9731193355652094 1.0; 0.09440867561557216 0.15241135947385948 0.2192175177763413 0.35379104555575147 0.4341897887314404 0.902535093646389 0.9789039918947209 1.0;
+        0.13095829852408797 0.22420723276215265 0.3144780438859386 0.5245404595404597 0.7694607509460198 0.9567380304880304 0.9889583333333334 1.0; 0.28427350427350423 0.37354166666666666 0.5246138342651501 0.8672146175977445 0.863397762897199 0.9663818637502848 1.0 1.0; 0.3257738095238095 0.6363203463203464 0.6898349567099566 0.8615584135363547 0.9448287509703917 0.9623277437136133 0.9810860363469059 1.0; 0.6489862914862914 0.7934036796536797 0.703974358974359 0.9399837458293341 0.9589244321986257 0.991551724137931 0.9973684210526315 1.0; 0.7641666666666668 0.759238763687293 0.7695021645021646 0.9463677536231885 0.9741421568627452 0.9957272727272727 1.0 1.0; 0.9248239260739262 0.7953571428571429 0.948312728937729 0.963696070382176 0.9861026936026935 1.0 1.0 1.0]
 
     bimodalities = [bimodalities...]
     overlap = [overlap...]
@@ -717,5 +800,5 @@ function plot_overlap(outcome_array)
 
     display(f)
     readline()
-    save("overlap_vs_w_hyb.png",f)
+    save("overlap_vs_w_hyb.png", f)
 end

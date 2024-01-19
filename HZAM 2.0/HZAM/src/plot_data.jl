@@ -3,8 +3,7 @@ module PlotData
 
 export create_population_plot, update_population_plot, create_gene_plot, update_gene_plot
 
-# for plotting:
-import Plots.savefig
+
 #gr()  # use GR backend for graphs
 using Colors, ColorSchemes
 import ColorSchemes.plasma
@@ -24,26 +23,26 @@ global ax
 global points
 
 """
-    create_population_plot(
+    function create_population_plot(
         hybrid_indices_functional::Vector{<:Real},
-        locations::Vector,
+        x_locations::Vector{Float32},
+        y_locations::Vector{Float32},
         save_plot::Bool
     )
 
 Initialize the plot of locations and hybrid indices.
 
 # Arguments
-- `hybrid_indices_functional::Vector`: list of the hybrid index (value between 0 and 1) of 
+- `hybrid_indices_functional::Vector{<:Real}`: list of the hybrid index (value between 0 and 1) of 
 every individual.
-- `locations::Vector`: the location of every individual 
-(must be in the same order as the hybrid indices).
-- `generation::Integer`: the number of elapsed generations.
+- `x_locations::Vector{Float32}`: the x coordinate of every individual. 
+- `y_locations::Vector{Float32}`: the y coordinate of every individual.
 - `save_plot::Bool`: true if the plot is to be saved to a PNG file.
 """
 function create_population_plot(
-    hybrid_indices_functional::Vector,
-    x_locations::Vector,
-    y_locations::Vector,
+    hybrid_indices_functional::Vector{<:Real},
+    x_locations::Vector{Float32},
+    y_locations::Vector{Float32},
     save_plot::Bool
 )
     fontsize_theme = Theme(fontsize=60)

@@ -6,7 +6,7 @@
     intrinsic_R = 1.1
     sigma_comp = 0.01
 
-    pd = PopulationData(K_total,
+    pd = Population.PopulationData(K_total,
         total_loci,
         intrinsic_R,
         sigma_comp)

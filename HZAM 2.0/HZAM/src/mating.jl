@@ -13,7 +13,7 @@ end
 
 """
     choose_closest_male(
-        zones::Matrix{Zone},
+        zones::Matrix{Population.Zone},
         zone_indices::Vector{CartesianIndex{2}},
         elig_M::Dict{CartesianIndex,<:Vector{<:Integer}},
         x_location_mother::Float32,
@@ -28,7 +28,7 @@ Return both the male index and its zone index. Return -1 for both values if
 no eligible male is found.
 
 # Arguments
-- `zones::Matrix{Zone}`: the matrix storing the population data for each zone.
+- `zones::Matrix{Population.Zone}`: the matrix storing the population data for each zone.
 - `zone_indices::Vector{CartesianIndex{2}}`: the indices of the zones to be checked for the closest male.
 - `elig_M::Dict{CartesianIndex,<:Vector{<:Integer}}`: the indices of all the eligible males in each zone.
 - `x_location_mother::Float32`: the x coordinate from which the males' distances are computed.
@@ -36,7 +36,7 @@ no eligible male is found.
 - `neighbourhood_size::Float32`: the distance cutoff for the search.
 """
 function choose_closest_male(
-    zones::Matrix{Zone},
+    zones::Matrix{Population.Zone},
     zone_indices::Vector{CartesianIndex{2}},
     elig_M::Dict{CartesianIndex,<:Vector{<:Integer}},
     x_location_mother::Float32,
@@ -94,8 +94,8 @@ Find the index of the closest male within a single zone from a list of eligible 
 
 # Arguments
 - `elig_M::Vector{<:Integer}`: the indices of all the eligible males.
-- `x_locations_M::Vector{Location}`: the x coordinates of all the males in the zone.
-- `y_locations_M::Vector{Location}`: the x coordinates of all the males in the zone.
+- `x_locations_M::Vector{Float32}`: the x coordinates of all the males in the zone.
+- `y_locations_M::Vector{Float32}`: the x coordinates of all the males in the zone.
 - `x_location_mother::Float32`: the x coordinate from which the males' distances are computed.
 - `y_location_mother::Float32`: the y coordinate from which the males' distances are computed.
 """

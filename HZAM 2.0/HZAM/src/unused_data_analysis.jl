@@ -1,3 +1,4 @@
+import HypothesisTests.EqualVarianceTTest
 """
     SpatialData
 
@@ -559,4 +560,29 @@ function calc_chi_squared(genotypes::Vector{<:Matrix{<:Integer}}, locus::Integer
     return (((n_AA - N * p_A^2)^2) / (N * p_A^2)) +
            (((n_AB - 2 * N * p_A * p_B)^2) / (2 * N * p_A * p_B)) +
            (((n_BB - N * p_B^2)^2) / (N * p_B^2))
+end
+
+function calc_distances_to_middle(genotypes, locations, sigma_disp, loci)
+    locations_x = [l.x for l in locations]
+    locations_y = [l.y for l in locations]
+
+    sorted_indices = sort_y(locations_y)
+
+    function calc_midpoint(locations, genotypes)
+        hybrid_indices = calc_traits_additive(genotypes, loci)
+
+        sigmoid_curve = calc_sigmoid_curve(locations, hybrid_indices)
+
+        return spaced_locations[argmin(abs.(sigmoid_curve .- 0.5))]
+    end
+
+    midpoints = [calc_midpoint(locations_x[i], genotypes[i]) for i in sorted_indices]
+
+    function calc_distance(location)
+        ribbon = Int(ceil(20 * location.y))
+
+        return location.x - midpoints[ribbon]
+    end
+
+    return calc_distance.(locations)
 end

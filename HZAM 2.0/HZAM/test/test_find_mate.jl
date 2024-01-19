@@ -50,10 +50,10 @@ end
     # locations of the zones along an axis
     intervals = collect(0.0f0:0.1f0:0.99f0)
 
-    zones = Matrix{Zone}(undef, 10, 10)
+    zones = Matrix{Population.Zone}(undef, 10, 10)
     for i in 1:10
         for j in 1:10
-            zones[i, j] = Zone(
+            zones[i, j] = Population.Zone(
                 1000,
                 10,
                 intervals[i],
@@ -96,13 +96,13 @@ end
 @testset "choose_closest_male_multiple_zones" begin
     # locations of the zones along an axis
     intervals = collect(0.0f0:0.1f0:0.99f0)
-    zones = Matrix{Zone}(undef, 10, 10)
+    zones = Matrix{Population.Zone}(undef, 10, 10)
 
     for i in 1:10
 
         for i in 1:10
             for j in 1:10
-                zones[i, j] = Zone(
+                zones[i, j] = Population.Zone(
                     1000,
                     10,
                     intervals[i],
@@ -125,7 +125,7 @@ end
         x_locations_F = zones[i, i].x_locations_F
         y_locations_F = zones[i, i].y_locations_F
 
-        zones[i, i] = Zone(
+        zones[i, i] = Population.Zone(
             genotypes_F,
             genotypes_M,
             x_locations_F,
@@ -159,7 +159,7 @@ end
 end
 
 @testset "choose_closest_male_empty_zone" begin
-    zone = Zone(0, 0, 0.0f0, 0.0f0, 0.1f0, 0)
+    zone = Population.Zone(0, 0, 0.0f0, 0.0f0, 0.1f0, 0)
     zones = [zone zone; zone zone]
     elig_M = Dict{CartesianIndex,Vector{Int64}}()
     elig_M[CartesianIndex(1, 1)] = []

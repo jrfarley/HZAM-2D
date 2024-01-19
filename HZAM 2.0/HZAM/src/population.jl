@@ -3,8 +3,6 @@ module Population
 import ..DataAnalysis.calc_traits_additive
 import QuadGK.quadgk
 
-export PopulationData, Zone
-
 "The width of the (square) grid of zones that divides the population into more manageable 
 chunks. Default is 10x10."
 NUM_ZONES = 10
@@ -302,7 +300,7 @@ struct PopulationData
 end
 
 """
-    assign_zone(location::Location)
+    assign_zone(x::Float32, y::Float32)
 
 Determine which zone a location falls in.
 """
@@ -406,7 +404,8 @@ Compute the distance from a point along an angle to the limit of the range
 The distance gets cut off at max_dist. Used in calculating the ideal densities.
 
 # Arguments
-- `location::Location`: the starting location.
+- `x::Float32`: the starting x coordinate
+- `y::Float32`: the starting y coordinate
 - `t::Real`: the angle.
 - `max_dist`: the maximum distance.
 """
@@ -503,19 +502,11 @@ distances above the given cutoff.
 # Example
 
 ```jldoctest
-julia> calc_squared_distances([Location(0.5f0, 0.5f0), Location(0.4f0, 0.4f0), 
-Location(0f0,0f0)], Location(0.5f0, 0.5f0), 0.1)
+julia> calc_squared_distances([0.4f0, 0f0, 0.5f0], [0.4f0, 0f0, 0.5f0],0.1)
 2-element Vector{Float32}:
  0.0
  0.019999998
-```
-```jldoctest
-julia> calc_squared_distances([0.5f0, 0.4f0, 0f0], [0.5f0, 0.4f0, 0f0], 0.5f0, 0.5f0, 0.1)
-2-element Vector{Float32}:
- 0.0
- 0.019999998
-```
- 
+``` 
 """
 function calc_squared_distances(
     x_locations::Vector{Float32},
