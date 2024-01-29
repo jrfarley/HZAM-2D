@@ -10,5 +10,8 @@ using BenchmarkTools
 HZAM.run_HZAM_sets_complete("FIRST POST")
 =#
 
-outcome_array = HZAM.load_overlap_data_from_folder("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/FIRST POST")
-println(outcome_array["full_pleiotropy"])
+@load "output.JLD2" output
+
+println(output.population_overlap)
+
+println(length(output.population_data.genotypes_F))

@@ -107,12 +107,12 @@ An OutputData stores all of the key data from a simulation run.
 - `population_overlap::Real`: the proportion of the range occupied by males of both mating trait phenotypes.
 - `bimodality::Real`: the extent to which phenotypically pure individuals occur in the hybrid zone
 - `population_tracking_data::Vector{PopulationTrackingData}`: the population size, hybridity, overlap, and cline width over time.
+- `overlap::Real`: the proportion of the range where both species occur.
+- `population_data`: the genotypes and locations for all individuals in the simulation.
 """
 struct OutputData
     sim_params::SimParams
-    genotypes::Vector{<:Matrix{<:Integer}}
-    x_locations::Vector{Float32}
-    y_locations::Vector{Float32}
+    population_data
     hybrid_zone_width::Real
     population_overlap::Real
     bimodality::Real
@@ -125,7 +125,8 @@ struct OutputData
         male_mating_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
         sim_params::SimParams,
         pop_track_data::Vector{PopulationTrackingData},
-        overlap::Real
+        overlap::Real,
+        population_data
     )
         mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
@@ -144,9 +145,7 @@ struct OutputData
 
         new(
             sim_params,
-            genotypes,
-            x_locations,
-            y_locations,
+            population_data,
             mmt_cline_width,
             overlap,
             bimodality,

@@ -11,10 +11,10 @@ global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
 
 
 "The set of hybrid fitnesses (w_hyb) values that will be run"
-global w_hyb_set = [1, 0.95, 0.9, 0.8, 0.75, 0.6, 0.5, 0.3, 0.0]
+global w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
 
 "The set of assortative mating strengths (S_AM) values that will be run"
-global S_AM_set = [1, 3, 10, 30, 100, 300, 500, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
 
 struct OverlapData
@@ -31,11 +31,11 @@ function run_HZAM_sets_complete(trial_name::String)
     female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
     male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
     hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
-    per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.01, 0.05, 0.05]
+    per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
 
     set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
 
-    for i in 1:5
+    for i in 1:length(set_names)
         run_HZAM_set(
             set_names[i],
             total_loci[i],
@@ -54,8 +54,12 @@ end
 
 """
     run_HZAM_set(
-        set_name::String, 
-        intrinsic_R::Real; 
+        set_name::String,
+        total_loci::Int=3,
+        female_mating_trait_loci=1:3,
+        male_mating_trait_loci=1:3,
+        hybrid_survival_loci=1:3,
+        per_reject_cost::Real=0; 
         <keyword arguments>
     )
 

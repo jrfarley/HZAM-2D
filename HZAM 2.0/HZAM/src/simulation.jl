@@ -22,8 +22,8 @@ Run a single HZAM simulation.
 - `hybrid_survival_loci=1:3`: the loci specifying the probability of survival to adulthood.
 - `survival_fitness_method:String="epistasis"`: the method used to calculate the probability of survival to adulthood.
 - `per_reject_cost=0`: the fitness loss of female per male rejected (due to search time, etc.). Can take values of 0 to 1.
-- `sigma_disp=0.05`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
-- `sigma_comp=0.01`: the standard deviation for the normal curve used in calculating local density.
+- `sigma_disp::Float32=0.05f0`: the standard deviation of the normal distribution determining how far offspring will disperse from their mothers.
+- `sigma_comp::Float32=0.01f0`: the standard deviation for the normal curve used in calculating local density.
 - `do_plot=true`: the program will display a plot of the locations and hybrid indices of every individual while the simulation is running if this is true.
 - `plot_int=10`: the interval (measured in generations) between updating the plot.
 - `gene_plot=false`: if true, generates phenotype plots.
@@ -34,9 +34,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     # the semicolon makes the following optional keyword arguments  
     K_total::Integer=40000, max_generations::Integer=1000,
     total_loci::Integer=6, female_mating_trait_loci=1:3, male_mating_trait_loci=1:3,
-    hybrid_survival_loci=1:3, survival_fitness_method::String="epistasis", 
-    per_reject_cost=0, sigma_disp=0.03,
-    sigma_comp=0.01, do_plot=true, plot_int=10, gene_plot=false, save_plot=false,
+    hybrid_survival_loci=1:3, survival_fitness_method::String="epistasis",
+    per_reject_cost=0, sigma_disp=0.03f0,
+    sigma_comp=0.01f0, do_plot=true, plot_int=10, gene_plot=false, save_plot=false,
     track_population_data=false)
 
     population_tracking_data = DataAnalysis.PopulationTrackingData[]
@@ -97,8 +97,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 
 
     #=
-    Generate the starting genotypes/locations and calculate the growth rates based on 
-    individual resource use for all individuals in the simulation.
+    Generate the starting genotypes/locations and calculate the growth rates 
+    for all individuals in the simulation.
     =#
     pd = Population.PopulationData(
         K_total,
@@ -135,33 +135,22 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         end
     end
 
+    zone_cartesian_indices = CartesianIndex(1, 1):CartesianIndex(NUM_ZONES, NUM_ZONES)
 
     # loop through the generations
     for generation in 1:max_generations
 
         # set up empty matrices to store the offspring data
-        genotypes_daughters_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_ZONES, NUM_ZONES)
-        genotypes_sons_all = Matrix{Vector{Matrix{Int8}}}(undef, NUM_ZONES, NUM_ZONES)
-        x_locations_daughters_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
-        y_locations_daughters_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
-        x_locations_sons_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
-        y_locations_sons_all = Matrix{Vector{Float32}}(undef, NUM_ZONES, NUM_ZONES)
-        offspring_per_parent_F = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
-        offspring_per_parent_M = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
+        genotypes_daughters_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
+        genotypes_sons_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
+        x_locations_daughters_all = [Float32[] for i in zone_cartesian_indices]
+        y_locations_daughters_all = [Float32[] for i in zone_cartesian_indices]
+        x_locations_sons_all = [Float32[] for i in zone_cartesian_indices]
+        y_locations_sons_all = [Float32[] for i in zone_cartesian_indices]
+        #offspring_per_parent_F = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
+        #offspring_per_parent_M = Matrix{Vector{Integer}}(undef, NUM_ZONES, NUM_ZONES)
 
-        # fill all the matrices with empty vectors
-        for i in eachindex(genotypes_daughters_all)
-            genotypes_daughters_all[i] = Matrix{Int8}[]
-            genotypes_sons_all[i] = Matrix{Int8}[]
-            x_locations_daughters_all[i] = Float32[]
-            y_locations_daughters_all[i] = Float32[]
-            x_locations_sons_all[i] = Float32[]
-            y_locations_sons_all[i] = Float32[]
-            offspring_per_parent_F[i] = zeros(length(pd.population[i].x_locations_F))
-            offspring_per_parent_M[i] = zeros(length(pd.population[i].x_locations_M))
-        end
-
-        for zone_index in eachindex(IndexCartesian(), pd.population)
+        for zone_index in zone_cartesian_indices
             # prepare for mating and reproduction
 
             zone = pd.population[zone_index]
@@ -172,7 +161,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                 # initialize tracking variables
                 mate = false # becomes true when female is paired with male
                 rejects = 0 # will track number of rejected males 
-                father = [] # will contain the index of the male mate
+                father = missing # will contain the index of the male mate
 
 
                 #=
@@ -186,10 +175,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                 end
 
                 # set a distance cutoff on the search for a mate
-                neighbourhood_size = 0.02f0
+                neighbourhood_size::Float32 = sigma_comp
 
 
-                while mate == false && neighbourhood_size < 0.1
+                while mate == false && neighbourhood_size < 4*sigma_comp
 
                     #=
                     Find the index for the zone that's the neighbourhood size away 
@@ -227,7 +216,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                     increase the neighbourhood size by 0.01 to look for males further away.
                     =#
                     if length(neighbourhood) == 0
-                        neighbourhood_size += 0.04f0
+                        neighbourhood_size += sigma_comp
                         continue
                     end
 
@@ -283,14 +272,14 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                         end
                     end
                     # increase the neighbourhood size to look for males further away
-                    neighbourhood_size += 0.01f0
+                    neighbourhood_size += sigma_comp
                 end
 
                 #=
                 Now draw the number of offspring from a poisson distribution with a mean 
                 value of the reproductive_fitness.
                 =#
-                if !isempty(father)
+                if !ismissing(father)
                     # determine fitness cost due to mate search (number of rejected males)
                     search_fitness = (1 - per_reject_cost)^rejects # typically equals 1
 
@@ -316,8 +305,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                             )
 
                             if survival_fitness > rand()
-                                offspring_per_parent_F[zone_index][mother] += 1
-                                offspring_per_parent_M[father_zone][father] += 1
+                                #offspring_per_parent_F[zone_index][mother] += 1
+                                #offspring_per_parent_M[father_zone][father] += 1
 
                                 # generate offspring location
                                 x, y = Population.new_location(
@@ -387,22 +376,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                     save_plot
                 )
             end
-
-
-
-            if generation % 100 == 0
-                #mmt_hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, male_mating_trait_loci)
-
-                overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)
-
-                println("generation: ", generation, "; overlap: ", overlap)
-                #sigmoid_curves = DataAnalysis.calc_sigmoid_curves(locations, mmt_hybrid_indices)
-                #mmt_cline_width = DataAnalysis.average_width(sigmoid_curves)
-                #println("generation: ", generation, "; width: ", DataAnalysis.average_width(sigmoid_curves))
-            end
-
-
-
         end
 
         if track_population_data
@@ -465,7 +438,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         male_mating_trait_loci,
         parameters,
         population_tracking_data,
-        overlap
+        overlap,
+        pd
     )
 
     return output

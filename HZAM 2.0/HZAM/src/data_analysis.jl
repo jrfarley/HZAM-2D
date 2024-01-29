@@ -1,6 +1,5 @@
 "Types and functions used for analyzing data produced by the simulation."
 module DataAnalysis
-export OutputData, SimParams, PopulationTrackingData
 
 using LsqFit: curve_fit
 using Statistics: mean
