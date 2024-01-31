@@ -11,10 +11,10 @@ global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
 
 
 "The set of hybrid fitnesses (w_hyb) values that will be run"
-global w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+global w_hyb_set = [1, 0.98]#, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
 
 "The set of assortative mating strengths (S_AM) values that will be run"
-global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+global S_AM_set = [1, 3]#, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
 
 struct OverlapData
@@ -36,13 +36,16 @@ function run_HZAM_sets_complete(trial_name::String)
     set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
 
     for i in 1:length(set_names)
+        println(set_names[i])
         run_HZAM_set(
             set_names[i],
             total_loci[i],
             female_mating_trait_loci[i],
             male_mating_trait_loci[i],
             hybrid_survival_loci[i],
-            per_reject_cost[i]
+            per_reject_cost[i];
+            max_generations = 10,
+            K_total = 10000
         )
         println("--------------------")
         println(string(set_names[i], " completed successfully!"))
@@ -103,7 +106,7 @@ function run_HZAM_set(
             run_name = string("HZAM_animation_run", "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
 
             # run one simulation by calling the function defined above:
-            outcome = run_one_HZAM_sim(
+            outcome, fig = run_one_HZAM_sim(
                 w_hyb,
                 S_AM,
                 intrinsic_R;
@@ -121,6 +124,8 @@ function run_HZAM_set(
 
             filename = string(dir, "/", run_name, ".jld2")
             @save filename outcome
+
+            save(string(dir, "/", run_name, ".png"), fig)
 
             println(run_name, "  completed.")
             outcome_array[i, j] = outcome

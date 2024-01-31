@@ -77,6 +77,7 @@ function create_population_plot(
 
     display(fig)
 
+    return fig
 end
 
 """

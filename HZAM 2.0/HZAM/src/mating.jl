@@ -1,6 +1,6 @@
 "Functions involved in mate selection and generating the offspring genotype."
 module Mating
-using ..Population
+import ..Population
 
 """
     distance(x1::Float32, y1::Float32, x2::Float32, y2::Float32)

@@ -178,7 +178,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                 neighbourhood_size::Float32 = sigma_comp
 
 
-                while mate == false && neighbourhood_size < 4*sigma_comp
+                while mate == false && neighbourhood_size <= Float32(1/(2*Population.NUM_ZONES))
 
                     #=
                     Find the index for the zone that's the neighbourhood size away 
@@ -441,7 +441,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         overlap,
         pd
     )
+    fig = PlotData.create_population_plot(
+        DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
+        x_locations,
+        y_locations,
+        false
+    )
 
-    return output
+    return output, fig
 end # of module
 
