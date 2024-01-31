@@ -11,10 +11,10 @@ global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
 
 
 "The set of hybrid fitnesses (w_hyb) values that will be run"
-global w_hyb_set = [1, 0.98]#, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+global w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
 
 "The set of assortative mating strengths (S_AM) values that will be run"
-global S_AM_set = [1, 3]#, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
+global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
 
 
 struct OverlapData
@@ -44,8 +44,6 @@ function run_HZAM_sets_complete(trial_name::String)
             male_mating_trait_loci[i],
             hybrid_survival_loci[i],
             per_reject_cost[i];
-            max_generations = 10,
-            K_total = 10000
         )
         println("--------------------")
         println(string(set_names[i], " completed successfully!"))
