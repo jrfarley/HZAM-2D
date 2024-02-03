@@ -11,7 +11,7 @@ include("plot_data.jl")
 import .DataAnalysis
 import .Mating
 import .Population.NUM_ZONES
-
+using Distributed
 import .PlotData
 import .Population
 

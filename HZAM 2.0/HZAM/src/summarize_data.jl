@@ -40,7 +40,7 @@ function run_HZAM_sets_complete(trial_name::String;
 
     set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
     println(nprocs())
-    @sync @distributed for i in 1:4#length(set_names)
+    @async @distributed for i in 1:length(set_names)
         println(set_names[i])
         run_HZAM_set(
             set_names[i],
