@@ -378,6 +378,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
             end
         end
 
+        if generation % 100 == 0 
+            println("generation: $generation")
+        end
+
         if track_population_data
             genotypes = [
                 vcat([d.genotypes_F for d in pd.population]...)
@@ -448,6 +452,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         false
     )
 
-    return output, fig
+    return output
 end # of module
 

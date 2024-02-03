@@ -75,7 +75,7 @@ function create_population_plot(
         save(string(dir, "/", 1, ".png"), fig)
     end
 
-    display(fig)
+    #display(fig)
 
     return fig
 end

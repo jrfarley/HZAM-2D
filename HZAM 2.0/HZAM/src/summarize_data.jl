@@ -6,6 +6,7 @@ using JLD2 # needed for saving / loading data in Julia format
 using CSV # for saving in csv format
 using DataFrames # for converting data to save as CSV
 
+
 "The directory where all files are saved"
 global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
 
@@ -23,7 +24,11 @@ struct OverlapData
     bimodality::Real
 end
 
-function run_HZAM_sets_complete(trial_name::String)
+function run_HZAM_sets_complete(trial_name::String; 
+    w_hyb_set_of_run=w_hyb_set, 
+    S_AM_set_of_run=S_AM_set, 
+    max_generations=1000,
+    K_total = 40000)
     set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
         "separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
         "low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
@@ -34,8 +39,8 @@ function run_HZAM_sets_complete(trial_name::String)
     per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
 
     set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
-
-    for i in 1:length(set_names)
+    println(nprocs())
+    @sync @distributed for i in 1:4#length(set_names)
         println(set_names[i])
         run_HZAM_set(
             set_names[i],
@@ -43,7 +48,11 @@ function run_HZAM_sets_complete(trial_name::String)
             female_mating_trait_loci[i],
             male_mating_trait_loci[i],
             hybrid_survival_loci[i],
-            per_reject_cost[i];
+            per_reject_cost[i],
+            w_hyb_set_of_run,
+            S_AM_set_of_run;
+            max_generations,
+            K_total
         )
         println("--------------------")
         println(string(set_names[i], " completed successfully!"))
@@ -82,29 +91,28 @@ store the outcome of each simulation in a JLD2 file.
 """
 function run_HZAM_set(
     set_name::String,
-    total_loci::Int=3,
-    female_mating_trait_loci=1:3,
-    male_mating_trait_loci=1:3,
-    hybrid_survival_loci=1:3,
-    per_reject_cost::Real=0;  # the semicolon makes the following optional keyword arguments 
+    total_loci::Int,
+    female_mating_trait_loci,
+    male_mating_trait_loci,
+    hybrid_survival_loci,
+    per_reject_cost,
+    w_hyb_set,
+    S_AM_set; 
     intrinsic_R::Real=1.1, K_total::Int=40000, max_generations::Int=1000,
     survival_fitness_method::String="epistasis", sigma_disp=0.03
 )
-    # set up array of strings to record outcomes
-    outcome_array = Array{DataAnalysis.OutputData,2}(undef, length(w_hyb_set), length(S_AM_set))
-
     dir = mkpath(string(results_folder, "/", set_name))
 
     # Loop through the different simulation sets
-    Threads.@threads for i in eachindex(w_hyb_set)
+    for i in eachindex(w_hyb_set)
         for j in eachindex(S_AM_set)
             w_hyb = w_hyb_set[i]
             S_AM = S_AM_set[j]
 
-            run_name = string("HZAM_animation_run", "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
-
+            run_name = string("HZAM_simulation_run", "_gen", max_generations, "_SC", per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM)
+            println("Beginning: $run_name")
             # run one simulation by calling the function defined above:
-            outcome, fig = run_one_HZAM_sim(
+            outcome = run_one_HZAM_sim(
                 w_hyb,
                 S_AM,
                 intrinsic_R;
@@ -119,18 +127,12 @@ function run_HZAM_set(
                 sigma_disp,
                 do_plot=false
             )
+            println("Ending: $run_name")
 
             filename = string(dir, "/", run_name, ".jld2")
             @save filename outcome
-
-            save(string(dir, "/", run_name, ".png"), fig)
-
-            println(run_name, "  completed.")
-            outcome_array[i, j] = outcome
         end # of S_AM loop
     end # of w_hyb loop   
-
-    return outcome_array
 end
 
 """
