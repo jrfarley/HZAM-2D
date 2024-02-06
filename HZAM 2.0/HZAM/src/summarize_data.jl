@@ -54,7 +54,7 @@ function run_HZAM_sets_complete(trial_name::String;
             male_mating_trait_loci[i],
             hybrid_survival_loci[i],
             per_reject_cost[i],
-            w_hyb_set_of_run,
+            w_hyb_sets[i],
             S_AM_set_of_run;
             max_generations,
             K_total
