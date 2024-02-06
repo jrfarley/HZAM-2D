@@ -21,6 +21,7 @@ end
 
 
 
-@time HZAM.run_HZAM_sets_complete(
-    "Run1_02Feb2024"
+HZAM.run_HZAM_sets_complete(
+    "Run1_02Feb2024",
+    set_numbers=[1,2,3,8,9]
 )

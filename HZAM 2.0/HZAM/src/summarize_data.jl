@@ -14,9 +14,13 @@ global results_folder = "HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes"
 "The set of hybrid fitnesses (w_hyb) values that will be run"
 global w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
 
+
+global w_hyb_sets = fill(w_hyb_set, 13)
+global w_hyb_sets[1] = w_hyb_set[5:13]
+global w_hyb_sets[8] = w_hyb_set[12:13]
+
 "The set of assortative mating strengths (S_AM) values that will be run"
 global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
-
 
 struct OverlapData
     cline_width::Real
@@ -24,11 +28,13 @@ struct OverlapData
     bimodality::Real
 end
 
-function run_HZAM_sets_complete(trial_name::String; 
-    w_hyb_set_of_run=w_hyb_set, 
-    S_AM_set_of_run=S_AM_set, 
+
+function run_HZAM_sets_complete(trial_name::String;
+    set_numbers = 1:13,
+    w_hyb_set_of_run=w_hyb_set,
+    S_AM_set_of_run=S_AM_set,
     max_generations=1000,
-    K_total = 40000)
+    K_total=40000)
     set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
         "separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
         "low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
@@ -40,8 +46,7 @@ function run_HZAM_sets_complete(trial_name::String;
 
     set_results_folder(string("HZAM_Sym_Julia_results_GitIgnore/simulation_outcomes/", trial_name))
     println(nprocs())
-    @async @distributed for i in 1:length(set_names)
-        println(set_names[i])
+    for i in set_numbers
         run_HZAM_set(
             set_names[i],
             total_loci[i],
@@ -97,7 +102,7 @@ function run_HZAM_set(
     hybrid_survival_loci,
     per_reject_cost,
     w_hyb_set,
-    S_AM_set; 
+    S_AM_set;
     intrinsic_R::Real=1.1, K_total::Int=40000, max_generations::Int=1000,
     survival_fitness_method::String="epistasis", sigma_disp=0.03
 )
