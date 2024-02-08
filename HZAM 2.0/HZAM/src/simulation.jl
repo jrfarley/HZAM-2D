@@ -445,13 +445,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         overlap,
         pd
     )
-    fig = PlotData.create_population_plot(
-        DataAnalysis.calc_traits_additive(genotypes, functional_loci_range),
-        x_locations,
-        y_locations,
-        false
-    )
-
     return output
 end # of module
 
