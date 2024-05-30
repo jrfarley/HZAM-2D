@@ -71,13 +71,18 @@ struct PopulationTrackingData
     hybridity::Real
     overlap::Base.Real
     width::Real
+    num_offspring_A::Vector{<:Tuple}
+    num_offspring_B::Vector{<:Tuple}
+
 
     function PopulationTrackingData(
         genotypes::Vector{<:Matrix{<:Integer}},
         x_locations::Vector{Float32},
         y_locations::Vector{Float32},
         male_mating_trait_loci::Union{UnitRange{<:Integer},Vector{<:Integer}},
-        overlap::Real
+        overlap::Real,
+        num_offspring_A::Vector{Tuple},
+        num_offspring_B::Vector{Tuple}
     )
         mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
 
@@ -88,7 +93,7 @@ struct PopulationTrackingData
 
         hybridity = mean(map(x -> 1 - 2 * abs(x - 0.5), mmt_hybrid_indices))
 
-        new(population_size, hybridity, overlap, mmt_cline_width)
+        new(population_size, hybridity, overlap, mmt_cline_width, num_offspring_A, num_offspring_B)
     end
 end
 

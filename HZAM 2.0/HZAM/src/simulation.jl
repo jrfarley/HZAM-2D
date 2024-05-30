@@ -40,8 +40,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     track_population_data=false)
 
     population_tracking_data = DataAnalysis.PopulationTrackingData[]
+    phenotype_counts = []
 
     overall_loci_range = collect(1:total_loci)
+
 
     # list of loci specifying the phenotype
     functional_loci_range = union(
@@ -140,6 +142,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
     # loop through the generations
     for generation in 1:max_generations
 
+        num_offspring_A = Vector{Tuple}(undef, 0)
+        num_offspring_B = Vector{Tuple}(undef, 0)
+
         # set up empty matrices to store the offspring data
         genotypes_daughters_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
         genotypes_sons_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
@@ -178,7 +183,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                 neighbourhood_size::Float32 = sigma_comp
 
 
-                while mate == false && neighbourhood_size <= Float32(1/(2*Population.NUM_ZONES))
+                while mate == false && neighbourhood_size <= Float32(1 / (2 * Population.NUM_ZONES))
 
                     #=
                     Find the index for the zone that's the neighbourhood size away 
@@ -290,6 +295,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                                            search_fitness
 
                     offspring = rand(Poisson(reproductive_fitness))
+                    num_offspring = 0
 
                     # if there are offspring, generate their genotypes and sexes
                     if offspring >= 1
@@ -305,8 +311,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                             )
 
                             if survival_fitness > rand()
-                                #offspring_per_parent_F[zone_index][mother] += 1
-                                #offspring_per_parent_M[father_zone][father] += 1
+                                if track_population_data
+                                    num_offspring += 1
+                                end
 
                                 # generate offspring location
                                 x, y = Population.new_location(
@@ -328,8 +335,35 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                                     push!(x_locations_sons_all[kid_zone], x)
                                     push!(y_locations_sons_all[kid_zone], y)
                                 end
-                                #end
                             end
+                        end
+
+                        if track_population_data
+                            mother_phenotype = DataAnalysis.calc_traits_additive(
+                                [zone.genotypes_F[mother]],
+                                male_mating_trait_loci
+                            )[1]
+
+                            if mother_phenotype ≈ 0
+                                push!(
+                                    num_offspring_A,
+                                    (
+                                        zone.x_locations_F[mother],
+                                        zone.y_locations_F[mother],
+                                        num_offspring
+                                    )
+                                )
+                            elseif mother_phenotype ≈ 1
+                                push!(
+                                    num_offspring_B,
+                                    (
+                                        zone.x_locations_F[mother],
+                                        zone.y_locations_F[mother],
+                                        num_offspring
+                                    )
+                                )
+                            end
+
                         end
                     end
                 end
@@ -376,12 +410,15 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                     save_plot
                 )
             end
+            overlap = Population.calc_species_overlap(
+                pd.population,
+                0.1,
+                sigma_comp,
+                male_mating_trait_loci
+            )[1]
+            println("overlap: $overlap")
         end
-
-        if generation % 100 == 0 
-            println("generation: $generation")
-        end
-
+        println("generation: $generation")
         if track_population_data
             genotypes = [
                 vcat([d.genotypes_F for d in pd.population]...)
@@ -397,11 +434,27 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
                 vcat([d.y_locations_M for d in pd.population]...)
             ]
 
-            overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)
+            push!(
+                phenotype_counts,
+                DataAnalysis.count_phenotypes_at_loci(
+                    genotypes,
+                    male_mating_trait_loci
+                )
+            )
+
+            overlap = Population.calc_species_overlap(pd.population, 0.03, sigma_comp, male_mating_trait_loci)[1]
 
             push!(
                 population_tracking_data,
-                DataAnalysis.PopulationTrackingData(genotypes, locations, male_mating_trait_loci, overlap)
+                DataAnalysis.PopulationTrackingData(
+                    genotypes,
+                    x_locations,
+                    y_locations,
+                    male_mating_trait_loci,
+                    overlap,
+                    num_offspring_A,
+                    num_offspring_B
+                )
             )
         end
     end # of loop through generations
@@ -442,9 +495,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
         male_mating_trait_loci,
         parameters,
         population_tracking_data,
-        overlap,
+        overlap[1],
         pd
     )
-    return output
+    return output, phenotype_counts
 end # of module
 

@@ -335,13 +335,21 @@ function calc_species_overlap(
     sigma_comp::Real,
     loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
 )
-    min_proportion = 0.05
+    min_proportion = 0.1
     spaced_locations = collect(0.0f0:0.01f0:0.09f0)
     num_overlap = 0
+    num_hybrid = 0
+    num_A = 0
+    num_B = 0
 
     function overlap_at_point(density_A, density_B, total_density)
         return density_A > total_density * min_proportion &&
                density_B > total_density * min_proportion
+    end
+
+    function hybrid_at_point(density_A, density_B, total_density)
+        hybrid_density = total_density - density_A - density_B
+        return hybrid_density > total_density * min_proportion
     end
 
     for i in 0:9
@@ -388,10 +396,25 @@ function calc_species_overlap(
                 i -> overlap_at_point(density_A[i], density_B[i], total_density[i]),
                 eachindex(locations_x)
             )
+
+            num_hybrid += count(
+                i -> hybrid_at_point(density_A[i], density_B[i], total_density[i]),
+                eachindex(locations_x)
+            )
+
+            num_A += count(
+                i -> density_A[i] > total_density[i]*min_proportion,
+                eachindex(locations_x) 
+            )
+
+            num_B += count(
+                i -> density_B[i] > total_density[i]*min_proportion,
+                eachindex(locations_x) 
+            )
         end
     end
 
-    return num_overlap / 100^2
+    return num_overlap / 100^2, num_hybrid / 100^2, num_A / 100^2, num_B / 100^2
 end
 
 

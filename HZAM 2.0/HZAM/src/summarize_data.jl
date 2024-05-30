@@ -16,8 +16,6 @@ global w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 
 
 
 global w_hyb_sets = fill(w_hyb_set, 13)
-global w_hyb_sets[1] = w_hyb_set[5:13]
-global w_hyb_sets[8] = w_hyb_set[12:13]
 
 "The set of assortative mating strengths (S_AM) values that will be run"
 global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]  # ratio of: probably of accepting homospecific vs. prob of accepting heterospecific
@@ -30,7 +28,7 @@ end
 
 
 function run_HZAM_sets_complete(trial_name::String;
-    set_numbers = 1:13,
+    set_numbers=1:13,
     w_hyb_set_of_run=w_hyb_set,
     S_AM_set_of_run=S_AM_set,
     max_generations=1000,
@@ -171,11 +169,11 @@ function plot_output_field(
 
     w_hyb_set = sort(union(w_hybs))
     S_AM_set = sort(union(S_AMs))
-    xticks = collect(1:length(w_hyb_set))
-    yticks = collect(1:length(S_AM_set))
+    xticks = collect(1:length(S_AM_set))
+    yticks = collect(1:length(w_hyb_set))
 
-    xs = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
-    ys = map(s -> indexin(s, S_AM_set)[1], S_AMs)
+    xs = map(s -> indexin(s, S_AM_set)[1], S_AMs)
+    ys = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
 
 
     fontsize_theme = Theme(fontsize=25)
@@ -187,8 +185,8 @@ function plot_output_field(
         fig[1, 1],
         xlabel="w_hyb",
         ylabel="S_AM",
-        xticks=(xticks, string.(w_hyb_set)),
-        yticks=(yticks, string.(S_AM_set)),
+        xticks=(xticks, string.(S_AM_set)),
+        yticks=(yticks, string.(w_hyb_set)),
         xticklabelsize=20,
         yticklabelsize=20,
         xlabelsize=15,
@@ -210,8 +208,6 @@ organized by hybrid fitness and assortative mating strength.
 """
 function load_from_folder(dir::String)
     files = readdir(dir)
-    w_hyb_set = [1, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]
-    S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]
     outcome_array = Array{DataAnalysis.OutputData,2}(
         undef, length(w_hyb_set), length(S_AM_set)
     )
@@ -219,6 +215,7 @@ function load_from_folder(dir::String)
         path = string(dir, "/", file)
         if occursin(".jld2", path)
             @load path outcome
+            println(outcome.sim_params)
             outcome_array[
                 indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
                 indexin(outcome.sim_params.S_AM, S_AM_set)[1]
@@ -533,7 +530,7 @@ frequencies over time.
 # Arguments
 - `filename="phenotype_frequencies"`: the name for the saved plot image.
 """
-function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
+function plot_phenotypes(phenotypes; filename="phenotype_frequencies1")
     ylabels = ["Mating preference", "Mating cue", "Hybrid survival trait"]
     function calc_proportion(dict)
         return_dict = Dict(collect(keys(dict)) .=> Float32.(collect(values(dict))))
@@ -542,32 +539,31 @@ function plot_phenotypes(phenotypes; filename="phenotype_frequencies")
         map!(x -> x / sum_counts, values(return_dict))
         return return_dict
     end
-    function plot_phenotypes_at_loci(loci, ax)
-        proportions = [calc_proportion(p[loci]) for p in phenotypes]
-        generations = collect(eachindex(proportions))
-        num_phenotypes = length(proportions[1])
-        xs = vcat([fill(gen, num_phenotypes) for gen in generations]...)
-        ys = vcat([collect(keys(p)) for p in proportions]...)
-        zs = vcat([collect(values(p)) for p in proportions]...)
-        return heatmap!(ax, xs, ys, zs)
-    end
 
     fig = Figure(resolution=(1800, 1200), figure_padding=60, colormap=:grayC)
-    ax = Vector(undef, 3)
-    hm = Vector(undef, 3)
 
-    for i in 1:3
-        ax[i] = Axis(fig[i, 1], xlabel="generation", ylabel=ylabels[i])
+    ax = Axis(fig, xlabel="generation", ylabel="Mating cue")
+    
+    proportions = [calc_proportion(p) for p in phenotypes]
+    generations = collect(eachindex(proportions))
+    num_phenotypes = length(proportions[1])
+    output = Matrix(undef, num_phenotypes, length(proportions))
+
+    for i in eachindex(proportions)
+        for j in collect(keys(proportions[1]))
+            phenotype = Int(round(j)*6)+1
+            output[phenotype, i] = proportions[i][j]
+        end
     end
+    println(output)
+    heatmap!(ax, output)
 
-    hm[1] = plot_phenotypes_at_loci(:female_mating_trait, ax[1])
-    hm[2] = plot_phenotypes_at_loci(:male_mating_trait, ax[2])
-    hm[3] = plot_phenotypes_at_loci(:hybrid_survival, ax[3])
+
     display(fig)
+    readline()
 
     dir = mkpath(string(results_folder, "/plots/"))
     save(string(dir, filename, ".png"), fig)
-    readline()
 end
 
 function plot_hybrid_index(hybrid_indices)
@@ -599,32 +595,35 @@ end
 
 function make_subplot(outcome_array, plot_title)
     sim_params = [o.sim_params for o in outcome_array]
-    bimodality = [o.bimodality for o in outcome_array]
-    cline_width = [o.hybrid_zone_width for o in outcome_array]
-    overlap = [o.population_overlap for o in outcome_array]
 
-    output = copy(cline_width)
-
-    for i in eachindex(bimodality)
-        if bimodality[i] > 0.95 && overlap[i] > 0.1
-            mmt_hybrid_indices = calc_traits_additive(genotypes, male_mating_trait_loci)
-
-            overlap = calc_overlap(mmt_hybrid_indices, locations, 0.01)
-            output[i] = -
+    function assign_output_value(outcome)
+        overlap_area, hybrid_area = Population.calc_species_overlap(
+            outcome.population_data.population,
+            0.03,
+            0.01,
+            outcome.sim_params.male_mating_trait_loci
+        )
+        if overlap_area > hybrid_area && overlap_area > 0.1
+            return 0-overlap_area
+        else
+            return outcome.hybrid_zone_width
         end
     end
 
-    output = [output...]
+    output = [assign_output_value(outcome) for outcome in outcome_array]
+
+    println(output)
+
+    w_hyb_set = sort([1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0])
+    
     w_hybs = [[s.w_hyb for s in sim_params]...]
     S_AMs = [[s.S_AM for s in sim_params]...]
-
-    w_hyb_set = sort(union(w_hybs))
-    S_AM_set = sort(union(S_AMs))
     xticks = collect(1:length(S_AM_set))
     yticks = collect(1:length(w_hyb_set))
 
     xs = map(s -> indexin(s, S_AM_set)[1], S_AMs)
     ys = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
+    output = [output...]
 
     fontsize_theme = Theme(fontsize=25)
     set_theme!(fontsize_theme)  # this sets the standard font size
@@ -636,8 +635,8 @@ function make_subplot(outcome_array, plot_title)
         title=plot_title,
         xlabel="S_AM",
         ylabel="w_hyb",
-        xticks=(yticks, string.(S_AM_set)),
-        yticks=(xticks, string.(w_hyb_set)),
+        xticks=(xticks, string.(S_AM_set)),
+        yticks=(yticks, string.(w_hyb_set)),
         xticklabelsize=20,
         yticklabelsize=20,
         xlabelsize=15,
@@ -648,9 +647,8 @@ function make_subplot(outcome_array, plot_title)
 
     Colorbar(fig[:, 2], hm, ticklabelsize=15)
     display(fig)
-
-    readline()
     save(string(plot_title, ".png"), fig)
+    display(fig)
     return fig
 end
 

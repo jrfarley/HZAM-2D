@@ -5,5 +5,5 @@ using LsqFit: curve_fit
 using Statistics: mean
 
 include("used_data_analysis.jl")
-#include("unused_data_analysis.jl")
+include("unused_data_analysis.jl")
 end

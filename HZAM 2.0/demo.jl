@@ -7,16 +7,15 @@ using Plots
 using BenchmarkTools
 
 #takes about  1000 s
-@time HZAM.run_one_HZAM_sim(0.95, 500, 1.1; # these values are 
+outcome, phenotype_counts = HZAM.run_one_HZAM_sim(0.5, 300, 1.3; # these values are 
     # hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-    K_total=40000, max_generations=1000,
-    do_plot=false, plot_int=10,
-    total_loci=12,
-    female_mating_trait_loci=1:3,
-    male_mating_trait_loci=4:6,
-    hybrid_survival_loci=7:9,
+    K_total=30000, max_generations=1000,
+    do_plot=true, plot_int=10,
+    total_loci=6,
+    female_mating_trait_loci=1:6,
+    male_mating_trait_loci=1:6,
+    hybrid_survival_loci=1:6,
     per_reject_cost=0,
-    gene_plot=false,
-    save_plot=false,
-    track_population_data=false
+    sigma_disp=0.03
 )
+
