@@ -27,7 +27,7 @@ Manifest.toml
 .DS_Store
 **/.DS_Store
 
-
+# Files and folders intended for local use
 *git_ignore.jl
 *GitIgnore.jl
 *_GitIgnore/
