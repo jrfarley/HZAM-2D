@@ -1,3 +1,4 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "julia.environmentPath": "d:\\Documents\\GitHub\\HZAM-J\\HZAM 2.0\\HZAM"
 }

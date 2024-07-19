@@ -27,7 +27,7 @@ using Random
         x_locations_M = Float32.(rand(1000) .* Ref(0.4))
         y_locations_M = Float32.(rand(1000) .* Ref(0.4) .+ Ref(0.55))
 
-        i = Int(round(rand() * 1000))
+        i = min(Int(round(rand() * 1000)), 1)
 
         x_locations_M[i] = male_x
         y_locations_M[i] = male_y

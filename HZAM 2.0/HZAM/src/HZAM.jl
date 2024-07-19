@@ -11,9 +11,10 @@ include("plot_data.jl")
 import .DataAnalysis
 import .Mating
 import .Population.NUM_ZONES
-using Distributed
 import .PlotData
 import .Population
+using Distributed
+using JLD2
 
 include("simulation.jl") # main function for running a simulation
 include("summarize_data.jl")

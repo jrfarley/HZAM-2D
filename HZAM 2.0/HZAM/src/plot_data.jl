@@ -71,7 +71,7 @@ function create_population_plot(
         markersize=10
     )
     if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse_no_pleiotropy")
         save(string(dir, "/", 1, ".png"), fig)
     end
 
@@ -123,7 +123,7 @@ function update_population_plot(
     println("")
     
     if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse_no_pleiotropy")
         save(string(dir, "/", generation, ".png"), fig)
     end
     display(fig)
@@ -144,7 +144,7 @@ function count_genotypes(
     num_loci = length(range)
     indices_range = (0:(1/(2*num_loci)):1)
     hybrid_indices = DataAnalysis.calc_traits_additive(genotypes, range)
-    return map(i -> count(x -> x == i, hybrid_indices), indices_range)
+    return map(i -> count(x -> x ≈ i, hybrid_indices), indices_range)
 end
 
 """
@@ -180,17 +180,19 @@ function create_gene_plot(
     loci::NamedTuple,
     save_plot::Bool
 )
+    println(loci)
+
     plot_titles = ["Neutral trait", "Female mating trait", "Male mating trait",
-        "Competition trait", "Hybrid survival trait", "Expected"]
-    global ax = Vector(undef, 6)
-    global points = Vector(undef, 6)
+        "Hybrid survival trait", "Expected"]
+    global ax = Vector(undef, 5)
+    global points = Vector(undef, 5)
 
     fontsize_theme = Theme(fontsize=60)
     set_theme!(fontsize_theme)  # set the standard font size
     global fig = Figure(resolution=(1800, 1200), figure_padding=60)
 
     # initialize the axis for each subplot
-    for i in 1:6
+    for i in 1:5
         global ax[i] = Axis(
             fig[Int(ceil(i / 3)), (i-1)%3+1],
             xlabel="trait value",
@@ -211,7 +213,7 @@ function create_gene_plot(
     species_B_output = count_genotypes.(values(loci), Ref(genotypes[species_B_indices]))
     other_output = count_genotypes.(values(loci), Ref(genotypes[other_indices]))
 
-    for i in 3:7
+    for i in 3:6
         num_loci = length(values(loci)[i])
         range = (0:(1/(2*num_loci)):1)
         xs = [range; range; range]
@@ -229,8 +231,8 @@ function create_gene_plot(
             lowclip=:blue)
     end
 
-    global points[6] = barplot!(
-        ax[6],
+    global points[5] = barplot!(
+        ax[5],
         (0:0.125:1),
         get_expected.((0:0.125:1), Ref(length(genotypes))),
         color=:blue
@@ -239,7 +241,7 @@ function create_gene_plot(
     display(fig)
 
     if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse_no_pleiotropy_high_search_cost")
         save(string(dir, "/", 1, ".png"), fig)
     end
 end
@@ -267,7 +269,7 @@ function update_gene_plot(
     save_plot::Bool
 )
 
-    [delete!(ax[i], points[i]) for i in 1:6] # remove the old points from the plot
+    [delete!(ax[i], points[i]) for i in 1:5] # remove the old points from the plot
 
     hybrid_survival_indices = DataAnalysis.calc_traits_additive(genotypes, loci.hybrid_survival)
 
@@ -279,7 +281,7 @@ function update_gene_plot(
     species_B_output = count_genotypes.(values(loci), Ref(genotypes[species_B_indices]))
     other_output = count_genotypes.(values(loci), Ref(genotypes[other_indices]))
 
-    for i in 3:7
+    for i in 3:6
         num_loci = length(values(loci)[i])
         range = (0:(1/(2*num_loci)):1)
         xs = [range; range; range]
@@ -297,8 +299,8 @@ function update_gene_plot(
             lowclip=:blue)
     end
 
-    global points[6] = barplot!(
-        ax[6],
+    global points[5] = barplot!(
+        ax[5],
         (0:0.125:1),
         get_expected.((0:0.125:1), Ref(length(genotypes))),
         color=:blue
@@ -306,7 +308,7 @@ function update_gene_plot(
     println(string("generation: ", generation))
 
     if save_plot
-        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse5")
+        dir = mkpath("HZAM_Sym_Julia_results_GitIgnore/plots/gene_timelapse_no_pleiotropy_high_search_cost")
         save(string(dir, "/", generation, ".png"), fig)
     end
 end
