@@ -33,13 +33,14 @@ Run a single HZAM simulation.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# the semicolon makes the following optional keyword arguments  
-	K_total::Integer = 40000, max_generations::Integer = 1000,
+	K_total::Integer = 30000, max_generations::Integer = 2000,
 	total_loci::Integer = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
 	hybrid_survival_loci = 1:3, survival_fitness_method::String = "epistasis",
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
 	track_population_data = false,
 	run_name = "temp", exit_early = true)
+	println(max_generations)
 
 
 	parameters = DataAnalysis.SimParams(

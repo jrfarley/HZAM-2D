@@ -271,7 +271,7 @@ function run_HZAM_set(
 end
 
 function search_cost_clines()
-	search_costs = [0, 0.01, 0.05, 0.1]
+	search_costs = [0.01, 0.05, 0.1]
 	for s in search_costs
 		run_HZAM_set(
 			"search_cost_cline_sc_$s",
@@ -281,8 +281,7 @@ function search_cost_clines()
 			[1],
 			s,
 			[1, 1, 1, 1, 1, 1],
-			[3, 10, 30, 100, 300, 1000],
-			max_generations = 1,
+			[3, 10, 30, 100, 300, 1000]
 		)
 	end
 end
