@@ -1,8 +1,6 @@
 
 using Distributed
 interrupt()
-rmprocs(20)
-addprocs(4)
 
 @time begin
 	using Pkg
@@ -10,6 +8,9 @@ addprocs(4)
 	Pkg.instantiate()
 	Pkg.precompile()
 end
+
+rmprocs(20)
+addprocs(4)
 
 @everywhere begin
 	using Pkg
@@ -23,8 +24,8 @@ end
 
 	import .HZAM
 	using JLD2 # needed for saving / loading data in Julia format
-	HZAM.set_results_folder(string("HZAM-J_2D_results/simulation_outcomes/Run2_2024July19"))
+	HZAM.set_results_folder(string("HZAM-J_2D_results/simulation_outcomes/Run2_2024July22"))
 end
 
 # run main simulation sets
-HZAM.run_HZAM_sets_complete("Run2_20240719")
+HZAM.run_HZAM_sets_complete("Run2_20240722")
