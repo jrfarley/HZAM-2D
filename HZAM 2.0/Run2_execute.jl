@@ -4,6 +4,13 @@ interrupt()
 rmprocs(20)
 addprocs(4)
 
+@time begin
+	using Pkg
+	Pkg.activate("HZAM 2.0/HZAM")
+	Pkg.instantiate()
+	Pkg.precompile()
+end
+
 @everywhere begin
 	using Pkg
 	Pkg.activate("HZAM 2.0/HZAM")

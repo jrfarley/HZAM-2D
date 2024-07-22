@@ -6,5 +6,5 @@ using LsqFit: curve_fit
 mean(itr) = sum(itr) / length(itr)
 
 include("used_data_analysis.jl")
-#include("unused_data_analysis.jl")
+include("unused_data_analysis.jl")
 end

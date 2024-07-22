@@ -682,6 +682,75 @@ function calc_bimodality_overall(
 	return mean(bimodality_per_range)
 end
 
+function calc_bimodality_on_transect(
+	pd,
+	sigmoid_curve,
+	y_coord,
+	loci,
+)
+	genotypes = [
+		vcat([d.genotypes_F for d in pd.population]...)
+		vcat([d.genotypes_M for d in pd.population]...)
+	]
+	x_locations = [
+		vcat([d.x_locations_F for d in pd.population]...)
+		vcat([d.x_locations_M for d in pd.population]...)
+	]
+	y_locations = [
+		vcat([d.y_locations_F for d in pd.population]...)
+		vcat([d.y_locations_M for d in pd.population]...)
+	]
+
+	hybrid_indices = calc_traits_additive(genotypes, loci)
+
+	y_coord = Float32(y_coord)
+	midpoint = Float32(spaced_locations[argmin(abs.(sigmoid_curve .- Ref(0.5)))])
+
+	function calc_density(x, y; species=-1)
+		if species != -1
+			indices = findall(h->h==species, hybrid_indices)
+		else
+			indices = eachindex(hybrid_indices)
+		end
+	
+		dif_x = x_locations[indices] .- Ref(x)
+		dif_y = y_locations[indices] .- Ref(y)
+		squared_distances = dif_x .^ 2 .+ dif_y .^ 2
+
+		return sum(exp.(-squared_distances ./ Ref(2 * (0.01^2))))
+	end
+
+	density = calc_density(
+		midpoint,
+		y_coord
+	)[1]
+
+	density_A = calc_density(
+		midpoint,
+		y_coord,
+		species = 0
+	)[1]
+
+	density_B = calc_density(
+		midpoint,
+		y_coord,
+		species = 1
+	)[1]
+
+	return (density_A + density_B) / density
+
+end
+
+function calc_bimodality(
+	pd,
+	loci,
+)
+	hybrid_index_avgs, sigmoid_curves, widths = calc_transects(pd, loci, 0.1:0.2:0.9)
+	bimodalities = calc_bimodality_on_transect.(Ref(pd), sigmoid_curves, collect(0.1:0.2:0.9), Ref(loci))
+
+	return mean(bimodalities)
+end
+
 """
 	calc_width(sigmoid_curve::Vector{<:Real})
 

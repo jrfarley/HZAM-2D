@@ -271,7 +271,7 @@ function run_HZAM_set(
 end
 
 function search_cost_clines()
-	search_costs = [0.01, 0.05, 0.1]
+	search_costs = [0.05, 0.1]
 	for s in search_costs
 		run_HZAM_set(
 			"search_cost_cline_sc_$s",
@@ -281,7 +281,7 @@ function search_cost_clines()
 			[1],
 			s,
 			[1, 1, 1, 1, 1, 1],
-			[3, 10, 30, 100, 300, 1000]
+			[2, 6, 20, 60, 170, 500]
 		)
 	end
 end
@@ -377,6 +377,20 @@ function load_from_folder(dir::String)
 				indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
 				indexin(outcome.sim_params.S_AM, S_AM_set)[1],
 			] = outcome
+		end
+	end
+	return outcome_array
+end
+
+function load_from_folder2(dir::String)
+	files = readdir(dir)
+	outcome_array = Tuple{DataAnalysis.OutputData, <:Real}[]
+	for file in files
+		path = string(dir, "/", file)
+		if occursin(".jld2", path) && occursin("gen1000", path)
+			@load path outcome
+			println(outcome.sim_params)
+			push!(outcome_array, (outcome, outcome.sim_params.S_AM))
 		end
 	end
 	return outcome_array
