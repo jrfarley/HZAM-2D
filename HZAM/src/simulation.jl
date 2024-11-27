@@ -403,7 +403,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 
 		# calculate cline width and overlap and save/possibly exit at simulation midpoint
 		# every 25 generations
-		if generation % 25 == 0
+		if generation % 5 == 0
 			println("generation: $generation")
 			cline_width = DataAnalysis.calc_cline_width(
 				pd,
@@ -418,17 +418,20 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 				sigma_comp,
 				male_mating_trait_loci,
 			)[1]
-			#println("MMT overlap: $overlap")
-            
-            #exit if the cline width is greater than the simulation width
-            if cline_width > 1 && overlap < 0.1 && exit_early
-                return
-            end
+
+			#exit if the cline width is greater than the simulation width
+			if cline_width > 1 && overlap < 0.1 && exit_early
+				return
+			end
 
 
 			push!(cline_width_25gen, cline_width)
 			push!(overlap_25gen, overlap)
 
+			#=
+			CODE FOR EXITING SIMULATIONS EARLY IF THE CLINES ARE STEADY, NOT USED IN CURRENT 
+			ANALYSIS 
+			--------------------------------------------------------------------------------
 			# save at midpoint and exit simulation if the cline width is steady
 			if generation == trunc(max_generations / 2) && isdir(working_dir)
 				filepath = string(working_dir, "/$run_name.jld2")
@@ -455,6 +458,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 					end
 				end
 			end
+			=#
 		end
 
 

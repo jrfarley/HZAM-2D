@@ -6,6 +6,8 @@ using Colors
 using DataFrames
 using GLM
 
+CairoMakie.activate!()
+
 ntz = []
 zho = []
 
@@ -53,7 +55,7 @@ group_color = [PolyElement(color = color, strokecolor = :transparent)
 			   for color in colors]
 
 "Outcome names for the legend"
-labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended",]
+labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended"]
 
 
 """
@@ -61,8 +63,9 @@ labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", 
 
 Classify the simulation outcome into one of six outcome types based on the cline width, bimodality, and population overlap.
 """
+
 function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
-	
+
 	# When the cline width is greater than 1, the simulations exit early. Thus missing simulations are classified as blended.
 	if ismissing(outcome)
 		return 5
@@ -79,16 +82,16 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 
 	generations = collect(1:20)
 
-	df = DataFrame(X=generations, Y=last_widths)
+	df = DataFrame(X = generations, Y = last_widths)
 
 	# Linear regression of cline width vs generation
 	ols = lm(@formula(Y ~ X), df)
 
 	# If the slope exceeds 0.03 units per 1000 generations (95% confidence interval) then the simulation is categorized as blended
-	if confint(ols)[2,1] > 0.00075 && bimodality ≤ 0.95
+	if confint(ols)[2, 1] > 0.00075 && bimodality ≤ 0.95
 		return 5
 	end
-	
+
 	if bimodality > 0.95
 		return overlap < 0.3 ? 3 : 4
 	elseif bimodality < 0.5
@@ -97,6 +100,7 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 
 	return 1
 end
+
 
 """
 	save_outcomes()
@@ -111,7 +115,7 @@ function save_outcomes()
 		output_array = categorize.(outcome_array)
 		push!(outcomes, output_array)
 	end
-	@save "MainPlot_GitIgnore/categorical_outcomes.JLD2" outcomes
+	@save "categorical_outcomes.JLD2" outcomes
 end
 
 """
@@ -125,7 +129,7 @@ reduced hybrid fitness and assortative mating.
 - `name::String` : the subplot title.
 - `ax::Makie.Axis` : the axis where the subplot will be placed.
 """
-function make_subplot(output_array::Array{<:Real}, name::String, ax::Makie.Axis)
+function make_subplot(output_array::Array{<:Real}, ax::Makie.Axis)
 	println(output_array)
 	output_array = output_array[end:-1:1, :]
 
@@ -133,7 +137,7 @@ function make_subplot(output_array::Array{<:Real}, name::String, ax::Makie.Axis)
 		ax,
 		output_array',
 		colormap = colors,
-		colorrange = (1,5),
+		colorrange = (1, 5),
 	)
 
 	xs = collect(1:8)
@@ -141,16 +145,8 @@ function make_subplot(output_array::Array{<:Real}, name::String, ax::Makie.Axis)
 
 	ax.xticks = (xs, ["1", "3", "10", "30", "100", "300", "1000", "Inf"])
 	ax.yticks = (ys, string.(reverse([1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0])))
-	ax.xlabel = "S_AM"
-	ax.ylabel = "w_hyb"
-	ax.xticklabelsize = 18
-	ax.yticklabelsize = 18
-	ax.xlabelsize = 20
-	ax.ylabelsize = 20
-	ax.titlesize = 22
-	ax.aspect = 1
-	ax.title = name
-	ax.xticklabelrotation = π / 2
+
+
 end
 
 """
@@ -159,38 +155,45 @@ end
 Construct the main figure showing the outcomes of all the simulations.
 """
 function make_main_plot()
-	f = Figure(size = (1000, 1250))
+	@load "categorical_outcomes.JLD2" outcomes
 
-	@load "MainPlot_GitIgnore/categorical_outcomes.JLD2" outcomes
+	f = Figure(size = (1000, 1150), pt_per_unit = 2)
+
+	g = f[1, 1] = GridLayout()
 	axes = Axis[]
 
+
 	for i in 1:9
-		ax = Axis(f[Int(ceil(i / 3)), (i-1)%3+1])
-		make_subplot(outcomes[i], names[i], ax)
+		ax = Axis(
+			g[Int(ceil(i / 3)), (i-1)%3+1],
+			xlabel = "S_AM",
+			ylabel = "w_hyb",
+			xticklabelrotation = π / 2,
+			title = names[i],
+			aspect = 1,
+			xticklabelsize = 18,
+			yticklabelsize = 18,
+			xlabelsize = 20,
+			ylabelsize = 20,
+			titlesize = 22
+		)
+		make_subplot(outcomes[i], ax)
 		push!(axes, ax)
 	end
-	
+
 	leg = Legend(
-		f[4, :],
+		f[2, :],
 		group_color,
 		labels,
 		orientation = :horizontal,
 		tellheight = true,
 		labelsize = 20,
 		nbanks = 2,
-		labelvalign = :center
+		labelvalign = :center,
 	)
-	trim!(f.layout)
-	display(f)
-	save("$(dirname(@__DIR__))/figures/main_plot3.png", f)
+	resize_to_layout!(f)
+	save("$(dirname(@__DIR__))/figures/main_plot.png", f)
 end
 
 #save_outcomes()
-#=
-f = Figure()
-hist(f[1, 1], ntz)
-hist(f[1, 2], zho)
-display(f)
-readline()
-=#
 make_main_plot()

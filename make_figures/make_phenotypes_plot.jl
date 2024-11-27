@@ -318,7 +318,7 @@ function compare_phenotype_plots()
 	make_phenotype_subplot(gd, string(dir, "search_cost"), "D) No Pleiotropy, 5% Search Cost")
 
 	display(f)
-	save("$(dirname(@__DIR__))/figures/phenotypes_over_time3.png", f)
+	save("$(dirname(@__DIR__))/figures/phenotypes_over_time.png", f)
 end
 
 """

@@ -345,3 +345,31 @@ function calc_bimodality(
 
 	return mean(bimodalities)
 end
+
+"""
+	function count_phenotypes_at_loci(
+		genotypes::Vector{<:Matrix{<:Integer}},
+		loci::Union{UnitRange{<:Integer},Vector{<:Integer}}
+	)
+
+Return the number of individuals with each phenotype for the given loci range.
+
+# Arguments
+- `genotypes::Vector{<:Matrix{<:Integer}}`: the genotypes of every individual
+- `loci::Union{UnitRange{<:Integer},Vector{<:Integer}}`: the loci range over which the phenotypes are calculated.
+"""
+function count_phenotypes_at_loci(
+	genotypes::Vector{<:Matrix{<:Integer}},
+	loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
+)
+	hybrid_indices = calc_traits_additive(genotypes, loci)
+	n = 2 * length(loci)
+
+	output = []
+
+	for i in 0:n
+		push!(output, count(x -> x ≈ i / n, hybrid_indices) / length(hybrid_indices))
+	end
+
+	return output
+end

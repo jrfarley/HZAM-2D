@@ -31,3 +31,7 @@ Manifest.toml
 *git_ignore.jl
 *GitIgnore.jl
 *_GitIgnore/
+categorical_outcomes.JLD2
+test.png
+*vscode/
+HZAM-2D_results/

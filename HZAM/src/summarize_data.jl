@@ -1,5 +1,5 @@
 using Colors, ColorSchemes
-using GLMakie
+#using GLMakie
 using JLD2 # needed for saving / loading data in Julia format
 using LsqFit: curve_fit
 using Statistics
@@ -318,13 +318,7 @@ function load_from_folder(dir::String)
 	for file in files
 		path = string(dir, "/", file)
 		if occursin(".jld2", path) && occursin("gen1000", path)
-			alt_filepath = replace(path, "gen1000.0" => "gen2000")
-
-			if isfile(alt_filepath)
-				@load alt_filepath outcome
-			else
-				@load path outcome
-			end
+			@load path outcome
 
 			println(outcome.sim_params)
 

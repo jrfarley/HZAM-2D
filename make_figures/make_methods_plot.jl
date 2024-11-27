@@ -107,4 +107,4 @@ colsize!(fig.layout, 2, Relative(3 / 7))
 
 display(fig)
 
-save(string("$(dirname(@__DIR__))/figures/methods_fig2.png"), fig)
+save(string("$(dirname(@__DIR__))/figures/methods_fig.png"), fig)
