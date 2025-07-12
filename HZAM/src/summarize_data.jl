@@ -29,8 +29,8 @@ global spaced_locations = collect(Float32, 0:0.01:1)
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-		max_generations::Integer = 2000,
-		K_total::Integer = 30000,
+		max_generations::Integer = 1500,
+		K_total::Integer = 20000,
 	)
 
 Run the main set of simulations with three loci per trait and save the outcomes to `results_folder`.
@@ -48,8 +48,8 @@ function run_HZAM_sets_complete_three_loci(;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-	max_generations::Integer = 2000,
-	K_total::Integer = 30000,
+	max_generations::Integer = 1500,
+	K_total::Integer = 20000,
 )
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
@@ -86,8 +86,8 @@ end
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-		max_generations::Integer = 2000,
-		K_total::Integer = 30000,
+		max_generations::Integer = 1500,
+		K_total::Integer = 20000,
 	)
 
 Run the main set of simulations with one locus per trait and save the outcomes to `results_folder`.
@@ -105,8 +105,8 @@ function run_HZAM_sets_complete_one_locus(;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-	max_generations::Integer = 2000,
-	K_total::Integer = 30000,
+	max_generations::Integer = 1500,
+	K_total::Integer = 20000,
 )
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
@@ -143,8 +143,8 @@ end
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-		max_generations::Integer = 2000,
-		K_total::Integer = 30000,
+		max_generations::Integer = 1500,
+		K_total::Integer = 20000,
 	)
 
 Run the main set of simulations with nine loci per trait and save the outcomes to `results_folder`.
@@ -163,7 +163,7 @@ function run_HZAM_sets_complete_nine_loci(;
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
-	K_total::Integer = 30000,
+	K_total::Integer = 20000,
 )
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
@@ -267,8 +267,8 @@ strength and store the outcome of each simulation in a JLD2 file.
 # Arguments
 - `set_name::String`: the name assigned to the set of simulations.
 - `intrinsic_R::Real`: the intrinsic growth rate.
-- `K_total::Integer=40000`: the carrying capacity of the environment.
-- `max_generations::Integer=1000`: the number of generations that the simulation will run.
+- `K_total::Integer=20000`: the carrying capacity of the environment.
+- `max_generations::Integer=1500`: the number of generations that the simulation will run.
 - `total_loci::Integer=6`: the total number of loci in the genome.
 - `female_mating_trait_loci=1:3`: the loci specifying the female's mate preference.
 - `male_mating_trait_loci=1:3`: the loci specifying the male's mating trait.
