@@ -8,13 +8,13 @@ export create_population_plot, update_population_plot, create_gene_plot, update_
 using Colors, ColorSchemes
 import ColorSchemes.plasma
 #using Plots.PlotMeasures  # needed for plot margin adjustment
-#using GLMakie
+using GLMakie
 using ..DataAnalysis
 
-# Activate the GLMakie backend
+# Activate the GLMakie backendgg
 #GLMakie.activate!()
 
-#GLMakie.activate!(inline=false) # set up the plot to display in its own window
+GLMakie.activate!(inline=false) # set up the plot to display in its own window
 
 # The figure that updates every generation.
 global fig

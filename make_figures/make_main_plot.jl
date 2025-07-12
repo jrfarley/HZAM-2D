@@ -71,24 +71,7 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 		return 5
 	end
 
-	widths = outcome.hybrid_zone_width
-	last_widths = widths[length(widths)-19:end]
-	overlaps = outcome.population_overlap
-	last_overlaps = overlaps[length(overlaps)-19:end]
-	bimodality = HZAM.DataAnalysis.calc_bimodality(outcome.population_data, outcome.sim_params.male_mating_trait_loci)
-
-	width = sum(last_widths) / length(last_widths)
-	overlap = sum(last_overlaps) / length(last_overlaps)
-
-	generations = collect(1:20)
-
-	df = DataFrame(X = generations, Y = last_widths)
-
-	# Linear regression of cline width vs generation
-	ols = lm(@formula(Y ~ X), df)
-
-	# If the slope exceeds 0.03 units per 1000 generations (95% confidence interval) then the simulation is categorized as blended
-	if confint(ols)[2, 1] > 0.00075 && bimodality ≤ 0.95
+	if is_blended(outcome)
 		return 5
 	end
 
@@ -99,6 +82,32 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 	end
 
 	return 1
+end
+
+function is_blended(outcome::HZAM.DataAnalysis.OutputData)
+	total_loci = length(outcome.sim_params.male_mating_trait_loci)
+	mmt_phenotype_counts = outcome.population_tracking_data[1]
+
+	if outcome.hybrid_zone_width > 1
+		return true
+	end
+
+	function get_hybrid_proportion(phenotype_counts)
+		hybrid_population = 0
+		for i in 1:(2*total_loci + 1)
+			hybrid_index = (i-1)/(2*total_loci)
+			if abs(1-hybrid_index)>0.1
+				hybrid_population+=phenotype_counts[i]
+			end
+		end
+		return hybrid_population / sum(phenotype_counts)
+	end
+	
+	hybrid_proportions = get_hybrid_proportion.(mmt_phenotype_counts)[501:1500]
+
+	test_result = ADFTest(hybrid_proportions, :constant, 20)
+
+	return pvalue(test_result) >= 0.05
 end
 
 

@@ -25,7 +25,7 @@ global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]
 global spaced_locations = collect(Float32, 0:0.01:1)
 
 """
-	run_HZAM_sets_complete(run_name::String;
+	run_HZAM_sets_complete_three_loci(;
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
@@ -33,11 +33,10 @@ global spaced_locations = collect(Float32, 0:0.01:1)
 		K_total::Integer = 30000,
 	)
 
-Run the main set of simulations used in the paper and save the outcomes to `results_folder`.
+Run the main set of simulations with three loci per trait and save the outcomes to `results_folder`.
 
 # Arguments
 
-- `run_name::String`: the name of the run.
 - `set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}}`: which sets to run (the sets 
 are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
 - `w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which w_hyb values to use.
@@ -45,7 +44,64 @@ are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
 - `max_generations::Integer`: how many generations to run the simulations for.
 - `K_total::Integer`: the carrying capacity of the simulated range.
 """
-function run_HZAM_sets_complete(run_name::String;
+function run_HZAM_sets_complete_three_loci(;
+	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
+	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
+	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
+	max_generations::Integer = 2000,
+	K_total::Integer = 30000,
+)
+	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
+		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
+		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
+	total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9, 1, 3]
+	female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
+	male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
+	hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
+
+
+	println("$(nprocs()) threads running")
+	@async @distributed for i in set_numbers
+		run_HZAM_set(
+			set_names[i],
+			total_loci[i],
+			female_mating_trait_loci[i],
+			male_mating_trait_loci[i],
+			hybrid_survival_loci[i],
+			per_reject_cost[i],
+			w_hyb_set_of_run,
+			S_AM_set_of_run;
+			max_generations,
+			K_total,
+		)
+		println("--------------------")
+		println(string(set_names[i], " completed successfully!"))
+		println("--------------------")
+	end
+end
+
+"""
+	run_HZAM_sets_complete_one_locus(;
+		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
+		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
+		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
+		max_generations::Integer = 2000,
+		K_total::Integer = 30000,
+	)
+
+Run the main set of simulations with one locus per trait and save the outcomes to `results_folder`.
+
+# Arguments
+
+- `set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}}`: which sets to run (the sets 
+are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
+- `w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which w_hyb values to use.
+- `S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which S_AM values to use.
+- `max_generations::Integer`: how many generations to run the simulations for.
+- `K_total::Integer`: the carrying capacity of the simulated range.
+"""
+function run_HZAM_sets_complete_one_locus(;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
@@ -56,11 +112,67 @@ function run_HZAM_sets_complete(run_name::String;
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
 		"one_locus_full_pleiotropy", "one_locus_no_pleiotropy"]
-	total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9, 1, 3]
-	female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6, [1], [1]]
-	male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9, [1], [2]]
-	hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, [1], [3]]
-	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0, 0]
+	total_loci = [2, 4, 3, 3, 3, 2, 2, 3, 3]
+	female_mating_trait_loci = [[1], [2], [1], [2], [2], [1], [1], [2], [2]]
+	male_mating_trait_loci = [[1], [3], [2], [1], [2], [1], [1], [3], [3]]
+	hybrid_survival_loci = [[1], [1], [1], [1], [1], [1], [1], [1], [1]]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
+
+	println("$(nprocs()) threads running")
+	@async @distributed for i in set_numbers
+		run_HZAM_set(
+			set_names[i],
+			total_loci[i],
+			female_mating_trait_loci[i],
+			male_mating_trait_loci[i],
+			hybrid_survival_loci[i],
+			per_reject_cost[i],
+			w_hyb_set_of_run,
+			S_AM_set_of_run;
+			max_generations,
+			K_total,
+		)
+		println("--------------------")
+		println(string(set_names[i], " completed successfully!"))
+		println("--------------------")
+	end
+end
+
+"""
+	run_HZAM_sets_complete_nine_loci(;
+		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
+		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
+		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
+		max_generations::Integer = 2000,
+		K_total::Integer = 30000,
+	)
+
+Run the main set of simulations with nine loci per trait and save the outcomes to `results_folder`.
+
+# Arguments
+
+- `set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}}`: which sets to run (the sets 
+are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
+- `w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which w_hyb values to use.
+- `S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which S_AM values to use.
+- `max_generations::Integer`: how many generations to run the simulations for.
+- `K_total::Integer`: the carrying capacity of the simulated range.
+"""
+function run_HZAM_sets_complete_nine_loci(;
+	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
+	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
+	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
+	max_generations::Integer = 1500,
+	K_total::Integer = 30000,
+)
+	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
+		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
+		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
+	total_loci = [18, 36, 27, 27, 27, 18, 18, 27, 27]
+	female_mating_trait_loci = [1:9, 10:18, 1:9, 10:18, 10:18, 1:9, 1:9, 10:18, 10:18]
+	male_mating_trait_loci = [1:9, 19:27, 10:18, 10:18, 4:6, 1:9, 1:9, 19:27, 19:27]
+	hybrid_survival_loci = [1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
 
 	println("$(nprocs()) threads running")
 	@async @distributed for i in set_numbers
@@ -177,7 +289,7 @@ function run_HZAM_set(
 	per_reject_cost::Real,
 	w_hyb_set::Union{UnitRange{<:Real}, Vector{<:Real}},
 	S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}};
-	intrinsic_R::Real = 1.1, K_total::Int = 30000, max_generations::Int = 2000,
+	intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
 	survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
 )
 	dir = mkpath(string(results_folder, "/", set_name))
@@ -189,13 +301,13 @@ function run_HZAM_set(
 			w_hyb = w_hyb_set[i]
 			S_AM = S_AM_set[j]
 
-			run_name_half_gen =
+			run_name =
 				string(
-					"HZAM_simulation_run_gen", trunc(max_generations / 2), "_SC",
+					"HZAM_simulation_run_gen", max_generations, "_SC",
 					per_reject_cost, "_Whyb", w_hyb, "_SAM", S_AM,
 				)
 
-			println("Beginning: $run_name_half_gen")
+			println("Beginning: $run_name")
 			# run one simulation by calling the function defined above:
 			outcome = run_one_HZAM_sim(
 				w_hyb,
@@ -211,9 +323,9 @@ function run_HZAM_set(
 				per_reject_cost,
 				sigma_disp,
 				do_plot = false,
-				run_name = run_name_half_gen,
+				run_name = run_name,
 			)
-			println("Ending: $run_name_half_gen")
+			println("Ending: $run_name")
 
 			if !isnothing(outcome)
 				run_name_full_gen =
@@ -317,7 +429,7 @@ function load_from_folder(dir::String)
 	end
 	for file in files
 		path = string(dir, "/", file)
-		if occursin(".jld2", path) && occursin("gen1000", path)
+		if occursin(".jld2", path)
 			@load path outcome
 
 			println(outcome.sim_params)
@@ -355,7 +467,7 @@ function load_from_folder_whyb_1(dir::String)
 				end
 
 				println(outcome.sim_params)
-				width = mean(outcome.hybrid_zone_width[end-19:end])
+				width = mean(outcome.hybrid_zone_width[(end-19):end])
 				if true #width < 20 * outcome.sim_params.sigma_disp
 					push!(outcome_array, (outcome, outcome.sim_params.S_AM))
 				end
@@ -403,7 +515,7 @@ function plot_fitnesses(fitnesses::Vector{<:Dict})
 		average_fitnesses = []
 		for i in eachindex(fitnesses)
 			fitness_values =
-				[fitnesses[j][phenotype] for j in i:min(length(fitnesses), i + n - 1)]
+				[fitnesses[j][phenotype] for j in i:min(length(fitnesses), i+n-1)]
 			push!(average_fitness, mean(fitness_values))
 		end
 		return average_fitnesses

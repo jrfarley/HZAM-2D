@@ -1,5 +1,5 @@
 using Distributions: Poisson # needed for "Poisson" functional_HI_all_inds
-using HypothesisTests
+# using HypothesisTests
 """
 	run_one_HZAM_sim(
 		w_hyb::Real, 
@@ -34,13 +34,13 @@ Run a single HZAM simulation.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# the semicolon makes the following optional keyword arguments  
-	K_total::Integer = 30000, max_generations::Integer = 2000,
+	K_total::Integer = 20000, max_generations::Integer = 1500,
 	total_loci::Integer = 6, female_mating_trait_loci = 1:3, male_mating_trait_loci = 1:3,
 	hybrid_survival_loci = 1:3, survival_fitness_method::String = "epistasis",
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
-	track_population_data = false,
-	run_name = "temp", exit_early = false)
+	track_population_data = true,
+	run_name = "temp", exit_early = true)
 
 
 	parameters = DataAnalysis.SimParams(
@@ -59,8 +59,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 
 	mmt_phenotype_counts = []
 	fmt_phenotype_counts = []
-	cline_width_25gen = Float64[]
-	overlap_25gen = Float64[]
 
 	overall_loci_range = collect(1:total_loci)
 
@@ -164,9 +162,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# loop through the generations
 	for generation in 1:max_generations
 
-		num_offspring_A = Vector{Tuple}(undef, 0)
-		num_offspring_B = Vector{Tuple}(undef, 0)
-
 		# set up empty matrices to store the offspring data
 		genotypes_daughters_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
 		genotypes_sons_all = [Matrix{Int8}[] for i in zone_cartesian_indices]
@@ -202,7 +197,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 				neighbourhood_size::Float32 = sigma_comp
 
 
-				while mate == false && neighbourhood_size <= Float32(1 / (2 * Population.NUM_ZONES))
+				# looks for a mate until the female has rejected 100 males
+				while mate == false && rejects <= 100
 
 					#=
 					Find the index for the zone that's the neighbourhood size away 
@@ -365,9 +361,9 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 			y_locations_daughters_all,
 			x_locations_sons_all,
 			y_locations_sons_all,
-			K_total,
 			sigma_comp,
 			intrinsic_R,
+			pd.ideal_densities,
 		)
 
 		# update the plot
@@ -401,16 +397,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 			end
 		end
 
-		# calculate cline width and overlap and save/possibly exit at simulation midpoint
-		# every 25 generations
-		if generation % 5 == 0
-			println("generation: $generation")
+		# calculate the cline width every 100 generations and exit early if the cline has collapsed 
+		if exit_early && generation % 100 == 0
 			cline_width = DataAnalysis.calc_cline_width(
 				pd,
 				male_mating_trait_loci,
 				0.1:0.2:0.9,
 			)
-			println("MMT cline width: $cline_width")
 
 			overlap = Population.calc_species_overlap(
 				pd.population,
@@ -420,45 +413,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 			)[1]
 
 			#exit if the cline width is greater than the simulation width
-			if cline_width > 1 && overlap < 0.1 && exit_early
+			if cline_width > 1 && overlap < 0.1
+				println("exiting")
 				return
 			end
-
-
-			push!(cline_width_25gen, cline_width)
-			push!(overlap_25gen, overlap)
-
-			#=
-			CODE FOR EXITING SIMULATIONS EARLY IF THE CLINES ARE STEADY, NOT USED IN CURRENT 
-			ANALYSIS 
-			--------------------------------------------------------------------------------
-			# save at midpoint and exit simulation if the cline width is steady
-			if generation == trunc(max_generations / 2) && isdir(working_dir)
-				filepath = string(working_dir, "/$run_name.jld2")
-				outcome = DataAnalysis.OutputData(
-					parameters,
-					pd,
-					cline_width_25gen,
-					overlap_25gen,
-					-1,
-					(fmt_phenotype_counts, mmt_phenotype_counts),
-				)
-
-				@save filepath outcome
-
-				half = max(1, trunc(Int, length(cline_width_25gen) / 2))
-
-				# run an augmented Dickey-Fuller test on the second half of the cline width 
-				# array and exit if the p-value is <0.05
-				if half >= 10 && exit_early
-					result = ADFTest(cline_width_25gen[half:end], :constant, 1)
-
-					if pvalue(result) < 0.05
-						return
-					end
-				end
-			end
-			=#
 		end
 
 
@@ -490,12 +448,27 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# track any variable of interest
 	population_tracking_data = (fmt_phenotype_counts, mmt_phenotype_counts)
 
+	overlap = Population.calc_species_overlap(
+		pd.population,
+		0.03,
+		sigma_comp,
+		male_mating_trait_loci,
+	)[1]
+
+	cline_width = DataAnalysis.calc_cline_width(
+				pd,
+				male_mating_trait_loci,
+				0.1:0.2:0.9,
+			)
+
+	bimodality = DataAnalysis.calc_bimodality(pd, male_mating_trait_loci)
+
 	return DataAnalysis.OutputData(
 		parameters,
 		pd,
-		cline_width_25gen,
-		overlap_25gen,
-		-1,
+		overlap,
+		cline_width,
+		bimodality,
 		population_tracking_data,
 	)
 end # of module

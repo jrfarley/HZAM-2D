@@ -854,3 +854,17 @@ function calc_sigmoid_curves(x_locations::Vector{Float32}, y_locations::Vector{F
 
 	return sigmoid_curves, cline_widths
 end
+
+function calc_hybridity(phenotype_counts, num_loci)
+	function calc_hybridity(n)
+		return min(n, 2*num_loci-n) / num_loci
+	end
+
+	hybridity = 0
+	for i in 1:(2*num_loci+1)
+		hybridity += phenotype_counts[i] * calc_hybridity(i-1)
+	end
+
+	return hybridity
+
+end
