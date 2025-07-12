@@ -28,7 +28,6 @@ Run a single HZAM simulation.
 - `plot_int=10`: the interval (measured in generations) between updating the plot.
 - `gene_plot=false`: if true, generates phenotype plots.
 - `save_plot=false`: if true, saves each plot to a PNG file.
-- `track_population_data=false`: if true, stores the population size, hybridity, overlap, and cline width for each generation
 - `run_name="temp": the name of the output file`
 - `exit_early=false`: when `true` the simulation will exit halfway through if the cline is stable.
 """
@@ -39,7 +38,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	hybrid_survival_loci = 1:3, survival_fitness_method::String = "epistasis",
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
-	track_population_data = true,
 	run_name = "temp", exit_early = true)
 
 
@@ -421,27 +419,25 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 
 
 		# count the individuals with each phenotype for both mating traits every generation
-		if track_population_data
-			genotypes = [
-				vcat([d.genotypes_F for d in pd.population]...)
-				vcat([d.genotypes_M for d in pd.population]...)
-			]
+		genotypes = [
+			vcat([d.genotypes_F for d in pd.population]...)
+			vcat([d.genotypes_M for d in pd.population]...)
+		]
 
-			push!(
-				mmt_phenotype_counts,
-				DataAnalysis.count_phenotypes_at_loci(
-					genotypes,
-					male_mating_trait_loci,
-				),
-			)
-			push!(
-				fmt_phenotype_counts,
-				DataAnalysis.count_phenotypes_at_loci(
-					genotypes,
-					female_mating_trait_loci,
-				),
-			)
-		end
+		push!(
+			mmt_phenotype_counts,
+			DataAnalysis.count_phenotypes_at_loci(
+				genotypes,
+				male_mating_trait_loci,
+			),
+		)
+		push!(
+			fmt_phenotype_counts,
+			DataAnalysis.count_phenotypes_at_loci(
+				genotypes,
+				female_mating_trait_loci,
+			),
+		)
 	end # of loop through generations
 
 	# the type of population_tracking_data is left unspecified so this can be modified to 
@@ -456,10 +452,10 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	)[1]
 
 	cline_width = DataAnalysis.calc_cline_width(
-				pd,
-				male_mating_trait_loci,
-				0.1:0.2:0.9,
-			)
+		pd,
+		male_mating_trait_loci,
+		0.1:0.2:0.9,
+	)
 
 	bimodality = DataAnalysis.calc_bimodality(pd, male_mating_trait_loci)
 
