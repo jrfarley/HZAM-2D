@@ -396,11 +396,12 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		end
 
 		if generation % 50 == 0
-			push!(cline_width, DataAnalysis.calc_cline_width(
+			width = DataAnalysis.calc_cline_width(
 				pd,
 				male_mating_trait_loci,
 				0.1:0.2:0.9,
-			))
+			)
+			push!(cline_width, width)
 		end
 
 
@@ -442,8 +443,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	return DataAnalysis.OutputData(
 		parameters,
 		pd,
-		overlap,
 		cline_width,
+		overlap,
 		bimodality,
 		population_tracking_data,
 	)

@@ -19,8 +19,8 @@ outcome =
 		gene_plot=false
 	)
 
-println(time()-t1)
+#println(time()-t1)
 
-
+println(outcome.hybrid_zone_width)
 
 @save "sample_outcome_full_pleiotropy2.jld2" outcome
