@@ -7,8 +7,8 @@ t1=time()
 outcome =
 	HZAM.run_one_HZAM_sim(0.95, 10, 1.1; # these values are 
 		# hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-		K_total = 20000, max_generations = 1500,
-		do_plot = true, plot_int = 10,
+		K_total = 10000, max_generations = 500,
+		do_plot = false, plot_int = 10,
 		total_loci = 12,
 		female_mating_trait_loci = 1:4,
 		male_mating_trait_loci = 5:8,
@@ -19,8 +19,8 @@ outcome =
 		gene_plot=true
 	)
 
-println(time()-t1)
+#println(time()-t1)
 
-
+println(outcome.hybrid_zone_width)
 
 @save "sample_outcome_full_pleiotropy2.jld2" outcome
