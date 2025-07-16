@@ -29,7 +29,6 @@ Run a single HZAM simulation.
 - `gene_plot=false`: if true, generates phenotype plots.
 - `save_plot=false`: if true, saves each plot to a PNG file.
 - `run_name="temp": the name of the output file`
-- `exit_early=false`: when `true` the simulation will exit halfway through if the cline is stable.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# the semicolon makes the following optional keyword arguments  
@@ -38,7 +37,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	hybrid_survival_loci = 1:3, survival_fitness_method::String = "epistasis",
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
-	run_name = "temp", exit_early = true)
+	run_name = "temp")
 
 
 	parameters = DataAnalysis.SimParams(
@@ -58,6 +57,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	mmt_phenotype_counts = []
 	fmt_phenotype_counts = []
 
+	cline_width = Real[]
 	overall_loci_range = collect(1:total_loci)
 
 
@@ -395,26 +395,12 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 			end
 		end
 
-		# calculate the cline width every 100 generations and exit early if the cline has collapsed 
-		if exit_early && generation % 100 == 0
-			cline_width = DataAnalysis.calc_cline_width(
+		if generation % 50 == 0
+			push!(cline_width, DataAnalysis.calc_cline_width(
 				pd,
 				male_mating_trait_loci,
 				0.1:0.2:0.9,
-			)
-
-			overlap = Population.calc_species_overlap(
-				pd.population,
-				0.03,
-				sigma_comp,
-				male_mating_trait_loci,
-			)[1]
-
-			#exit if the cline width is greater than the simulation width
-			if cline_width > 1 && overlap < 0.1
-				println("exiting")
-				return
-			end
+			))
 		end
 
 
@@ -450,12 +436,6 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		sigma_comp,
 		male_mating_trait_loci,
 	)[1]
-
-	cline_width = DataAnalysis.calc_cline_width(
-		pd,
-		male_mating_trait_loci,
-		0.1:0.2:0.9,
-	)
 
 	bimodality = DataAnalysis.calc_bimodality(pd, male_mating_trait_loci)
 

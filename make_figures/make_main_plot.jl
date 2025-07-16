@@ -5,6 +5,7 @@ using CairoMakie # used for plotting
 using Colors
 using DataFrames
 using GLM
+using HypothesisTests
 
 CairoMakie.activate!()
 
@@ -22,7 +23,7 @@ colors = [
 ]
 
 "The directory where the simulation run is stored."
-dir = "$(dirname(@__DIR__))/HZAM-2D_Julia_results_GitIgnore/Run2_2024July22/"
+dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/Run3/"
 
 "Folders with all simulation outcome files from each set used for the main plot"
 folders = [
@@ -75,9 +76,9 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 		return 5
 	end
 
-	if bimodality > 0.95
-		return overlap < 0.3 ? 3 : 4
-	elseif bimodality < 0.5
+	if outcome.bimodality > 0.95
+		return outcome.population_overlap < 0.3 ? 3 : 4
+	elseif outcome.bimodality < 0.5
 		return 2
 	end
 
@@ -88,22 +89,22 @@ function is_blended(outcome::HZAM.DataAnalysis.OutputData)
 	total_loci = length(outcome.sim_params.male_mating_trait_loci)
 	mmt_phenotype_counts = outcome.population_tracking_data[1]
 
-	if outcome.hybrid_zone_width > 1
+	if outcome.hybrid_zone_width > 1 && outcome.bimodality < 0.95
 		return true
+	else
+		return false
 	end
 
 	function get_hybrid_proportion(phenotype_counts)
 		hybrid_population = 0
-		for i in 1:(2*total_loci + 1)
-			hybrid_index = (i-1)/(2*total_loci)
-			if abs(1-hybrid_index)>0.1
-				hybrid_population+=phenotype_counts[i]
-			end
-		end
-		return hybrid_population / sum(phenotype_counts)
+		sum(phenotype_counts[2:(length(phenotype_counts)-1)])
 	end
 	
 	hybrid_proportions = get_hybrid_proportion.(mmt_phenotype_counts)[501:1500]
+
+	if all(x->x==hybrid_proportions[1], hybrid_proportions)
+		return false
+	end
 
 	test_result = ADFTest(hybrid_proportions, :constant, 20)
 
@@ -201,8 +202,8 @@ function make_main_plot()
 		labelvalign = :center,
 	)
 	resize_to_layout!(f)
-	save("$(dirname(@__DIR__))/figures/main_plot.png", f)
+	save("$(dirname(@__DIR__))/figures/main_plot_test.png", f)
 end
 
-#save_outcomes()
+save_outcomes()
 make_main_plot()

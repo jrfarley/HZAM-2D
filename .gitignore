@@ -37,3 +37,5 @@ test.png
 HZAM-J_2D_results/
 HZAM-2D_results/
 test.jl
+test_categorization.jl
+make_figures/test_phenotypes_plot.jl
