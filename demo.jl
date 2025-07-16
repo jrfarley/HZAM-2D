@@ -5,9 +5,9 @@ using JLD2 # needed for saving / loading data in Julia format
 
 t1=time()
 outcome =
-	HZAM.run_one_HZAM_sim(0.95, 10, 1.1; # these values are 
+	HZAM.run_one_HZAM_sim(1, 300, 1.1; # these values are 
 		# hybrid fitness; AM strength; ecol. diff; intrinsic growth rate 
-		K_total = 20000, max_generations = 1500,
+		K_total = 20000, max_generations = 3000,
 		do_plot = true, plot_int = 10,
 		total_loci = 12,
 		female_mating_trait_loci = 1:4,
@@ -16,7 +16,7 @@ outcome =
 		per_reject_cost = 0.1,
 		sigma_disp = 0.03,
 		sigma_comp = 0.01,
-		gene_plot=true
+		gene_plot=false
 	)
 
 println(time()-t1)
