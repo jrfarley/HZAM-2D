@@ -24,7 +24,7 @@ colors = [
 ]
 
 "The directory where the simulation run is stored."
-dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/Run3_one_locus_20250715/"
+dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/Run3_nine_loci_20250718/"
 
 "Folders with all simulation outcome files from each set used for the main plot"
 folders = [
@@ -220,7 +220,7 @@ function make_main_plot()
 		labelvalign = :center,
 	)
 	resize_to_layout!(f)
-	save("$(dirname(@__DIR__))/figures/main_plot_test_one_locus.png", f)
+	save("$(dirname(@__DIR__))/figures/main_plot_test_nine_loci.png", f)
 end
 
 save_outcomes()
