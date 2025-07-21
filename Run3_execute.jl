@@ -16,12 +16,12 @@ end
 	include("HZAM/src/HZAM.jl")
 
 	import .HZAM
-	using Dates
 end
 
 # run main simulation sets
-HZAM.run_HZAM_sets_complete_nine_loci(set_numbers=[3])
+HZAM.run_HZAM_sets_complete_nine_loci("Run3", set_numbers=[3])
 
-for i in 1:2
-	HZAM.run_HZAM_sets_complete_one_locus()
+for i in 1:4
+	HZAM.run_HZAM_sets_complete_one_locus("Run3_replicate_$i")
+	HZAM.run_HZAM_sets_complete_nine_loci("Run3_replicate_$i")
 end

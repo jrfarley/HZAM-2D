@@ -19,7 +19,7 @@ end
 	using Dates
 end
 
-# run main simulation sets
-for i in 1:2
-	HZAM.run_HZAM_sets_complete_three_loci()
+# run the three loci sets 4 more times
+for i in 1:4
+	HZAM.run_HZAM_sets_complete_three_loci("Run3_replicate_$i")
 end

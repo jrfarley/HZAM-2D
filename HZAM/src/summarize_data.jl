@@ -45,22 +45,14 @@ are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
 - `max_generations::Integer`: how many generations to run the simulations for.
 - `K_total::Integer`: the carrying capacity of the simulated range.
 """
-function run_HZAM_sets_complete_three_loci(;
+function run_HZAM_sets_complete_three_loci(run_name::String;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/Run3_three_loci_$(Dates.format(today(), "yyyymmdd"))"
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run4_three_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run5_three_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
+	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
 	
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
@@ -113,22 +105,14 @@ are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
 - `max_generations::Integer`: how many generations to run the simulations for.
 - `K_total::Integer`: the carrying capacity of the simulated range.
 """
-function run_HZAM_sets_complete_one_locus(;
+function run_HZAM_sets_complete_one_locus(run_name;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/Run3_one_locus_$(Dates.format(today(), "yyyymmdd"))"
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run4_one_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run5_one_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
+	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
 	
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
@@ -182,22 +166,14 @@ are full pleiotropy, no pleiotropy, magic cue, magic preference, etc.).
 - `max_generations::Integer`: how many generations to run the simulations for.
 - `K_total::Integer`: the carrying capacity of the simulated range.
 """
-function run_HZAM_sets_complete_nine_loci(;
+function run_HZAM_sets_complete_nine_loci(run_name;
 	set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
 	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/Run3_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run4_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
-
-	if isdir(dir)
-		dir = "HZAM-J_2D_results/Run5_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
-	end
+	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
