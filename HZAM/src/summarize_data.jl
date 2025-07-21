@@ -112,7 +112,7 @@ function run_HZAM_sets_complete_one_locus(run_name;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
+	dir = "HZAM-J_2D_results/$(run_name)_one_locus_$(Dates.format(today(), "yyyymmdd"))"
 	
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
@@ -173,7 +173,7 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
+	dir = "HZAM-J_2D_results/$(run_name)_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
