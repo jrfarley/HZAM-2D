@@ -6,6 +6,7 @@ using Colors
 using DataFrames
 using GLM
 using HypothesisTests
+using MannKendall
 
 CairoMakie.activate!()
 
@@ -19,11 +20,11 @@ colors = [
 	RGB(166 / 255, 206 / 255, 227 / 255),
 	RGB(31 / 255, 120 / 255, 180 / 255),
 	RGB(177 / 255, 89 / 255, 40 / 255),
-	#RGB(106 / 255, 66 / 255, 154 / 255),
+	RGB(0 / 255, 0 / 255, 0 / 255),
 ]
 
 "The directory where the simulation run is stored."
-dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/Run3/"
+dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/Run3_three_loci_20250716/"
 
 "Folders with all simulation outcome files from each set used for the main plot"
 folders = [
@@ -56,7 +57,7 @@ group_color = [PolyElement(color = color, strokecolor = :transparent)
 			   for color in colors]
 
 "Outcome names for the legend"
-labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended"]
+labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended", "One species"]
 
 
 """
@@ -72,6 +73,12 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 		return 5
 	end
 
+	if is_one_species_extinct(outcome)
+		println("EXTINCTION")
+		println(outcome.sim_params)
+		return 6
+	end
+
 	if is_blended(outcome)
 		return 5
 	end
@@ -85,30 +92,41 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 	return 1
 end
 
+function is_one_species_extinct(outcome::HZAM.DataAnalysis.OutputData)
+	mmt_phenotype_counts = outcome.population_tracking_data[2]
+
+	final_phenotype_counts = mmt_phenotype_counts[end]
+
+	num_mmt_loci = length(outcome.sim_params.male_mating_trait_loci)
+
+	species_A_proportion = sum(final_phenotype_counts[1:(Integer(floor(0.2*num_mmt_loci))+1)])
+
+	species_B_proportion = sum(final_phenotype_counts[(Integer(ceil(1.8*num_mmt_loci))+1):length(final_phenotype_counts)])
+
+	return (species_A_proportion==0 && species_B_proportion > 0.5) || (species_B_proportion==0 && species_A_proportion>0.5)
+end
+
+function is_cline_width_increasing(outcome::HZAM.DataAnalysis.OutputData)
+	cline_widths = outcome.hybrid_zone_width[11:30]
+
+	test = mk_original_test(cline_widths)
+
+	return test.trend=="increasing"
+end
+
 function is_blended(outcome::HZAM.DataAnalysis.OutputData)
-	total_loci = length(outcome.sim_params.male_mating_trait_loci)
-	mmt_phenotype_counts = outcome.population_tracking_data[1]
 
-	if outcome.hybrid_zone_width > 1 && outcome.bimodality < 0.95
+	if outcome.bimodality > 0.95
+		return false
+	end
+
+	max_cline_width = maximum(outcome.hybrid_zone_width)
+
+	if max_cline_width > 1
 		return true
-	else
-		return false
 	end
 
-	function get_hybrid_proportion(phenotype_counts)
-		hybrid_population = 0
-		sum(phenotype_counts[2:(length(phenotype_counts)-1)])
-	end
-	
-	hybrid_proportions = get_hybrid_proportion.(mmt_phenotype_counts)[501:1500]
-
-	if all(x->x==hybrid_proportions[1], hybrid_proportions)
-		return false
-	end
-
-	test_result = ADFTest(hybrid_proportions, :constant, 20)
-
-	return pvalue(test_result) >= 0.05
+	return is_cline_width_increasing(outcome)
 end
 
 
@@ -147,7 +165,7 @@ function make_subplot(output_array::Array{<:Real}, ax::Makie.Axis)
 		ax,
 		output_array',
 		colormap = colors,
-		colorrange = (1, 5),
+		colorrange = (1, 6),
 	)
 
 	xs = collect(1:8)
@@ -185,7 +203,7 @@ function make_main_plot()
 			yticklabelsize = 18,
 			xlabelsize = 20,
 			ylabelsize = 20,
-			titlesize = 22
+			titlesize = 22,
 		)
 		make_subplot(outcomes[i], ax)
 		push!(axes, ax)
@@ -202,7 +220,7 @@ function make_main_plot()
 		labelvalign = :center,
 	)
 	resize_to_layout!(f)
-	save("$(dirname(@__DIR__))/figures/main_plot_test.png", f)
+	save("$(dirname(@__DIR__))/figures/main_plot_test_three_loci.png", f)
 end
 
 save_outcomes()

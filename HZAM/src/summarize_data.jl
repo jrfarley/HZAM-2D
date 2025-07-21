@@ -1,6 +1,7 @@
-using Colors, ColorSchemes
-#using GLMakie
-using JLD2 # needed for saving / loading data in Julia format
+using ColorSchemes
+using Colors
+using Dates
+using JLD2
 using LsqFit: curve_fit
 using Statistics
 
@@ -51,6 +52,16 @@ function run_HZAM_sets_complete_three_loci(;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
+	dir = "HZAM-J_2D_results/Run3_three_loci_$(Dates.format(today(), "yyyymmdd"))"
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run4_three_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run5_three_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+	
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
@@ -71,9 +82,10 @@ function run_HZAM_sets_complete_three_loci(;
 			hybrid_survival_loci[i],
 			per_reject_cost[i],
 			w_hyb_set_of_run,
-			S_AM_set_of_run;
+			S_AM_set_of_run,
+			dir;
 			max_generations,
-			K_total,
+			K_total
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
@@ -108,6 +120,17 @@ function run_HZAM_sets_complete_one_locus(;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
+	dir = "HZAM-J_2D_results/Run3_one_locus_$(Dates.format(today(), "yyyymmdd"))"
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run4_one_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run5_one_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+	
+
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
@@ -128,9 +151,10 @@ function run_HZAM_sets_complete_one_locus(;
 			hybrid_survival_loci[i],
 			per_reject_cost[i],
 			w_hyb_set_of_run,
-			S_AM_set_of_run;
+			S_AM_set_of_run,
+			dir;
 			max_generations,
-			K_total,
+			K_total
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
@@ -165,6 +189,16 @@ function run_HZAM_sets_complete_nine_loci(;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
+	dir = "HZAM-J_2D_results/Run3_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run4_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+
+	if isdir(dir)
+		dir = "HZAM-J_2D_results/Run5_nine_loci_$(Dates.format(today(), "yyyymmdd"))"
+	end
+
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
@@ -184,9 +218,10 @@ function run_HZAM_sets_complete_nine_loci(;
 			hybrid_survival_loci[i],
 			per_reject_cost[i],
 			w_hyb_set_of_run,
-			S_AM_set_of_run;
+			S_AM_set_of_run,
+			dir;
 			max_generations,
-			K_total,
+			K_total
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
@@ -257,8 +292,10 @@ end
 		hybrid_survival_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
 		per_reject_cost::Real,
 		w_hyb_set::Union{UnitRange{<:Real}, Vector{<:Real}},
-		S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}};
-		<keyword arguments>
+		S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}},
+		dir::String;
+		intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
+		survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
 	)
 
 Run the simulation for the given combinations of hybrid fitness and assortative mating 
@@ -288,11 +325,12 @@ function run_HZAM_set(
 	hybrid_survival_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
 	per_reject_cost::Real,
 	w_hyb_set::Union{UnitRange{<:Real}, Vector{<:Real}},
-	S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}};
+	S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}},
+	dir::String;
 	intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
 	survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
 )
-	dir = mkpath(string(results_folder, "/", set_name))
+	dir = mkpath(string(dir, "/", set_name))
 	set_working_dir(dir)
 
 	# Loop through the different simulation sets

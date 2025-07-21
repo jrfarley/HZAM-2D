@@ -146,7 +146,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		else
 			# display plot of individual locations and genotypes
 			PlotData.create_population_plot(
-				DataAnalysis.calc_traits_additive(genotypes, female_mating_trait_loci),
+				DataAnalysis.calc_traits_additive(genotypes, male_mating_trait_loci),
 				x_locations,
 				y_locations,
 				save_plot,
@@ -379,6 +379,21 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 				vcat([d.y_locations_M for d in pd.population]...)
 			]
 
+			male_cline_width = DataAnalysis.calc_cline_width(
+				pd,
+				male_mating_trait_loci,
+				0.1:0.2:0.9,
+			)
+
+			female_cline_width = DataAnalysis.calc_cline_width(
+				pd,
+				female_mating_trait_loci,
+				0.1:0.2:0.9,
+			)
+
+			println("Mating cue cline: $male_cline_width")
+
+			println("Mating preference cline: $female_cline_width")
 
 			if gene_plot
 				# histogram of phenotype counts for each trait

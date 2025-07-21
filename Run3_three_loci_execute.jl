@@ -17,8 +17,9 @@ end
 
 	import .HZAM
 	using Dates
-	HZAM.set_results_folder("HZAM-J_2D_results/Run3_three_loci_$(Dates.format(today(), "yyyymmdd"))")
 end
 
 # run main simulation sets
-HZAM.run_HZAM_sets_complete_three_loci()
+for i in 1:2
+	HZAM.run_HZAM_sets_complete_three_loci()
+end

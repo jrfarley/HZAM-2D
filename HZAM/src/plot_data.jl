@@ -208,8 +208,8 @@ function create_gene_plot(
 
     hybrid_survival_indices = DataAnalysis.calc_traits_additive(genotypes, loci.hybrid_survival)
 
-    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
-    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    species_A_indices = findall(h -> h < 0.5, hybrid_survival_indices)
+    species_B_indices = findall(h -> h > 0.5, hybrid_survival_indices)
     other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
 
     species_A_output = count_genotypes.(values(loci), Ref(genotypes[species_A_indices]))
@@ -276,8 +276,8 @@ function update_gene_plot(
 
     hybrid_survival_indices = DataAnalysis.calc_traits_additive(genotypes, loci.hybrid_survival)
 
-    species_A_indices = findall(h -> h == 0, hybrid_survival_indices)
-    species_B_indices = findall(h -> h == 1, hybrid_survival_indices)
+    species_A_indices = findall(h -> h < 0.5, hybrid_survival_indices)
+    species_B_indices = findall(h -> h > 0.5, hybrid_survival_indices)
     other_indices = setdiff(eachindex(genotypes), union(species_A_indices, species_B_indices))
 
     species_A_output = count_genotypes.(values(loci), Ref(genotypes[species_A_indices]))
