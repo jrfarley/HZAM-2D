@@ -19,10 +19,10 @@ end
 end
 
 # run main simulation sets
-HZAM.run_HZAM_sets_complete_nine_loci("Run3_replicate_1", set_numbers=2:9)
-HZAM.run_HZAM_sets_complete_one_locus("Run3_replicate_1", set_numbers=3:9)
+HZAM.run_HZAM_sets_complete_nine_loci("Run3_replicate_1", set_numbers=[2,3,4,5,6,7,10,11])
+HZAM.run_HZAM_sets_complete_one_locus("Run3_replicate_1", set_numbers=[3,4,5,6,7,10,11])
 
 for i in 2:4
-	HZAM.run_HZAM_sets_complete_one_locus("Run3_replicate_$i")
-	HZAM.run_HZAM_sets_complete_nine_loci("Run3_replicate_$i")
+	HZAM.run_HZAM_sets_complete_one_locus("Run3_replicate_$i", set_numbers=[1,2,3,4,5,6,7,10,11])
+	HZAM.run_HZAM_sets_complete_nine_loci("Run3_replicate_$i", set_numbers=[1,2,3,4,5,6,7,10,11])
 end
