@@ -82,10 +82,18 @@ function categorize(outcome::Union{HZAM.DataAnalysis.OutputData, Missing})
 	if is_blended(outcome)
 		return 5
 	end
+	overlap = HZAM.Population.calc_species_overlap(
+		outcome.population_data.population,
+		0.03,
+		0.01,
+		outcome.sim_params.male_mating_trait_loci,
+	)[1]
 
-	if outcome.bimodality > 0.95
-		return outcome.population_overlap < 0.3 ? 3 : 4
-	elseif outcome.bimodality < 0.5
+	bimodality = HZAM.DataAnalysis.calc_bimodality(outcome.population_data, outcome.sim_params.male_mating_trait_loci)
+
+	if bimodality > 0.95
+		return overlap < 0.3 ? 3 : 4
+	elseif bimodality < 0.5
 		return 2
 	end
 
@@ -223,5 +231,17 @@ function make_main_plot()
 	save("$(dirname(@__DIR__))/figures/main_plot_test_nine_loci.png", f)
 end
 
+function test_categorization(dir)
+	outcome_array = HZAM.load_from_folder(dir)
+	output_array = categorize.(outcome_array)
+	println(output_array)
+end
+
+test_categorization("HZAM-J_2D_results/Run3_magic_search_costs_three_loci_20250721/low_reject_separate_fmt")
+
+
+readline()
+#=
 save_outcomes()
 make_main_plot()
+=#

@@ -56,12 +56,13 @@ function run_HZAM_sets_complete_three_loci(run_name::String;
 	
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
-		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
-	total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9, 1, 3]
-	female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6]
-	male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9]
-	hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
-	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
+		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
+		"low_reject_separate_fmt", "high_reject_separate_fmt"]
+	total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9, 9, 9]
+	female_mating_trait_loci = 	[1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6, 4:6]
+	male_mating_trait_loci = 	[1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9, 1:3]
+	hybrid_survival_loci = 		[1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
+	per_reject_cost = 			[0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 
 	println("$(nprocs()) threads running")
@@ -118,12 +119,12 @@ function run_HZAM_sets_complete_one_locus(run_name;
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
-		"one_locus_full_pleiotropy", "one_locus_no_pleiotropy"]
-	total_loci = [2, 4, 3, 3, 3, 2, 2, 3, 3]
-	female_mating_trait_loci = [[1], [2], [1], [2], [2], [1], [1], [2], [2]]
-	male_mating_trait_loci = [[1], [3], [2], [1], [2], [1], [1], [3], [3]]
-	hybrid_survival_loci = [[1], [1], [1], [1], [1], [1], [1], [1], [1]]
-	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
+		"low_reject_separate_fmt", "high_reject_separate_fmt"]
+	total_loci = [2, 4, 3, 3, 3, 2, 2, 3, 3, 3, 3]
+	female_mating_trait_loci = [[1], [2], [1], [2], [2], [1], [1], [2], [2], [2], [2]]
+	male_mating_trait_loci = [[1], [3], [2], [1], [2], [1], [1], [3], [3], [1], [1]]
+	hybrid_survival_loci = [[1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1]]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 	println("$(nprocs()) threads running")
 	@async @distributed for i in set_numbers
@@ -177,12 +178,13 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
-		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy"]
-	total_loci = [18, 36, 27, 27, 27, 18, 18, 27, 27]
-	female_mating_trait_loci = [1:9, 10:18, 1:9, 10:18, 10:18, 1:9, 1:9, 10:18, 10:18]
-	male_mating_trait_loci = [1:9, 19:27, 10:18, 10:18, 4:6, 1:9, 1:9, 19:27, 19:27]
-	hybrid_survival_loci = [1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9]
-	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05]
+		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
+		"low_reject_separate_fmt", "high_reject_separate_fmt"]
+	total_loci = [18, 36, 27, 27, 27, 18, 18, 27, 27, 27, 27]
+	female_mating_trait_loci = [1:9, 10:18, 1:9, 10:18, 10:18, 1:9, 1:9, 10:18, 10:18, 10:18, 10:18]
+	male_mating_trait_loci = [1:9, 19:27, 10:18, 1:9, 10:18, 1:9, 1:9, 19:27, 19:27, 1:9, 1:9]
+	hybrid_survival_loci = [1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9, 1:9]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 	println("$(nprocs()) threads running")
 	@async @distributed for i in set_numbers

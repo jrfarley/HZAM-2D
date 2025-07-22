@@ -636,7 +636,7 @@ function calc_real_densities(
 	if species ≠ -1
 		genotypes_all = vcat([[z.genotypes_F; z.genotypes_M] for z in neighbourhood]...)
 		hybrid_indices = calc_traits_additive(genotypes_all, loci)
-		filtered_indices = filter(i -> hybrid_indices[i] == species, eachindex(hybrid_indices))
+		filtered_indices = filter(i -> abs(hybrid_indices[i] - species) ≤ 0.1, eachindex(hybrid_indices))
 
 		x_locations_all = x_locations_all[filtered_indices]
 		y_locations_all = y_locations_all[filtered_indices]

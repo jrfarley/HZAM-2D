@@ -283,7 +283,7 @@ function calc_bimodality_on_transect(
 	interest and if `species=-1 then every phenotype is included."
 	function calc_density(x, y; species = -1)
 		if species != -1
-			indices = findall(h -> h == species, hybrid_indices)
+			indices = findall(h -> abs(h-species) ≤ 0.1, hybrid_indices)
 		else
 			indices = eachindex(hybrid_indices)
 		end
