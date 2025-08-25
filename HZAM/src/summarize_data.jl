@@ -25,6 +25,11 @@ global S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]
 "Evenly spaced x coordinates over the range."
 global spaced_locations = collect(Float32, 0:0.01:1)
 
+global set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
+	"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
+	"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
+	"low_reject_separate_fmt", "high_reject_separate_fmt"]
+
 """
 	run_HZAM_sets_complete_three_loci(;
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
@@ -51,18 +56,19 @@ function run_HZAM_sets_complete_three_loci(run_name::String;
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
+	cline_width_loci = "mmt",
 )
-	dir = "HZAM-J_2D_results/$(run_name)_three_loci_$(Dates.format(today(), "yyyymmdd"))"
-	
+	dir = "HZAM-J_2D_results/$(run_name)_three_loci"
+
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
 		"separate_hst", "low_reject_full_pleiotropy", "high_reject_full_pleiotropy",
 		"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
 		"low_reject_separate_fmt", "high_reject_separate_fmt"]
 	total_loci = [6, 12, 9, 9, 9, 6, 6, 9, 9, 9, 9]
-	female_mating_trait_loci = 	[1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6, 4:6]
-	male_mating_trait_loci = 	[1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9, 1:3]
-	hybrid_survival_loci = 		[1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
-	per_reject_cost = 			[0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
+	female_mating_trait_loci = [1:3, 4:6, 1:3, 4:6, 4:6, 1:3, 1:3, 4:6, 4:6, 4:6, 4:6]
+	male_mating_trait_loci = [1:3, 7:9, 4:6, 1:3, 4:6, 1:3, 1:3, 7:9, 7:9, 1:3, 1:3]
+	hybrid_survival_loci = [1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3, 1:3]
+	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 
 	println("$(nprocs()) threads running")
@@ -78,13 +84,15 @@ function run_HZAM_sets_complete_three_loci(run_name::String;
 			S_AM_set_of_run,
 			dir;
 			max_generations,
-			K_total
+			K_total,
+			cline_width_loci,
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
 		println("--------------------")
 	end
 end
+
 
 """
 	run_HZAM_sets_complete_one_locus(;
@@ -139,7 +147,7 @@ function run_HZAM_sets_complete_one_locus(run_name;
 			S_AM_set_of_run,
 			dir;
 			max_generations,
-			K_total
+			K_total,
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
@@ -173,7 +181,9 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
+	cline_width_loci = "mmt",
 )
+	dir = "HZAM-J_2D_results/$(run_name)_nine_loci"
 	dir = "HZAM-J_2D_results/$(run_name)_nine_loci"
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
@@ -199,7 +209,8 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 			S_AM_set_of_run,
 			dir;
 			max_generations,
-			K_total
+			K_total,
+			cline_width_loci,
 		)
 		println("--------------------")
 		println(string(set_names[i], " completed successfully!"))
@@ -307,6 +318,7 @@ function run_HZAM_set(
 	dir::String;
 	intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
 	survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
+	cline_width_loci = "mmt",
 )
 	dir = mkpath(string(dir, "/", set_name))
 	set_working_dir(dir)
@@ -340,6 +352,7 @@ function run_HZAM_set(
 				sigma_disp,
 				do_plot = false,
 				run_name = run_name,
+				cline_width_loci,
 			)
 			println("Ending: $run_name")
 
@@ -746,3 +759,5 @@ function summarize_gene_correlations(source_dir::String; filename = "gene_correl
 	save(string(dir, "/", filename, ".png"), fig)
 	readline()
 end
+
+

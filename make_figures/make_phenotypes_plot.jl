@@ -38,7 +38,10 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		output
 	end
 
-	@load filename mmt_phenotype_counts fmt_phenotype_counts outcome
+	@load filename  outcome
+
+	mmt_phenotype_counts = outcome.population_tracking_data[2]
+	fmt_phenotype_counts = outcome.population_tracking_data[1]
 
 	"The phenotype frequency over time and transect sub-subplots are grid layouts since each 
 	row of the plot is a separate heatmap because the colormaps need to be different."
@@ -168,10 +171,10 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 	hidedecorations!(ax5, ticks = true)
 	hidedecorations!(ax6, ticks = true)
 
-	ax2.xticks = [1000, 2000]
+	ax2.xticks = [2000, 4000]
 	linkxaxes!(ax1, ax2)
 	linkyaxes!(ax1, ax2)
-	ax1.xticks = [1000, 2000]
+	ax1.xticks = [2000, 4000]
 
 	"Add the preference phenotype frequencies over time to ax1."
 	heatmap!(ax1, reshape_output(fmt_phenotype_counts), colormap = Reverse(:grayC))
@@ -311,14 +314,14 @@ function compare_phenotype_plots()
 	gc = f[3, 1] = GridLayout()
 	gd = f[4, 1] = GridLayout()
 
-	dir = "$(dirname(@__DIR__))/HZAM-2D_Julia_results_GitIgnore/example_outcomes/"
-	make_phenotype_subplot(ga, string(dir, "no_pleiotropy"), "A) No Pleiotropy")
-	make_phenotype_subplot(gb, string(dir, "magic_preference"), "B) Magic Preference")
-	make_phenotype_subplot(gc, string(dir, "magic_cue"), "C) Magic Cue")
-	make_phenotype_subplot(gd, string(dir, "search_cost"), "D) No Pleiotropy, 5% Search Cost")
+	dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/example_outcomes_6000_gen/"
+	make_phenotype_subplot(ga, string(dir, "no_pleiotropy.jld2"), "A) No Pleiotropy")
+	make_phenotype_subplot(gd, string(dir, "magic_cue_search_cost.jld2"), "D) Magic Cue, 5% Search Cost")
+	make_phenotype_subplot(gb, string(dir, "magic_cue.jld2"), "B) Magic Cue")
+	make_phenotype_subplot(gc, string(dir, "search_cost.jld2"), "C) No Pleiotropy, 5% Search Cost")
 
 	display(f)
-	save("$(dirname(@__DIR__))/figures/phenotypes_over_time.png", f)
+	save("$(dirname(@__DIR__))/figures/phenotypes_over_time_test.png", f)
 end
 
 """

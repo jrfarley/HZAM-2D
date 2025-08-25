@@ -37,7 +37,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	hybrid_survival_loci = 1:3, survival_fitness_method::String = "epistasis",
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
-	run_name = "temp")
+	run_name = "temp",
+	cline_width_loci = "mmt")
 
 
 	parameters = DataAnalysis.SimParams(
@@ -53,6 +54,13 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		hybrid_survival_loci,
 		per_reject_cost,
 	)
+
+	if cline_width_loci== "mmt"
+		cline_width_loci = male_mating_trait_loci
+	elseif cline_width_loci == "fmt"
+		cline_width_loci = female_mating_trait_loci
+		println("Measuring FMT cline width")
+	end
 
 	mmt_phenotype_counts = []
 	fmt_phenotype_counts = []
@@ -401,7 +409,7 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 			else
 				# plot of locations and hybrid indices
 				PlotData.update_population_plot(
-					DataAnalysis.calc_traits_additive(genotypes, male_mating_trait_loci),
+					DataAnalysis.calc_traits_additive(genotypes, cline_width_loci),
 					x_locations,
 					y_locations,
 					generation,
@@ -413,10 +421,11 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		if generation % 50 == 0
 			width = DataAnalysis.calc_cline_width(
 				pd,
-				male_mating_trait_loci,
+				cline_width_loci,
 				0.1:0.2:0.9,
 			)
 			push!(cline_width, width)
+			# println("Mating preference cline: $width")
 		end
 
 
