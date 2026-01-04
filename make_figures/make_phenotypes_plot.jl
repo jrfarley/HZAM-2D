@@ -1,4 +1,4 @@
-include("$(dirname(@__DIR__))/HZAM/src/HZAM.jl")
+include("$(pwd())/HZAM/src/HZAM.jl")
 import .HZAM
 using JLD2 # needed for saving / loading data in Julia format
 using CairoMakie
@@ -38,7 +38,10 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		output
 	end
 
-	@load filename  outcome
+	print(filename)
+	@load filename outcome
+
+	print("loaded")
 
 	mmt_phenotype_counts = outcome.population_tracking_data[2]
 	fmt_phenotype_counts = outcome.population_tracking_data[1]
@@ -62,6 +65,8 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		yminorticks = [4],
 	)
 
+	print("ax1")
+
 	"Axis showing the cue phenotype frequencies over time."
 	ax2 = Axis(
 		g[2, 1],
@@ -76,6 +81,7 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		yminorticks = [4],
 	)
 
+	print("ax2")
 	"Axis showing the preference densities over a transect at the end of the simulation."
 	ax3 = Axis(
 		g[1, 2],
@@ -84,6 +90,7 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		yminorticks = [4],
 		xminorticks = [51],
 	)
+	print("ax3")
 
 
 	"Axis showing the cue densities over a transect at the end of the simulation."
@@ -98,18 +105,21 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		yminorticks = [4],
 		xminorticks = [51],
 	)
+	print("ax4")
 
 	"Axis showing the locations and preferences of each individual in the simulation."
 	ax5 = Axis(
 		g[1, 3],
 		aspect = 1,
 	)
+	print("ax5")
 
 	"Axis showing the locations and cues of each individual in the simulation."
 	ax6 = Axis(
 		g[2, 3],
 		aspect = 1,
 	)
+	print("ax6")
 
 	pd = outcome.population_data
 	genotypes = [
@@ -135,6 +145,8 @@ function make_phenotype_subplot(g::Makie.GridLayout, filename::String, plotname:
 		x_locations,
 		y_locations,
 	)
+
+	println("phenotypes plotted")
 
 	"Add the cue phenotype densities to ax4."
 	plot_phenotype_distribution(
@@ -314,14 +326,14 @@ function compare_phenotype_plots()
 	gc = f[3, 1] = GridLayout()
 	gd = f[4, 1] = GridLayout()
 
-	dir = "$(dirname(@__DIR__))/HZAM-J_2D_results/example_outcomes_6000_gen/"
+	dir = "$(pwd())/HZAM-J_2D_results/example_outcomes_6000_gen/"
 	make_phenotype_subplot(ga, string(dir, "no_pleiotropy.jld2"), "A) No Pleiotropy")
 	make_phenotype_subplot(gd, string(dir, "magic_cue_search_cost.jld2"), "D) Magic Cue, 5% Search Cost")
 	make_phenotype_subplot(gb, string(dir, "magic_cue.jld2"), "B) Magic Cue")
 	make_phenotype_subplot(gc, string(dir, "search_cost.jld2"), "C) No Pleiotropy, 5% Search Cost")
 
 	display(f)
-	save("$(dirname(@__DIR__))/figures/phenotypes_over_time_test.png", f)
+	save("$(pwd())/figures/phenotypes_over_time_appendix.png", f)
 end
 
 """

@@ -4,15 +4,13 @@ using Dates
 using JLD2
 using LsqFit: curve_fit
 using Statistics
+using MannKendall
 
 "Compute the mean value of a vector."
 mean(itr) = sum(itr) / length(itr)
 
 "The default directory where all files are saved."
 global results_folder = mkpath("HZAM-J_2D_results")
-
-"The active directory that simulation.jl uses."
-global working_dir = results_folder
 
 
 "The set of hybrid fitnesses (w_hyb) values that will be run"
@@ -218,6 +216,103 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 end
 
 """
+	categorize(outcome)
+
+Classify the simulation outcome into one of six outcome types based on the cline width, bimodality, and population overlap.
+"""
+function categorize(outcome; categorization_loci = "mmt")::Integer
+	# if there is no simulation outcome return 7 (not one of the 6 outcome types)
+	if ismissing(outcome)
+		return 7
+	end
+
+	loci::Union{UnitRange{<:Integer}, Vector{<:Integer}} = [1]
+
+	if categorization_loci == "fmt"
+		loci = outcome.sim_params.female_mating_trait_loci
+	else
+		loci = outcome.sim_params.male_mating_trait_loci
+	end
+
+	# return 6 when one of the initial populations is extinct, 5 when the two populations are blended
+	if is_one_species_extinct(outcome; categorization_loci)
+		return 6
+	elseif is_blended(outcome)
+		return 5
+	end
+
+	# calculate the percentage of the simulated range occupied by both populations
+	overlap = Population.calc_species_overlap(
+		outcome.population_data.population,
+		0.03,
+		0.01,
+		loci,
+	)[1]
+
+	# calculate the hybrid zone bimodality	
+	bimodality = DataAnalysis.calc_bimodality(outcome.population_data, loci)
+
+	# bimodality determines if the simulation outcome is overlap, bimodal, or Unimodal
+	# overlap determines if the simulation outcome is narrow overlap or broad overlap
+	if bimodality > 0.95
+		return overlap < 0.3 ? 3 : 4
+	elseif bimodality < 0.5
+		return 2
+	end
+
+	return 1
+end
+
+"""
+	is_one_species_extinct(outcome::HZAM.DataAnalysis.OutputData; categorization_loci = "mmt")::Bool
+
+Determine if the simulation outcome shows the extinction of one population.
+"""
+function is_one_species_extinct(outcome; categorization_loci = "mmt")::Bool
+	# phenotype_counts stores the number of individuals with each categorization_loci phenotype for each generation
+	# num_loci is the number of loci in the trait of interest (as determined by categorization_loci)
+	if categorization_loci=="fmt"
+		phenotype_counts = outcome.population_tracking_data[1]
+		num_loci = length(outcome.sim_params.female_mating_trait_loci)
+	else
+		phenotype_counts = outcome.population_tracking_data[2]
+		num_loci = length(outcome.sim_params.male_mating_trait_loci)
+	end
+
+	# phenotype counts at the end of the simulation
+	final_phenotype_counts = phenotype_counts[end]
+
+	species_A_proportion = sum(final_phenotype_counts[1:(Integer(floor(0.2*num_loci))+1)])
+
+	species_B_proportion = sum(final_phenotype_counts[(Integer(ceil(1.8*num_loci))+1):length(final_phenotype_counts)])
+
+	return (species_A_proportion == 0 && species_B_proportion > 0.5) || (species_B_proportion == 0 && species_A_proportion>0.5)
+end
+
+"""
+	is_blended(outcome::HZAM.DataAnalysis.OutputData)::Bool
+
+Determine if a simulation outcome is blended.
+"""
+function is_blended(outcome)::Bool
+	# Simulation outcomes with bimodality>0.95 are not blended. Otherwise they are if the 
+	# cline width ever excedes the width of the simulated range.
+	if outcome.bimodality > 0.95
+		return false
+	elseif maximum(outcome.hybrid_zone_width) > 1
+		return true
+	end
+
+	# Perform a Mann-Kendall test to determine if the cline width is increasing
+	cline_widths = outcome.hybrid_zone_width[11:end]
+	test = mk_original_test(cline_widths)
+
+	return test.trend=="increasing"
+end
+
+
+
+"""
 	run_HZAM_sets_supplemental(run_name::String;
 		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
 		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
@@ -320,7 +415,6 @@ function run_HZAM_set(
 	cline_width_loci = "mmt",
 )
 	dir = mkpath(string(dir, "/", set_name))
-	set_working_dir(dir)
 
 	# Loop through the different simulation sets
 	for i in eachindex(w_hyb_set)
@@ -368,6 +462,73 @@ function run_HZAM_set(
 	end # of w_hyb loop   
 end
 
+function run_HZAM_set_search_cost_supplement(
+	set_name::String,
+	total_loci::Int,
+	female_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
+	male_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
+	hybrid_survival_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
+	per_reject_cost_set::Union{UnitRange{<:Real}, Vector{<:Real}},
+	S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}},
+	dir::String;
+	intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
+	survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
+	cline_width_loci = "mmt",
+	w_hyb = 1,
+	mating_preference_type = "additive",
+)
+	dir = mkpath(string(dir, "/", set_name))
+	println(per_reject_cost_set)
+	println(S_AM_set)
+
+	index_array = Array{Missing, 2}(
+		undef, length(per_reject_cost_set), length(S_AM_set),
+	)
+
+	# Loop through the different simulation sets
+	@async @distributed for i in CartesianIndices(index_array)
+		sc = per_reject_cost_set[i[1]]
+		S_AM = S_AM_set[i[2]]
+
+		run_name =
+			string(
+				"HZAM_simulation_run_gen", max_generations, "_SC",
+				sc, "_Whyb", w_hyb, "_SAM", S_AM,
+			)
+
+		println("Beginning: $run_name")
+		# run one simulation by calling the function defined above:
+		outcome = run_one_HZAM_sim(
+			w_hyb,
+			S_AM,
+			intrinsic_R;
+			K_total,
+			max_generations,
+			total_loci,
+			female_mating_trait_loci,
+			male_mating_trait_loci,
+			hybrid_survival_loci,
+			survival_fitness_method,
+			per_reject_cost = sc,
+			sigma_disp,
+			do_plot = false,
+			run_name = run_name,
+			cline_width_loci,
+		)
+		println("Ending: $run_name")
+
+		if !isnothing(outcome)
+			run_name_full_gen =
+				string(
+					"HZAM_simulation_run_gen", max_generations, "_SC",
+					sc, "_Whyb", w_hyb, "_SAM", S_AM,
+				)
+			filename = string(dir, "/", run_name_full_gen, ".jld2")
+			@save filename outcome
+		end
+	end # of S_AM loop
+end
+
 
 """
 	set_results_folder(dir::String)
@@ -378,67 +539,23 @@ function set_results_folder(dir::String)
 	global results_folder = mkpath(dir)
 end
 
-"""
-	set_working_dir(dir::String)
-
-Set the output directory for all methods in summarize_data.jl.
-"""
-function set_working_dir(dir::String)
-	global working_dir = mkpath(dir)
-end
 
 """
-	plot_output_field(
-		outcomes::Array{<:Real},
-		sim_params::Array{DataAnalysis.SimParams}
-	)
+	read_directory(dir::String, set::String)
 
-Create a heatmap of an output variable vs hybrid fitness and assortative mating.
-
-# Arguments
-- `outcomes::Array{:Real}`: the output from the simulation to be displayed.
-- `sim_params::Array{<:DataAnalysis.SimParams}`: the simulation parameters resulting in the
- outcomes.
+Load the data from each simulation output style in each run folder in the given directory 
+for the given simulation set (i.e. "full_pleiotropy").
 """
-function plot_output_field(
-	outcomes::Array{<:Real},
-	sim_params::Array{DataAnalysis.SimParams},
-)
-	output = [outcomes...]
-	w_hybs = [[s.w_hyb for s in sim_params]...]
-	S_AMs = [[s.S_AM for s in sim_params]...]
-
-	w_hyb_set = sort(union(w_hybs))
-	S_AM_set = sort(union(S_AMs))
-	xticks = collect(1:length(S_AM_set))
-	yticks = collect(1:length(w_hyb_set))
-
-	xs = map(s -> indexin(s, S_AM_set)[1], S_AMs)
-	ys = map(w -> indexin(w, w_hyb_set)[1], w_hybs)
-
-
-	fontsize_theme = Theme(fontsize = 25)
-	set_theme!(fontsize_theme)  # this sets the standard font size
-
-	fig = Figure(resolution = (1800, 1200), figure_padding = 60, colormap = :grayC)
-
-	ax = Axis(
-		fig[1, 1],
-		xlabel = "w_hyb",
-		ylabel = "S_AM",
-		xticks = (xticks, string.(S_AM_set)),
-		yticks = (yticks, string.(w_hyb_set)),
-		xticklabelsize = 20,
-		yticklabelsize = 20,
-		xlabelsize = 15,
-		ylabelsize = 15,
-	)
-	hm = heatmap!(ax, xs, ys, output, colorrange = (0, 0.5))
-
-	Colorbar(fig[:, 2], hm, ticklabelsize = 15)
-	display(fig)
-	readline()
-	return fig
+function read_directory(dir::String, set::String)
+	input_folders = readdir(dir, join = true)
+	outcome_arrays = []
+	for folder in input_folders
+		try
+			push!(outcome_arrays, load_from_folder("$(folder)/$(set)"))
+		catch
+		end
+	end
+	return outcome_arrays
 end
 
 """
@@ -448,63 +565,33 @@ Load the data from each simulation output file stored in the given directory int
 organized by hybrid fitness and assortative mating strength.
 """
 function load_from_folder(dir::String)
-	files = readdir(dir)
 	outcome_array = Array{Union{DataAnalysis.OutputData, Missing}, 2}(
 		undef, length(w_hyb_set), length(S_AM_set),
 	)
 	for i in eachindex(outcome_array)
 		outcome_array[i] = missing
 	end
-	for file in files
-		path = string(dir, "/", file)
-		if occursin(".jld2", path)
-			@load path outcome
-
-			println(outcome.sim_params)
-
-			if outcome.sim_params.S_AM in S_AM_set
-				outcome_array[
-					indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
-					indexin(outcome.sim_params.S_AM, S_AM_set)[1],
-				] = outcome
-			end
-		end
-	end
-	return outcome_array
-end
-
-"""
-	load_from_folder(dir::String)
-
-Load the data from each simulation output file stored in the given directory where hybrid 
-fitness is one and store the output in a vector of tuples `(outcome, S_AM)`.
-"""
-function load_from_folder_whyb_1(dir::String)
-	files = readdir(dir)
-	outcome_array = Tuple{DataAnalysis.OutputData, <:Real}[]
-	for file in files
-		path = string(dir, "/", file)
-		if occursin(".jld2", path) && occursin("gen1000", path) && occursin("Whyb1", path)
-			if occursin(".jld2", path) && occursin("gen1000", path)
-				alt_filepath = replace(path, "gen1000.0" => "gen2000")
-
-				if isfile(alt_filepath)
-					@load alt_filepath outcome
-				else
-					@load path outcome
-				end
+	try
+		files = readdir(dir)
+		for file in files
+			path = string(dir, "/", file)
+			if occursin(".jld2", path)
+				@load path outcome
 
 				println(outcome.sim_params)
-				width = mean(outcome.hybrid_zone_width[(end-19):end])
-				if true #width < 20 * outcome.sim_params.sigma_disp
-					push!(outcome_array, (outcome, outcome.sim_params.S_AM))
+
+				if outcome.sim_params.S_AM in S_AM_set
+					outcome_array[
+						indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+						indexin(outcome.sim_params.S_AM, S_AM_set)[1],
+					] = outcome
 				end
 			end
 		end
+	catch
 	end
 	return outcome_array
 end
-
 
 """
 	plot_fitnesses(fitnesses::Vector{<:Dict})
@@ -759,4 +846,294 @@ function summarize_gene_correlations(source_dir::String; filename = "gene_correl
 	readline()
 end
 
+function calc_extinction_frequencies()
+	extinctions_array = Array{Integer, 2}(
+		undef, length(w_hyb_set), length(S_AM_set),
+	)
 
+	for j in eachindex(extinctions_array)
+		extinctions_array[j]=0
+	end
+
+	for i in 1:3
+		source_dir = "HZAM-J_2D_results_categorized/mmt_three_loci/Run3_three_loci_$i"
+		files = readdir(source_dir)
+
+		for file in files
+			path = string(source_dir, "/", file)
+			@load path outcome_array
+			for j in eachindex(extinctions_array)
+				if ismissing(outcome_array[j])
+					continue
+				end
+				categorized_outcome = Integer(outcome_array[j])
+				if outcome_array[j] == 6
+					extinctions_array[j] += 1
+				end
+			end
+		end
+	end
+
+	return extinctions_array
+end
+
+function calc_overlap_difference(folder1, folder2)
+	overlap_outcomes1 = 0
+
+	overlap_outcomes2 = 0
+
+	for i in 1:3
+		source_dir = "HZAM-J_2D_results_categorized/mmt_three_loci/Run3_three_loci_$i"
+		files = readdir(source_dir)
+
+		@load string(source_dir, "/", folder1) outcome_array
+		outcome_array1 = outcome_array
+
+		@load string(source_dir, "/", folder2) outcome_array
+		outcome_array2 = outcome_array
+
+		overlap_outcomes1 += count(x->x == 4, outcome_array1)
+		overlap_outcomes2 += count(x->x == 4, outcome_array2)
+
+
+		@load string(source_dir, "/", folder1) parameters_array
+
+		for j in eachindex(parameters_array)
+			if parameters_array[j].S_AM == 300
+				if outcome_array1[j]==4
+					overlap_outcomes1 += 1
+				end
+
+				if outcome_array2[j] == 4
+					overlap_outcomes2 += 1
+				end
+			end
+		end
+	end
+
+	return overlap_outcomes1 / overlap_outcomes2
+end
+
+function calc_outcome_frequencies(outcome; S_AM_range = 1:8, w_hyb_range = 1:13)
+	folders = [
+		"full_pleiotropy",
+		"separate_hst",
+		"separate_mmt",
+		"separate_fmt",
+		"low_reject_separate_fmt",
+		"high_reject_separate_fmt",
+		"no_pleiotropy",
+		"low_reject_no_pleiotropy",
+		"high_reject_no_pleiotropy",
+	]
+
+	function calc_outcome_frequency(folder)
+		outcomes = 0
+		extinction_outcomes = 0
+		for i in 1:3
+			source_dir = "HZAM-J_2D_results_categorized/mmt_three_loci/Run3_three_loci_$i"
+			@load "$source_dir/$folder.JLD2" outcome_array
+			@load "$source_dir/$folder.JLD2" parameters_array
+			outcome_array = outcome_array[w_hyb_range, S_AM_range]
+			parameters_array = parameters_array[w_hyb_range, S_AM_range]
+			outcomes += length(outcome_array)
+			extinction_outcomes += count(x->x==outcome, outcome_array)
+		end
+
+		return extinction_outcomes / outcomes
+	end
+
+	return Dict(zip(folders, map(x->calc_outcome_frequency(x), folders)))
+end
+
+"""
+	extract_data(source_folder::String, source_setup::String, output_folder::String, categorization_loci::String)
+
+Load all of the simulation outcomes in a folder and condense the data by removing anything not used in the paper.
+
+# Arguments
+- `source_folder::String`: the folder where the simulation outcomes are stored
+- `source_setup::String`: the simulation setup of interest (i.e. "no_pleiotropy)
+- `output_folder::String`: where the output is to be stored
+- `categorization_loci::String`: whether mmt or fmt is used for categorizing outcomes
+"""
+function extract_data(source_folder::String, source_setup::String, output_folder::String, categorization_loci::String)
+	source_dir = string(source_folder, "/", source_setup)
+	files=[]
+	try
+		files = readdir(source_dir)
+	catch
+		return
+	end
+	outcome_array = Array{Integer, 2}(
+		undef, length(w_hyb_set), length(S_AM_set),
+	)
+	parameters_array = Array{Union{DataAnalysis.SimParams, Missing}, 2}(
+		undef, length(w_hyb_set), length(S_AM_set),
+	)
+	overlap_array = Array{Union{<:Real, Missing}, 2}(
+		undef, length(w_hyb_set), length(S_AM_set),
+	)
+	bimodality_array = Array{Union{<:Real, Missing}, 2}(
+		undef, length(w_hyb_set), length(S_AM_set),
+	)
+	for i in eachindex(outcome_array)
+		outcome_array[i] = 7
+		parameters_array[i] = missing
+		overlap_array[i] = missing
+		bimodality_array[i] = missing
+	end
+	for file in files
+		path = string(source_dir, "/", file)
+		if occursin(".jld2", path)
+			@load path outcome
+
+			if categorization_loci == "fmt"
+				loci = outcome.sim_params.female_mating_trait_loci
+			else
+				loci = outcome.sim_params.male_mating_trait_loci
+			end
+
+			outcome_array[
+				indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+				indexin(outcome.sim_params.S_AM, S_AM_set)[1],
+			] = categorize(outcome; categorization_loci)
+			parameters_array[
+				indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+				indexin(outcome.sim_params.S_AM, S_AM_set)[1],
+			] = outcome.sim_params
+			overlap_array[
+				indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+				indexin(outcome.sim_params.S_AM, S_AM_set)[1],
+			] = HZAM.Population.calc_species_overlap(
+				outcome.population_data.population,
+				0.03,
+				0.01,
+				loci,
+			)[1]
+			bimodality_array[
+				indexin(outcome.sim_params.w_hyb, w_hyb_set)[1],
+				indexin(outcome.sim_params.S_AM, S_AM_set)[1],
+			] = HZAM.DataAnalysis.calc_bimodality(outcome.population_data, loci)
+		end
+	end
+	results_folder = mkpath(output_folder)
+	@save string(results_folder, "/", source_setup, ".JLD2") outcome_array parameters_array overlap_array bimodality_array
+end
+
+"""
+	extract_all(source_dir::String, output_dir::String; set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9, categorization_loci = "mmt")
+
+Condense all of the simulation results data into a format easier to work with.
+
+# Arguments
+- `source_dir::String`: the directory storing the simulation outcomes
+- `output_dir::String`: the output directory to be created
+- `set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9`: the simulation setups used
+- `categorization_loci = "mmt"`: the loci used to categorized simulation outcomes (either "fmt" or "mmt")
+"""
+function extract_all(source_dir::String, output_dir::String; set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9, categorization_loci = "mmt")
+	input_folders = readdir(source_dir)
+	for folder in input_folders
+		for set in set_numbers
+			try
+				extract_data("$(source_dir)/$folder", set_names[set], "$(output_dir)/$folder", categorization_loci)
+			catch
+			end
+		end
+	end
+end
+
+"""
+	first_to_three(source_dir::String, output_dir::String; set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9, categorization_loci = "mmt")
+
+Check if any parameter setups have not resulted in three of the same outcome type and run another round of simulations for those parameter setups.
+
+# Arguments
+- `source_dir::String`: the directory storing the simulation outcomes
+- `output_dir::String`: the output directory to be created
+- `set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9`: the simulation setups used
+- `categorization_loci = "mmt"`: the loci used to categorized simulation outcomes (either "fmt" or "mmt")
+"""
+function first_to_three(source_dir::String, output_dir::String; set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9, categorization_loci = "mmt")
+	completed = true
+
+	w_hyb_set = [1, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+
+	S_AM_set = [1, 3, 10, 30, 100, 300, 1000, Inf]
+
+	function first_to_three(outcomes)
+		for i in 1:6
+			occurences = count(x->x==i, outcomes)
+			if occurences ≥ 3
+				return i
+			end
+		end
+		return 7
+	end
+
+	for set_number in set_numbers
+		println(set_names[set_number])
+		outcome_arrays = HZAM.read_directory(source_dir, set_names[set_number])
+
+		categorized_outcome_arrays = [categorize.(outcome_array; categorization_loci) for outcome_array in outcome_arrays]
+
+
+		first_to_three_outcome_array = first_to_three.([getindex.(categorized_outcome_arrays, i) for i in CartesianIndices(outcome_arrays[1])])
+
+		indices = findall(x->x==7, first_to_three_outcome_array)
+
+		println(indices)
+		if length(indices) > 0
+			completed = false
+		end
+
+		results_folder = mkpath("$(output_dir)/$(set_names[set_number])")
+		@sync @distributed for i in indices
+			w_hyb = w_hyb_set[i[1]]
+			S_AM = S_AM_set[i[2]]
+
+			sample = outcome_arrays[1][i]
+
+			run_name =
+				string(
+					"HZAM_simulation_run_gen", sample.sim_params.max_generations, "_SC",
+					sample.sim_params.per_reject_cost, "_Whyb", sample.sim_params.w_hyb,
+					"_SAM", sample.sim_params.S_AM,
+				)
+
+
+			println("Beginning: $run_name")
+			# run one simulation by calling the function defined above:
+			outcome = HZAM.run_one_HZAM_sim(
+				w_hyb,
+				S_AM,
+				sample.sim_params.intrinsic_R;
+				K_total = sample.sim_params.K_total,
+				max_generations = sample.sim_params.max_generations,
+				total_loci = sample.sim_params.total_loci,
+				female_mating_trait_loci = sample.sim_params.female_mating_trait_loci,
+				male_mating_trait_loci = sample.sim_params.male_mating_trait_loci,
+				hybrid_survival_loci = sample.sim_params.hybrid_survival_loci,
+				per_reject_cost = sample.sim_params.per_reject_cost,
+				sigma_disp = sample.sim_params.sigma_disp,
+				do_plot = false,
+				cline_width_loci,
+			)
+			println("Ending: $run_name")
+
+			if !isnothing(outcome)
+				run_name_full_gen =
+					string(
+						"HZAM_simulation_run_gen", sample.sim_params.max_generations, "_SC",
+						sample.sim_params.per_reject_cost, "_Whyb", sample.sim_params.w_hyb,
+						"_SAM", sample.sim_params.S_AM,
+					)
+				filename = string(results_folder, "/", run_name_full_gen, ".jld2")
+				@save filename outcome
+			end
+		end
+	end
+
+	return completed
+end

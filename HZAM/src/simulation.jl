@@ -29,6 +29,8 @@ Run a single HZAM simulation.
 - `gene_plot=false`: if true, generates phenotype plots.
 - `save_plot=false`: if true, saves each plot to a PNG file.
 - `run_name="temp": the name of the output file`
+- `cline_width_loci`: either "mmt" or "fmt", sets the loci used to determine simulation outcomes.
+- `mating_preference_type`: either "additive" or "multivariate", determines how the preference loci affect match strength.
 """
 function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	# the semicolon makes the following optional keyword arguments  
@@ -38,7 +40,8 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 	per_reject_cost = 0, sigma_disp = 0.03f0,
 	sigma_comp = 0.01f0, do_plot = true, plot_int = 10, gene_plot = false, save_plot = false,
 	run_name = "temp",
-	cline_width_loci = "mmt")
+	cline_width_loci = "mmt",
+	mating_preference_type = "additive")
 
 
 	parameters = DataAnalysis.SimParams(
@@ -55,11 +58,17 @@ function run_one_HZAM_sim(w_hyb::Real, S_AM::Real, intrinsic_R::Real;
 		per_reject_cost,
 	)
 
-	if cline_width_loci== "mmt"
+	if cline_width_loci == "mmt"
 		cline_width_loci = male_mating_trait_loci
 	elseif cline_width_loci == "fmt"
 		cline_width_loci = female_mating_trait_loci
 		println("Measuring FMT cline width")
+	end
+
+	if mating_preference_type == "multivariate"
+		calc_match_strength = Mating.calc_match_strength_multivariate
+	else
+		calc_match_strength = Mating.calc_match_strength
 	end
 
 	mmt_phenotype_counts = []

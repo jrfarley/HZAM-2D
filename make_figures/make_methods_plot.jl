@@ -4,8 +4,10 @@ using JLD2 # needed for saving / loading data in Julia format
 using CairoMakie # used for plotting
 using Colors
 
-@load "$(dirname(@__DIR__))/HZAM-2D_Julia_results_GitIgnore/example_outcomes/magic_preference" outcome
+@load "$(dirname(@__DIR__))/HZAM-J_2D_results/example_simulation_for_fig.jld2" outcome
 
+print(outcome.bimodality)
+print(outcome.population_overlap)
 pd = outcome.population_data
 
 genotypes = [
@@ -27,8 +29,8 @@ fig = Figure(resolution = (1600, 1000))
 # create the axis and labels
 ax = Axis(
 	fig[1, 1],
-	xlabel = "x",
-	ylabel = "y",
+	xlabel = "𝑥",
+	ylabel = "𝑦",
 	xlabelsize = 30,
 	ylabelsize = 30,
 	xticklabelsize = 30,
@@ -50,7 +52,7 @@ points = scatter!(
 )
 
 
-Colorbar(fig[:, 0], points, ticklabelsize = 30, flipaxis = false, label = "Male mating trait", labelsize = 30)
+Colorbar(fig[:, 0], points, ticklabelsize = 30, flipaxis = false, label = "Mating cue trait value", labelsize = 30)
 
 # y coordinates of each transect
 y_coords = collect(0.1:0.2:0.9)
@@ -70,7 +72,7 @@ for i in 1:5
 		sigmoid_axis,
 		Axis(
 			g[6-i, 1],
-			xlabel = "x",
+			xlabel = "𝑥",
 			xlabelsize = 30,
 			xticklabelsize = 30,
 			xgridvisible = false,
@@ -92,7 +94,7 @@ for i in 1:5
 		color = (:gray, 0.5))
 	text!(
 		Point.(0.1, 0.8),
-		text = "y = $(y_coords[i])",
+		text = "𝑦 = $(y_coords[i])",
 		align = (:center, :center),
 		color = :black,
 		fontsize = 30,
@@ -107,4 +109,4 @@ colsize!(fig.layout, 2, Relative(3 / 7))
 
 display(fig)
 
-save(string("$(dirname(@__DIR__))/figures/methods_fig.png"), fig)
+save(string("$(dirname(@__DIR__))/figures/methods_fig1.png"), fig)
