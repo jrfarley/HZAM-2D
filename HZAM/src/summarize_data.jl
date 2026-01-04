@@ -119,7 +119,7 @@ function run_HZAM_sets_complete_one_locus(run_name;
 	max_generations::Integer = 1500,
 	K_total::Integer = 20000,
 )
-	dir = "HZAM-J_2D_results/$(run_name)_one_locus_$(Dates.format(today(), "yyyymmdd"))"
+	dir = "HZAM-J_2D_results/$(run_name)_one_locus"
 
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
@@ -181,6 +181,7 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 	K_total::Integer = 20000,
 	cline_width_loci = "mmt",
 )
+	dir = "HZAM-J_2D_results/$(run_name)_nine_loci"
 	dir = "HZAM-J_2D_results/$(run_name)_nine_loci"
 
 	set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separate_fmt",
@@ -308,61 +309,6 @@ function is_blended(outcome)::Bool
 	test = mk_original_test(cline_widths)
 
 	return test.trend=="increasing"
-end
-
-
-
-"""
-	run_HZAM_sets_supplemental(run_name::String;
-		w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
-		S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-		max_generations::Integer = 2000,
-		K_total::Integer = 30000,
-	)
-
-Run an extra set of simulations and save the outcomes to `results_folder`. Currently setup 
-to run no pleiotropy and full pleitropy sets with one locus.
-
-# Arguments
-
-- `run_name::String`: the name of the run.
-- `w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which w_hyb values to use.
-- `S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}}`: which S_AM values to use.
-- `max_generations::Integer`: how many generations to run the simulations for.
-- `K_total::Integer`: the carrying capacity of the simulated range.
-"""
-function run_HZAM_sets_supplemental(run_name::String;
-	w_hyb_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = w_hyb_set,
-	S_AM_set_of_run::Union{UnitRange{<:Real}, Vector{<:Real}} = S_AM_set,
-	max_generations::Integer = 2000,
-	K_total::Integer = 30000,
-)
-	set_names = ["one_locus_full_pleiotropy", "one_locus_no_pleiotropy",
-		"two_loci_full_pleiotropy", "two_loci_no_pleiotropy"]
-	total_loci = [1, 3, 2, 6]
-	female_mating_trait_loci = [[1], [2], 1:2, 3:4]
-	male_mating_trait_loci = [[1], [3], 1:2, 5:6]
-	hybrid_survival_loci = [[1], [1], 1:2, 1:2]
-	per_reject_cost = [0, 0, 0, 0]
-
-	println("$(nprocs()) threads running")
-	@async @distributed for i in set_numbers
-		run_HZAM_set(
-			set_names[i],
-			total_loci[i],
-			female_mating_trait_loci[i],
-			male_mating_trait_loci[i],
-			hybrid_survival_loci[i],
-			per_reject_cost[i],
-			w_hyb_set_of_run,
-			S_AM_set_of_run;
-			max_generations,
-			K_total,
-		)
-		println("--------------------")
-		println(string(set_names[i], " completed successfully!"))
-		println("--------------------")
-	end
 end
 
 
