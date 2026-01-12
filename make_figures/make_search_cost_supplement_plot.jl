@@ -11,7 +11,7 @@ colors = [
 	RGB(166 / 255, 206 / 255, 227 / 255),
 	RGB(31 / 255, 120 / 255, 180 / 255),
 	RGB(177 / 255, 89 / 255, 40 / 255),
-	RGB(0 / 255, 0 / 255, 0 / 255)#,
+	RGB(0 / 255, 0 / 255, 0 / 255),#,
 	#RGB(255 / 255, 255 / 255, 255 / 255),
 ]
 
@@ -50,6 +50,9 @@ function load_four_outcomes(index, path)
 		println(parameters)
 	end
 
+	println(parameters)
+	readline()
+
 	return outcomes
 end
 
@@ -66,9 +69,12 @@ function subplot(path, gl)
 	println(grid_data)
 
 	for i in 1:length(sc_set), j in 1:length(S_AM_set)
-		ax = Axis(gl[i,j], aspect = 1)
+		ax = Axis(gl[i, j], #aspect = 1,
+			xgridvisible = false, ygridvisible = false,
+			aspect = DataAspect(),
+		)
 
-		data = grid_data[i,j]
+		data = grid_data[i, j]
 
 		# Count categories
 		counts = [count(==(k), data) for k in 1:6]
@@ -80,36 +86,77 @@ function subplot(path, gl)
 		pie!(ax, fracs, color = colors)
 		hidedecorations!(ax)  # hides ticks, grid and lables
 		hidespines!(ax)  # hide the frame
+
 	end
 
 	for i in 1:length(sc_set)
-		Label(gl[i,0], "$(sc_set[i]*100)", tellwidth=false)
+		Label(gl[i, 0], "$(sc_set[i]*100)", tellwidth = false)
 	end
 	for i in 1:length(S_AM_set)
-		Label(gl[7, i], "$(S_AM_set[i])", tellwidth=false)
+		Label(gl[7, i], "$(S_AM_set[i])", tellwidth = false)
 	end
 
-	Label(gl[1:6,-1], "Search cost (%)", rotation=pi/2, tellwidth=false)
+	Label(gl[1:6, -1], "Search cost (%)", rotation = pi/2, tellwidth = false)
 	colsize!(gl, -1, 15)
-	Label(gl[8,1:6], "Strength of conspecific mate preference", tellwidth=false)
-	#Box(gl[1,0], color = :transparent, strokecolor = :black, strokewidth = 2)
+
+	colsize!(gl, 0, 30)
+
+	for i in 1:6
+		colsize!(gl, i, 30)
+		rowsize!(gl, i, 30)
+	end
+
+	Label(gl[8, 1:6], "Strength of conspecific mate preference", tellwidth = false)
+
+	rowgap!(gl, 10)
+	colgap!(gl, 10)
+end
+
+function trial()
+	fig = Figure(resolution = (900, 1100))
+	g = fig[1, 1] = GridLayout(hgap = 0, vgap = 0)
+
+	gl = g[1, 1] = GridLayout(hgap = 0, vgap = 0)
+
+	group_color = [PolyElement(color = color, strokecolor = :transparent)
+				   for color in colors]
+	labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended", "One species", "Uncategorizable"]
+
+	#=
+		leg = Legend(
+			fig[2, :],
+			group_color[1:6],
+			labels[1:6],
+			orientation = :horizontal,
+			tellheight = true,
+			labelsize = 20,
+			nbanks = 2,
+			labelvalign = :center,
+		)
+	=#
+	path = "HZAM-J_2D_results_categorized/supplement/multivariate_replicate"
+	subplot(path, gl)
+	colsize!(g, 1, Aspect(1, 1))
+	colgap!(g, 1, 100)
+	#resize_to_layout!(fig)
+	display(fig)
 end
 
 function make_plot(path)
 	paths = [
-		"HZAM-J_2D_results_categorized/supplement/multivariate_replicate",
-		"HZAM-J_2D_results_categorized/supplement/multivariate_w_hyb_095",
 		"HZAM-J_2D_results_categorized/supplement/one_mmt_one_fmt_replicate",
 		"HZAM-J_2D_results_categorized/supplement/one_mmt_one_fmt_w_hyb_095",
 		"HZAM-J_2D_results_categorized/supplement/one_mmt_three_fmt_replicate",
-		"HZAM-J_2D_results_categorized/supplement/one_mmt_three_fmt_w_hyb_095"
+		"HZAM-J_2D_results_categorized/supplement/one_mmt_three_fmt_w_hyb_095",
+		"HZAM-J_2D_results_categorized/supplement/multivariate_replicate",
+		"HZAM-J_2D_results_categorized/supplement/multivariate_w_hyb_095",
 	]
 
-	fig = Figure(resolution = (900,1100))
-	g = fig[1,1] = GridLayout()
+	fig = Figure(resolution = (900, 1100))
+	g = fig[1, 1] = GridLayout(hgap = 0, vgap = 0)
 
 	for i in 1:6
-		gl = g[2*((i+1)÷2)-1, 2+(-1)^(i%2)] = GridLayout()
+		gl = g[2*((i+1)÷2)-1, 2+(-1)^(i%2)] = GridLayout(hgap = 0, vgap = 0)
 		subplot(paths[i], gl)
 		#Box(g[(i-1)÷2 + 1, (i-1) % 2 + 1], color = :transparent, strokecolor = :black) 
 	end
@@ -117,21 +164,22 @@ function make_plot(path)
 	#Box(fig[1,1], color = :transparent, strokecolor = :black) 
 
 	#Label(g[:,2], "")
-	Label(g[0,1], "100% Hybrid fitness", tellwidth=false, fontsize=LABELSIZE)
-	Label(g[0,3], "95% Hybrid fitness", tellwidth=false, fontsize = LABELSIZE)
-	colsize!(g, 2, 10)
+	Label(g[0, 1], "100% Hybrid fitness", tellwidth = false, fontsize = LABELSIZE)
+	Label(g[0, 3], "95% Hybrid fitness", tellwidth = false, fontsize = LABELSIZE)
+	colsize!(g, 2, 60)
 
-	Label(g[1,0], "Multivariate preference", rotation = π/2, tellwidth=false, fontsize=LABELSIZE)
-	Label(g[3,0], "Single locus preference", rotation = π/2, tellwidth=false, fontsize=LABELSIZE)
-	Label(g[5,0], "Multilocus preference", rotation = π/2, tellwidth=false, fontsize=LABELSIZE)
+	Label(g[1, 0], "One locus", rotation = π/2, tellwidth = false, fontsize = LABELSIZE)
+	Label(g[3, 0], "Three additive loci", rotation = π/2, tellwidth = false, fontsize = LABELSIZE)
+	Label(g[5, 0], "Three non-additive loci", rotation = π/2, tellwidth = false, fontsize = LABELSIZE)
 	colsize!(g, 0, LABELSIZE)
+
 	rowsize!(g, 2, 10)
 	rowsize!(g, 4, 10)
-	
+
 	#rowgap!(g, 50)
 	#colgap!(g, 50)
 	group_color = [PolyElement(color = color, strokecolor = :transparent)
-			   for color in colors]
+				   for color in colors]
 	labels = ["Bimodal hybrid zone", "Unimodal hybrid zone", "Narrow overlap zone", "Broad overlap zone", "Blended", "One species", "Uncategorizable"]
 
 
@@ -147,9 +195,12 @@ function make_plot(path)
 	)
 
 
+	resize_to_layout!(fig)
 	display(fig)
 	save("$(dirname(@__DIR__))/figures/test_supplement.png", fig)
 	#readline()
 end
 
 make_plot("HZAM-J_2D_results_categorized/supplement/multivariate_w_hyb_095")
+
+#trial()

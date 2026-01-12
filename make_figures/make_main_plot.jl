@@ -44,11 +44,11 @@ names = [
 	"Matching",
 	"Magic Preference",
 	"Magic Cue (MC)",
-	"Low Reject Cost, MC",
-	"High Reject Cost, MC",
+	"Low Search Cost, MC",
+	"High Search Cost, MC",
 	"No Pleiotropy (NP)",
-	"Low Reject Cost, NP",
-	"High Reject Cost, NP",
+	"Low Search Cost, NP",
+	"High Search Cost, NP",
 ]
 
 "Colour squares for the legend"
@@ -145,7 +145,7 @@ function make_main_plot(dir, set_numbers)
 	save("$(dirname(@__DIR__))/figures/main_plot_test.png", f)
 end
 
-function make_plot_first_to_three4(outcome_folders, set_numbers, output_name)
+function make_plot_first_to_three(outcome_folders, set_numbers, output_name; single_row = false)
 	first_to_three_outcome_arrays = Vector{<:Any}(undef, 11)
 
 	function first_to_three(categorized_outcomes)
@@ -175,15 +175,20 @@ function make_plot_first_to_three4(outcome_folders, set_numbers, output_name)
 		first_to_three_outcome_arrays[set] = first_to_three_outcome_array
 	end
 
-	f = Figure(size = (1000, 500), pt_per_unit = 2)#Figure(size = (1000, 1150), pt_per_unit = 2)
+	if !single_row
+		f = Figure(size = (1000, 1150), pt_per_unit = 2)
+	else
+		f=Figure(size = (1000, 500), pt_per_unit = 2)
+	end
 
 	g = f[1, 1] = GridLayout()
 	axes = Vector{<:Any}(undef, 9)
 
 
 	for i in set_numbers
+		row = single_row ? 1 : Int(ceil(i / 3))
 		ax = Axis(
-			g[Int(1#=ceil(i / 3)=#), (i-1)%3+1],
+			g[row, (i-1)%3+1],
 			xlabel = "S_AM",
 			ylabel = "w_hyb",
 			xticklabelrotation = π / 2,
@@ -215,11 +220,10 @@ function make_plot_first_to_three4(outcome_folders, set_numbers, output_name)
 	readline()
 end
 
-
-#make_plot_first_to_three(["HZAM-J_2D_results_categorized/mmt_one_locus/Run3_one_locus_$i" for i in 1:10], 1:9, "one_locus_mmt")
-
-#make_plot_first_to_three(["HZAM-J_2D_results_categorized/fmt_three_loci/fmt_clines_three_loci_$i" for i in 1:11], 4:6, "three_loci_fmt")
-
+#make_plot_first_to_three(["HZAM-J_2D_results_categorized/mmt_three_loci/Run3_three_loci_$i" for i in 1:11], 1:9, "three_loci_mmt")
+#make_plot_first_to_three(["HZAM-J_2D_results_categorized/mmt_nine_loci/Run3_nine_loci_$i" for i in 1:10], 1:9, "nine_loci_mmt")
+#make_plot_first_to_three(["HZAM-J_2D_results_categorized/mmt_one_locus/Run3_one_locus_$i" for i in 1:9], 1:9, "one_locus_mmt")
+make_plot_first_to_three(["HZAM-J_2D_results_categorized/fmt_three_loci/fmt_clines_three_loci_$i" for i in 1:11], 4:6, "three_loci_fmt"; single_row = true)
 
 #make_main_plot()
 

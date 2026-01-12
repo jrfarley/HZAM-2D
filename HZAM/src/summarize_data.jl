@@ -28,6 +28,25 @@ global set_names = ["full_pleiotropy", "no_pleiotropy", "separate_mmt", "separat
 	"low_reject_no_pleiotropy", "high_reject_no_pleiotropy",
 	"low_reject_separate_fmt", "high_reject_separate_fmt"]
 
+struct JobParams
+	w_hyb::Real
+	S_AM::Real
+	intrinsic_R::Real
+	K_total::Int
+	max_generations::Int
+	total_loci::Int
+	female_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}}
+	male_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}}
+	hybrid_survival_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}}
+	survival_fitness_method::String
+	sc::Real
+	sigma_disp::Real
+	run_name::String
+	cline_width_loci::String
+	mating_preference_type::String
+	filename::String
+end
+
 """
 	run_HZAM_sets_complete_three_loci(;
 		set_numbers::Union{UnitRange{<:Integer}, Vector{<:Integer}} = 1:9,
@@ -70,7 +89,7 @@ function run_HZAM_sets_complete_three_loci(run_name::String;
 
 
 	println("$(nprocs()) threads running")
-	@async @distributed for i in set_numbers
+	@sync @distributed for i in set_numbers
 		run_HZAM_set(
 			set_names[i],
 			total_loci[i],
@@ -133,7 +152,7 @@ function run_HZAM_sets_complete_one_locus(run_name;
 	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 	println("$(nprocs()) threads running")
-	@async @distributed for i in set_numbers
+	@sync @distributed for i in set_numbers
 		run_HZAM_set(
 			set_names[i],
 			total_loci[i],
@@ -195,7 +214,7 @@ function run_HZAM_sets_complete_nine_loci(run_name;
 	per_reject_cost = [0, 0, 0, 0, 0, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05]
 
 	println("$(nprocs()) threads running")
-	@async @distributed for i in set_numbers
+	@sync @distributed for i in set_numbers
 		run_HZAM_set(
 			set_names[i],
 			total_loci[i],
@@ -408,71 +427,32 @@ function run_HZAM_set(
 	end # of w_hyb loop   
 end
 
-function run_HZAM_set_search_cost_supplement(
-	set_name::String,
-	total_loci::Int,
-	female_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
-	male_mating_trait_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
-	hybrid_survival_loci::Union{UnitRange{<:Integer}, Vector{<:Integer}},
-	per_reject_cost_set::Union{UnitRange{<:Real}, Vector{<:Real}},
-	S_AM_set::Union{UnitRange{<:Real}, Vector{<:Real}},
-	dir::String;
-	intrinsic_R::Real = 1.1, K_total::Int = 20000, max_generations::Int = 1500,
-	survival_fitness_method::String = "epistasis", sigma_disp = 0.03,
-	cline_width_loci = "mmt",
-	w_hyb = 1,
-	mating_preference_type = "additive",
-)
-	dir = mkpath(string(dir, "/", set_name))
-	println(per_reject_cost_set)
-	println(S_AM_set)
-
-	index_array = Array{Missing, 2}(
-		undef, length(per_reject_cost_set), length(S_AM_set),
+function job(params::JobParams)
+	println("Beginning: $(params.run_name)")
+	# run one simulation by calling the function defined above:
+	outcome = run_one_HZAM_sim(
+		params.w_hyb,
+		params.S_AM,
+		params.intrinsic_R;
+		params.K_total,
+		params.max_generations,
+		params.total_loci,
+		params.female_mating_trait_loci,
+		params.male_mating_trait_loci,
+		params.hybrid_survival_loci,
+		params.survival_fitness_method,
+		per_reject_cost = params.sc,
+		params.sigma_disp,
+		do_plot = false,
+		params.run_name,
+		params.cline_width_loci,
+		params.mating_preference_type,
 	)
+	println("Ending: $(params.run_name)")
 
-	# Loop through the different simulation sets
-	@async @distributed for i in CartesianIndices(index_array)
-		sc = per_reject_cost_set[i[1]]
-		S_AM = S_AM_set[i[2]]
-
-		run_name =
-			string(
-				"HZAM_simulation_run_gen", max_generations, "_SC",
-				sc, "_Whyb", w_hyb, "_SAM", S_AM,
-			)
-
-		println("Beginning: $run_name")
-		# run one simulation by calling the function defined above:
-		outcome = run_one_HZAM_sim(
-			w_hyb,
-			S_AM,
-			intrinsic_R;
-			K_total,
-			max_generations,
-			total_loci,
-			female_mating_trait_loci,
-			male_mating_trait_loci,
-			hybrid_survival_loci,
-			survival_fitness_method,
-			per_reject_cost = sc,
-			sigma_disp,
-			do_plot = false,
-			run_name = run_name,
-			cline_width_loci,
-		)
-		println("Ending: $run_name")
-
-		if !isnothing(outcome)
-			run_name_full_gen =
-				string(
-					"HZAM_simulation_run_gen", max_generations, "_SC",
-					sc, "_Whyb", w_hyb, "_SAM", S_AM,
-				)
-			filename = string(dir, "/", run_name_full_gen, ".jld2")
-			@save filename outcome
-		end
-	end # of S_AM loop
+	if !isnothing(outcome)
+		@save params.filename outcome
+	end
 end
 
 
